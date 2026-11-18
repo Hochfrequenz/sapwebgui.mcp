@@ -11,16 +11,10 @@ from sapwebguimcp.backend.manager import (
 )
 
 
-def test_backend_manager_is_webgui() -> None:
-    """The backend type is fixed to 'webgui'."""
-    assert BackendManager().backend_type == "webgui"
-
-
 def test_get_backend_manager_is_singleton() -> None:
     """get_backend_manager should lazily create one shared manager."""
     reset_backend_manager()
     manager = get_backend_manager()
-    assert manager.backend_type == "webgui"
     assert get_backend_manager() is manager
     reset_backend_manager()
 

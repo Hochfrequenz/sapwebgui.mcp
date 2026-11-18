@@ -24,10 +24,9 @@ from sapwebguimcp.server import mcp
 _PATCH_GET_BACKEND = "sapwebguimcp.tools.sap_tools.get_backend"
 
 
-def _make_backend(backend_type: str = "webgui", **overrides) -> AsyncMock:
+def _make_backend(**overrides) -> AsyncMock:
     """Create a mock backend with sensible defaults for general-purpose tools."""
     backend = AsyncMock()
-    backend.backend_type = backend_type
     backend.check_popup = AsyncMock(return_value=overrides.get("popup", None))
     backend.click_button = AsyncMock(return_value=None)
     backend.click_tab = AsyncMock(return_value=None)

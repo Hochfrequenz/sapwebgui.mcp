@@ -164,7 +164,6 @@ def test_valid_filters_are_accepted() -> None:
 
 def _backend() -> Any:
     backend = MagicMock(spec=WebGuiBackend)
-    backend.backend_type = "webgui"
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
     backend.get_status_bar = AsyncMock(return_value=StatusBarInfo(type="S", message=""))
     backend.press_key = AsyncMock()

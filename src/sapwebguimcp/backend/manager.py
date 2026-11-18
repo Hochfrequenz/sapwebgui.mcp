@@ -15,7 +15,6 @@ class BackendManager:  # pylint: disable=too-few-public-methods
     """Manages WebGUI backend instances across sessions."""
 
     def __init__(self) -> None:
-        self.backend_type = "webgui"
         self._backends: dict[str, WebGuiBackend] = {}  # Cache by session ID
         self._page_ids: dict[str, int] = {}  # Track page identity for cache invalidation
 
@@ -74,17 +73,6 @@ async def get_backend(
     """
     manager = get_backend_manager()
     return await manager.get_or_create(session, agent_id, tool_name)
-
-
-async def get_webgui_backend(
-    session: str | None = None,
-    agent_id: str | None = None,
-    tool_name: str = "",
-) -> WebGuiBackend:
-    """Get a WebGuiBackend instance. Asserts backend_type is webgui."""
-    backend = await get_backend(session, agent_id, tool_name)
-    assert isinstance(backend, WebGuiBackend)
-    return backend
 
 
 async def close_backend() -> None:
