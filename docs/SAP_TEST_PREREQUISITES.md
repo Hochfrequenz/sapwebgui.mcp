@@ -1,8 +1,12 @@
 # SAP Test Prerequisites
 
-This document describes everything needed to run integration tests on a fresh SAP system. The test suite supports two backends — set up whichever you'll be developing against (or both).
+This document describes everything needed to run the integration tests on a fresh SAP system. The tests drive SAP Web GUI in a Chrome browser. Unit tests do not need any of this (`uv run --group tests python -m pytest unittests/ -m "not integration"`).
 
-## SAP System Configuration (both backends)
+## SAP System Configuration
+
+### SAP Web GUI
+
+The ICF service `/sap/bc/gui/sap/its/webgui` must be active on the system, and the test user must be able to log on to it with user and password.
 
 ### User Permissions
 
@@ -31,40 +35,23 @@ The required test objects are maintained in an abapGit repository:
 
 Install via abapGit pull, or create manually:
 
-| Object                              | Transaction | Details                                                                                                                                                              |
-| ----------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Report `ZTEST_MCP_EDIT`             | SE38        | Must contain `REPORT ZTEST_MCP_EDIT.` + `WRITE 'MCP test report'.`                                                                                                   |
-| Class `ZCL_TEST_MCP_EDIT`           | SE24        | Public class with method `DO_SOMETHING`                                                                                                                              |
-| Class `ZCL_SAPGUIMCP_ORIGLANG_TEST` | SE24        | Local (`$TMP`) class with original language **EN**, i.e. different from the DE logon language of the test user (optional: the language dialog test skips without it) |
+| Object                    | Transaction | Details                                                            |
+| ------------------------- | ----------- | ------------------------------------------------------------------ |
+| Report `ZTEST_MCP_EDIT`   | SE38        | Must contain `REPORT ZTEST_MCP_EDIT.` + `WRITE 'MCP test report'.` |
+| Class `ZCL_TEST_MCP_EDIT` | SE24        | Public class with method `DO_SOMETHING`                            |
 
 Creating these objects generates **transport requests** owned by the test user (needed for SE09 tests).
 
-Create `ZCL_SAPGUIMCP_ORIGLANG_TEST` **logged on in EN** (SE24, Create, Local Object, activate), because SAP takes the original language from the logon language. Creating it through ADT does not work: ADT uses the configured DE logon language, so `TADIR-MASTERLANG` would be `D`. Verify with `SELECT MASTERLANG FROM TADIR WHERE PGMID = 'R3TR' AND OBJECT = 'CLAS' AND OBJ_NAME = 'ZCL_SAPGUIMCP_ORIGLANG_TEST'` (expected `E`). Switching it to change mode in a DE session shows the dialog `SAPLSETX` 0100 ("Abweichende Original- und Anmeldesprache", #1087).
-
-> **Note**: The ABAP editor exists in two flavours, selected per user in
-> _SE38 → Hilfsmittel/Utilities → Einstellungen/Settings → ABAP Editor → Editor_:
-> "Quellcode-basierter Editor" drives the `GuiAbapEditor` control, "Text-basierter Editor"
-> the `GuiTextedit` control. The backend takes a different code path for each
-> (see `src/sapwebguimcp/backend/desktop/_abap_editor.py`), so the edit tests only cover the
-> flavour the test user has configured. Issue #859 only affected `GuiAbapEditor`. To cover
-> both, run the desktop edit tests once per setting.
-
-> **Note**: Test object names are centralized in `unittests/desktop/conftest.py` (`TEST_REPORT`, `TEST_CLASS`, `TEST_METHOD`). If you use different names, update them there.
-
 ### abapGit test repositories
 
-Two public GitHub repositories (`Hochfrequenz/...`) back the abapGit and edit tests. They must be registered in abapGit on the SAP system as follows:
+Two public GitHub repositories (`Hochfrequenz/...`) back the abapGit and edit tests. They must be registered in abapGit on the SAP system:
 
-| Repository                         | Must be registered in abapGit on                                                                        | Used by                                     | Branches                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------- |
-| `Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` | S/4HANA systems (required). ERP 6.0 systems: optional, the dependent desktop tests skip if it is absent | abapGit integration tests (desktop, WebGUI) | `main`, `test/branch-switch` |
-| `Z_MCP_TEST_EDITABLE_WB_OBJECTS`   | all system types (provides `ZTEST_MCP_EDIT`, `ZCL_TEST_MCP_EDIT`)                                       | edit / SE09 tests                           | `main`, `test/branch-switch` |
+| Repository                         | Used by                                       |
+| ---------------------------------- | --------------------------------------------- |
+| `Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` | abapGit pull and list tests                   |
+| `Z_MCP_TEST_EDITABLE_WB_OBJECTS`   | edit tests, SE09 tests (provides the objects) |
 
-- Desktop tests that need `Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` (`test_abapgit_pull_public_repo`, `test_abapgit_pull_returns_status_message`, `test_abapgit_pull_without_trkorr_returns_transport_guidance`, `test_abapgit_list_repos`) first list the registered repositories and skip with a reason naming the repository if it is missing. They skip only when the listing succeeded and returned at least one repository; a failed or empty listing never causes a skip, so a broken listing still fails visibly. The repository name is matched exactly.
-- `test/branch-switch` is a copy of `main` with a changed `WRITE` text. It is used by the live tests of the `branch` parameter of `sap_abapgit_pull` (`test_abapgit_pull_unknown_branch_leaves_branch_unchanged`, `test_abapgit_pull_branch_failure_restores_previous_branch`, `test_abapgit_pull_branch_switch_and_back`): do not delete it and do not merge it into `main`.
-- Those tests need the optional `P_BRANCH` parameter of the report `Z_ABAPGIT_PULL_MCP_SHORTCUT` (merged; the report must be installed in a version that has it). Without it the branch pull is reported as not confirmed.
-- The pull-by-key tests (`test_abapgit_pull_by_key`, `test_abapgit_pull_by_key_with_branch`, `test_abapgit_pull_by_key_updates_last_pull`, `test_abapgit_pull_by_unknown_key`) need the `P_KEY` parameter of the report: install `Z_ABAPGIT_PULL_MCP_SHORTCUT` at main commit 4cab3b7 or later on every test system. The first three need `Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` registered as an **online** repository on a client that allows repository changes; the unknown-key test needs neither.
-- `Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` must not be pinned to a commit: a successful pull with a branch clears the pin, and the client can neither read nor restore it. The branch tests always leave the repository on its original branch.
+`Z_PUBLIC_ABAPGIT_TEST_REPOSITORY` must not be pinned to a commit. The pull tests need the report `Z_ABAPGIT_PULL_MCP_SHORTCUT` ([repository](https://github.com/Hochfrequenz/Z_ABAPGIT_PULL_MCP_SHORTCUT)) installed on the system. The public repository is also available as a git submodule under `unittests/testdata/abapgit_repos/` (run `git submodule update --init` to fetch it).
 
 ### Optional Environment Variables
 
@@ -72,125 +59,92 @@ Some live tests need values that are specific to your SAP system. They have no d
 
 | Variable                     | Used by                                         | Meaning                                                                         |
 | ---------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| `SAP_TEST_TRANSPORT`         | abapGit pull/e2e tests (WebGUI and desktop)     | A modifiable workbench transport request on which the test user has a task      |
+| `SAP_TEST_TRANSPORT`         | abapGit pull/e2e tests                          | A modifiable workbench transport request on which the test user has a task      |
 | `SAP_TEST_TRANSPORT_NO_TASK` | `test_abapgit_pull_transport_without_user_task` | A modifiable workbench transport request on which the test user has **no** task |
+| `ABAPGIT_PAT`                | abapGit tests with a private repository         | GitHub token that can read the private test repository (tests skip without it)  |
 
 The SE09 and ST22 live tests use the user returned by `sap_login`, so no user variable is needed.
 
-## Desktop Backend Setup
-
-### Server Side
-
-- **SAP GUI Scripting**: Transaction `RZ11` → parameter `sapgui/user_scripting` → set to `TRUE`
-    - Dynamic parameter, no server restart needed
-    - Users must re-login after the change (close and reopen SAP GUI)
-
-### Client Side
-
-- **SAP GUI for Windows** installed
-- **SAP GUI Scripting enabled**: Options → Accessibility & Scripting → Scripting
-    - Check "Enable Scripting"
-    - Uncheck "Notify when a script attaches to SAP GUI"
-    - Uncheck "Notify when a script opens a connection"
-- **R/3 only**: Switch ABAP editor to "text-based editor" (SE38 → Hilfsmittel → Einstellungen → ABAP Editor → "Text-basierter Editor"). The source-code-based editor does not fully expose content via COM scripting. See [#442](https://github.com/Hochfrequenz/sapgui.mcp/issues/442).
-
-### Credentials Configuration
-
-SAP credentials are configured in `~/.config/sap-mcp/systems.json` (see [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config)).
-
-`.env` only needs the language:
-
-```env
-SAP_LANGUAGE=DE
-```
-
-The connection name, user, password, and mandant are read from `systems.json`.
-
-### Running Desktop Tests
-
-Every test that requests the `backend` (desktop) or `sap_mcp_client` (WebGUI) fixture is marked `integration` automatically (see `unittests/conftest.py`). Use `-m integration` to run only live tests and `-m "not integration"` to exclude them. Marked tests generally still skip when SAP is not configured (some desktop files only gate on the Windows platform).
-
-```bash
-# All desktop integration tests
-python -m pytest unittests/desktop/ -v
-
-# Specific module
-python -m pytest unittests/desktop/test_bp_integration.py -v
-
-# Unit tests only (no SAP needed)
-python -m pytest unittests/desktop/test_com_evaluate_unit.py unittests/desktop/test_dump_tree_unit.py unittests/desktop/test_element_finder.py -v
-```
-
-The desktop integration fixture only closes the SAP GUI connections it (or the tools under test) opened itself.
-Connections that were already open before the run, such as your own SAP GUI windows, are left untouched.
-
-### Troubleshooting (Desktop)
-
-| Problem                                            | Solution                                                                            |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| "Scripting is disabled on the server"              | RZ11: set `sapgui/user_scripting = TRUE`, then re-login                             |
-| "SAP Logon connection entry not found"             | Check `default_system` in `systems.json` matches the exact description in SAP Logon |
-| SE38 edit tests read only 1 line                   | Switch to "text-based editor" in SE38 settings (R/3 only)                           |
-| SE09 tests fail — no transport requests            | Create the test objects above (generates transports automatically)                  |
-| "The 'Sapgui Component' could not be instantiated" | SAP server may be down or unreachable. Check VPN.                                   |
-| Ghost connections block login                      | Restart SAP Logon or close stale connections manually                               |
-
-## WebGUI Backend Setup
-
-### Client Side
+## Client Side
 
 - **Chrome browser** installed
-- **VPN** connected (if SAP system is on an internal network)
+- **VPN** connected (if the SAP system is on an internal network)
+- **uv** and the project environment (see [CONTRIBUTING.md](../CONTRIBUTING.md#development-setup))
 
 ### Start Chrome with Remote Debugging
+
+The tests connect to a running Chrome through the Chrome DevTools Protocol (CDP, `BROWSER_MODE=connect`, the default). Start Chrome with a separate profile directory (without `--user-data-dir`, Chrome joins an existing instance and ignores the debugging flag):
 
 ```powershell
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\temp\chrome-debug" --ignore-certificate-errors
 ```
 
-Verify it's working:
+On macOS or Linux use the Chrome binary of your system with the same flags (for example `--user-data-dir=/tmp/chrome-debug`). Verify it is working:
 
 ```powershell
 Invoke-WebRequest -Uri 'http://localhost:9222/json/version' -UseBasicParsing
 ```
 
+On Windows, the server auto-launches Chrome with these flags when none is reachable (set `CHROME_PATH` if it cannot find Chrome, see the [README](../README.md#environment-variables-server-specific)). On macOS and Linux you must start Chrome yourself.
+
 ### Credentials Configuration
 
-SAP credentials are configured in `~/.config/sap-mcp/systems.json` (see [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config)).
+SAP credentials are configured in `~/.config/sap-mcp/systems.json` (see [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config)). The `host`, user, password, client and language come from there. A system entry for the tests looks like this:
 
-`.env` only needs the URL, language and browser settings:
+```json
+{
+    "default_system": "dev",
+    "systems": {
+        "dev": {
+            "host": "https://your-sap-server:44300",
+            "client": "100",
+            "user": "your_username",
+            "password": "your_password",
+            "language": "DE"
+        }
+    }
+}
+```
+
+`.env` (in the repository root, read by pytest and by the server) only needs the test-specific settings:
 
 ```env
-SAP_URL=https://your-sap-server/sap/bc/gui/sap/its/webgui
 SAP_LANGUAGE=DE
 BROWSER_MODE=connect
 CDP_URL=http://localhost:9222
 ```
 
-### Running WebGUI Tests
+`SAP_LANGUAGE` is read by the tests only (they pick their expected UI texts and snapshot suffix from it); the language the server logs on with comes from the system's `language` in `systems.json`. Keep both the same. `SAP_URL` is used only for a system without `host`; it never overrides `host`. To run against another file, point `SAP_CONFIG_FILE` at it.
+
+## Running the Tests
+
+Every test that requests the `sap_mcp_client` fixture is marked `integration` automatically (see `unittests/conftest.py`). Use `-m integration` to run only live tests and `-m "not integration"` to exclude them. Live tests skip when SAP credentials are not configured.
 
 ```bash
-# All WebGUI integration tests
-python -m pytest unittests/webgui/ -v
+# All live tests
+uv run --group tests python -m pytest unittests/webgui/ -m integration -v
 
-# Specific module
-python -m pytest unittests/webgui/test_se16_integration.py -v
+# One module
+uv run --group tests python -m pytest unittests/webgui/test_se16_integration.py -v
 
-# Unit tests only (no SAP/Chrome needed — uses HTML snapshots)
-python -m pytest unittests/webgui/test_selectors.py -v
+# Offline selector tests (no SAP or Chrome needed, uses HTML snapshots)
+uv run --group tests python -m pytest unittests/webgui/test_selectors.py -v
 ```
+
+All live tests share one Chrome through CDP and one SAP user. Run them one process at a time.
 
 ### HTML Snapshots
 
-WebGUI unit tests validate CSS selectors against captured HTML snapshots stored in `unittests/testdata/html_snapshots/`. These are system-specific — transport numbers, usernames, and other data in the snapshots come from the system they were captured on. If you switch to a new SAP system, re-capture snapshots by running integration tests with `SAP_LANGUAGE=DE` and `SAP_LANGUAGE=EN`.
+WebGUI unit tests validate CSS selectors against captured HTML snapshots stored in `unittests/testdata/html_snapshots/`. These are system-specific: transport numbers, user names, and other data in the snapshots come from the system they were captured on. If you switch to a new SAP system, re-capture the snapshots with `scripts/recapture-snapshots.ps1` (it runs the integration tests with `SAP_LANGUAGE=DE` and `SAP_LANGUAGE=EN`).
 
-### Troubleshooting (WebGUI)
+## Troubleshooting
 
 | Problem                          | Solution                                                                   |
 | -------------------------------- | -------------------------------------------------------------------------- |
 | Chrome connection errors         | Ensure `--remote-debugging-port=9222` and `--user-data-dir` flags are set  |
 | "Cannot connect to CDP"          | Check Chrome is running, verify with `http://localhost:9222/json/version`  |
-| SAP login fails                  | Check `SAP_URL` is accessible in browser, verify credentials               |
+| SAP login fails                  | Check the system's `host` is reachable in the browser, verify credentials  |
 | OK-Code field not visible        | Enable in SAP Web GUI settings (gear icon → Settings → Show OK-Code Field) |
-| Tools timeout                    | SAP Web GUI can be slow; check Chrome window for SAP response              |
-| Snapshot tests fail after system | Re-capture HTML snapshots: run integration tests, then run unit tests      |
+| Tools timeout                    | SAP Web GUI can be slow; check the Chrome window for SAP's response        |
+| SE09 tests fail, no transports   | Create the test objects above (this generates transports automatically)    |
+| Snapshot tests fail after system | Re-capture HTML snapshots: run the integration tests, then the unit tests  |

@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 """
-abapGit integration tools for SAP (WebGUI and desktop backends).
+abapGit integration tools for SAP (WebGUI backend).
 
 This module provides:
 - List: Enumerate all registered abapGit repositories and their metadata

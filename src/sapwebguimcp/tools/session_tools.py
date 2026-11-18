@@ -68,13 +68,6 @@ async def sap_session_close_impl(session_id: str) -> SessionCloseResult:
                 f"Session '{session_id}' not found. Active: {available}."  # lang-ok: our own message
             )
 
-        if await backend.session_origin(session_id) == "attached":
-            return SessionCloseResult.failure(
-                f"Session '{session_id}' is attached (a window the user already had open) and is never closed "
-                f"by this server. Use sap_session_detach('{session_id}') to stop using it; the SAP window "
-                "stays open."
-            )
-
         closed = await backend.close_session(session_id)
         if not closed:
             return SessionCloseResult.failure(f"Failed to close session '{session_id}'.")  # lang-ok: our own message

@@ -1,60 +1,103 @@
 # Tools
 
-This directory contains MCP tool definitions for SAP Web GUI automation.
+This directory contains the MCP tool definitions of the SAP Web GUI MCP Server. Every tool drives
+SAP Web GUI in a Chrome browser through the `WebGuiBackend`.
 
 ## Module Structure
 
 ```
 tools/
-├── __init__.py            # Package exports (register functions)
-├── sap_tools.py           # High-level SAP tools
-├── browser_tools.py       # Low-level browser escape hatches
-├── se11_tools.py          # SE11 ABAP Dictionary lookup
-├── se16_tools.py          # SE16N table data query
-├── se24_tools.py          # SE24 Class Builder lookup
-├── se37_tools.py          # SE37 Function Builder lookup
-├── se93_tools.py          # SE93 Transaction Maintenance lookup
-├── sm37_tools.py          # SM37 background job lookup
-├── quick_report_tools.py  # Composite: TX → fill → F8 → read result
-└── README.md              # This file
+├── __init__.py             # Package exports (the register_* functions)
+├── sap_tools.py            # Core tools: login, transaction, screen reading, forms, keyboard, sessions
+├── session_tools.py        # Implementations of the sap_session_* tools
+├── browser_tools.py        # Low-level browser escape hatches
+├── se09_tools.py           # SE09 Transport Organizer lookup
+├── se11_tools.py           # SE11 ABAP Dictionary lookup
+├── se16_tools.py           # SE16N table data query
+├── se24_tools.py           # SE24 Class Builder lookup
+├── se24_edit_tools.py      # SE24 method editing
+├── se37_tools.py           # SE37 Function Builder lookup
+├── se37_edit_tools.py      # SE37 function module editing
+├── se38_edit_tools.py      # SE38 report editing
+├── se93_tools.py           # SE93 Transaction Maintenance lookup
+├── sm30_tools.py           # SM30 table maintenance view lookup
+├── sm37_tools.py           # SM37 background job lookup
+├── slg1_tools.py           # SLG1 application log lookup
+├── spro_tools.py           # SPRO IMG search
+├── st22_tools.py           # ST22 short dump lookup
+├── abapgit_tools.py        # abapGit pull and list, SE38 source reading
+├── quick_report_tools.py   # Composite: TX -> fill -> F8 -> read result
+├── catalog_tools.py        # Offline search: transactions
+├── table_tools.py          # Offline search: tables
+├── class_tools.py          # Offline search: classes
+├── fm_tools.py             # Offline search: function modules
+├── intent_tools.py         # log_intent
+├── feedback_tools.py       # log_feedback
+└── README.md               # This file
 ```
 
 ## Available Tools
 
-### SAP Tools (`sap_tools.py`)
+The server registers these tools. `sap_get_capabilities` returns the same list with the full
+descriptions at runtime.
 
-High-level, SAP-specific operations:
+### Core SAP Tools (`sap_tools.py`)
 
-| Tool                  | Description                                                         |
-| --------------------- | ------------------------------------------------------------------- |
-| `sap_login`           | Opens SAP Web GUI for user to enter credentials                     |
-| `sap_transaction`     | Enters and executes a transaction code (auto-enables OK-Code field) |
-| `sap_keepalive_start` | Starts background task to prevent session timeout                   |
-| `sap_keepalive_stop`  | Stops the keepalive background task                                 |
+| Tool                                                                                                                  | Description                                                           |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `sap_login`, `sap_list_connections`                                                                                   | Log in with a system from `systems.json`; list the configured systems |
+| `sap_transaction`                                                                                                     | Enter and execute a transaction code (auto-enables the OK-Code field) |
+| `sap_get_capabilities`                                                                                                | Tool list plus the SAP knowledge base (`data/sap_knowledge.md`)       |
+| `sap_get_screen_text`, `sap_get_screen_info`, `sap_get_form_fields`                                                   | Read the current screen                                               |
+| `sap_discover_fields`, `sap_discover_buttons`, `sap_get_shortcuts`, `sap_lookup_fields`                               | Find fields, buttons and keyboard shortcuts                           |
+| `sap_fill_form`, `sap_set_field`, `sap_set_checkbox`, `sap_set_radio_button`, `sap_select_dropdown`, `sap_select_tab` | Fill and operate form controls                                        |
+| `sap_click_button`, `sap_press_key`, `sap_close_popup`                                                                | Press buttons and keys, dismiss popups                                |
+| `sap_read_table`, `sap_click_table_cell`                                                                              | Read and click ALV grids and tables                                   |
+| `sap_read_status_bar`, `sap_screenshot`                                                                               | Status bar message, screenshot                                        |
+| `sap_session_status`, `sap_keepalive_start`, `sap_keepalive_stop`                                                     | Session state and keepalive                                           |
+| `sap_session_list`, `sap_session_close`, `sap_session_bind`, `sap_session_release`, `sap_session_reset_to_primary`    | Multi-session management                                              |
+| `sap_session_detach`                                                                                                  | Registered but not supported on the Web GUI (always returns an error) |
+| `choose`                                                                                                              | Let the user pick from a list (for example a system), from FastMCP    |
 
 ### Specialized Transaction Tools (faster, return structured data)
 
-| Tool              | File            | Description                                               |
-| ----------------- | --------------- | --------------------------------------------------------- |
-| `sap_se11_lookup` | `se11_tools.py` | Look up table/structure metadata from ABAP Dictionary     |
-| `sap_se16_query`  | `se16_tools.py` | Query table data via SE16N with pagination                |
-| `sap_se24_lookup` | `se24_tools.py` | Look up class/interface metadata from Class Builder       |
-| `sap_se37_lookup` | `se37_tools.py` | Look up function module signatures from Function Builder  |
-| `sap_se93_lookup` | `se93_tools.py` | Look up transaction metadata from Transaction Maintenance |
-| `sap_sm37_lookup` | `sm37_tools.py` | Look up background job status and logs |
+| Tool                                                                 | File                 | Description                                 |
+| -------------------------------------------------------------------- | -------------------- | ------------------------------------------- |
+| `sap_se09_lookup`                                                    | `se09_tools.py`      | Transport requests                          |
+| `sap_se11_lookup`                                                    | `se11_tools.py`      | Table and structure metadata                |
+| `sap_se16_query`                                                     | `se16_tools.py`      | Table data via SE16N with pagination        |
+| `sap_se24_lookup`, `sap_se24_edit`                                   | `se24_*.py`          | Class and interface metadata; edit a method |
+| `sap_se37_lookup`, `sap_se37_edit`                                   | `se37_*.py`          | Function module signature; edit a module    |
+| `sap_se38_edit`                                                      | `se38_edit_tools.py` | Edit a report                               |
+| `sap_se93_lookup`                                                    | `se93_tools.py`      | Transaction metadata                        |
+| `sap_sm30_lookup`                                                    | `sm30_tools.py`      | Table maintenance view entries (read-only)  |
+| `sap_sm37_lookup`                                                    | `sm37_tools.py`      | Background jobs and logs                    |
+| `sap_slg1_lookup`                                                    | `slg1_tools.py`      | Application logs                            |
+| `sap_spro_search`                                                    | `spro_tools.py`      | Search the IMG for customizing activities   |
+| `sap_st22_lookup`                                                    | `st22_tools.py`      | ABAP short dumps                            |
+| `sap_abapgit_pull`, `sap_abapgit_list_repos`, `sap_read_se38_source` | `abapgit_tools.py`   | abapGit pull and list; read report source   |
 
-### Composite Tools (multi-step pipelines)
+### Composite Tool
 
-| Tool               | File                   | Description                                                    |
-| ------------------ | ---------------------- | -------------------------------------------------------------- |
-| `sap_quick_report` | `quick_report_tools.py` | TX → fill selection screen → F8 → classify & read result table |
+| Tool               | File                    | Description                                                   |
+| ------------------ | ----------------------- | ------------------------------------------------------------- |
+| `sap_quick_report` | `quick_report_tools.py` | TX -> fill selection screen -> F8 -> classify and read result |
 
-**Note:** Use these specialized tools instead of `sap_transaction('SExx')` - they are faster
-and return structured Pydantic models instead of requiring manual screen parsing.
+**Note:** Use the specialized tools instead of `sap_transaction('SExx')`. They are faster and return
+structured Pydantic models instead of requiring manual screen parsing.
+
+### Offline Catalog Tools (no SAP connection needed)
+
+`search_transactions`, `search_tables`, `search_classes`, `search_function_modules`.
+
+### Logging Tools
+
+`log_intent` (the agent states what it is about to do) and `log_feedback` (technical feedback; it can
+create a GitHub issue when `GITHUB_PAT` is set).
 
 ### Browser Tools (`browser_tools.py`)
 
-Low-level escape hatches when SAP tools don't work:
+Low-level escape hatches when the SAP tools do not work:
 
 | Tool                    | Description                                |
 | ----------------------- | ------------------------------------------ |
@@ -118,6 +161,9 @@ def register_my_custom_tools(mcp: FastMCP) -> None:
             return f"Error: {e}"
 ```
 
+Real tools return a Pydantic result model (see `models/`) instead of a plain string; see
+`ARCHITECTURE.md` for the SE99 example.
+
 ### 2. Register in server.py
 
 Update `server.py` to include your new tools:
@@ -155,7 +201,7 @@ import pytest
 class TestMyCustomTools:
     """Tests for my_custom_tools module."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_my_tool_success(self) -> None:
         """Test my_tool returns success."""
         # Your test implementation
@@ -238,7 +284,7 @@ The `SELECTORS` dictionary in `sap_tools.py` contains CSS selectors for SAP Web 
 You may need to customize these for your specific SAP version:
 
 ```python
-from sapwebguimcp.tools import SELECTORS
+from sapwebguimcp.tools.sap_tools import SELECTORS
 
 # Override a selector
 SELECTORS["okcode_field"] = 'input#myCustomOkCodeField'
@@ -252,16 +298,16 @@ MY_SELECTORS = {
 
 ## Testing Tools
 
-Run tool tests with:
+Run the offline tests with:
 
 ```bash
-uv run --group tests python -m pytest
+uv run --group tests python -m pytest unittests/ -m "not integration"
 ```
 
 For coverage:
 
 ```bash
-uv run --group coverage coverage run -m pytest
+uv run --group coverage coverage run -m pytest -m "not integration"
 ```
 
 ## Debugging Tips

@@ -16,8 +16,8 @@ They are NOT shipped with the package and NOT used at runtime.
 | `consolidate_catalog.py`  | Build `transactions.json` from SE16 result files | After scraping TSTC with `sap_se16_query`                                          |
 | `add_inline_results.py`   | Add inline SE16 results to catalog               | When SE16 returned results inline (not to file)                                    |
 | `recapture-snapshots.ps1` | Recapture HTML test snapshots in DE/EN           | When SAP UI changes or adding new tests                                            |
-| `render_readme_demo.py`   | Render README demo composites + concat file      | Rebuilding the README GIF (see below)                                              |
-| `smoke_test_exe.py`       | Start a built binary and send an MCP initialize  | `build_executable.yml` runs it for every release binary                            |
+| `render_readme_demo.py`   | Render README demo composites + concat file      | Rebuilding the demo GIF (inherited from the desktop project, see below)            |
+| `smoke_test_exe.py`       | Start a built binary and send an MCP initialize  | `build_executable.yml` runs it for every built binary (Windows, macOS)             |
 | `harvest_lang_texts.py`   | Compare a language pack with SAP's own texts     | After an SAP upgrade, after changing a sourced pack text, before adding a language |
 
 ## Language Pack Verification
@@ -74,8 +74,12 @@ python scripts/add_inline_results.py
 
 ## README Demo GIF
 
-The README GIF is produced from a real agent run by the `readme-demo` skill
-(`.claude/skills/readme-demo/SKILL.md`). The skill writes `readme-demo/transcript.md`
+The demo GIF (`docs/readme-demo.gif`) was produced for the desktop project (SAP GUI for Windows) and is
+not used by the README of this repository. The `readme-demo` skill (`.claude/skills/readme-demo/SKILL.md`)
+still describes that desktop flow and relies on the `sap_run_script` tool, which this server does not have,
+so the skill cannot be run here as it is. The renderer below is kept for a future WebGUI demo.
+
+The GIF comes from a real agent run. The skill writes `readme-demo/transcript.md`
 and beat-numbered screenshots into `readme-demo/frames/`. To (re)build the composites
 and the GIF:
 
@@ -104,16 +108,17 @@ When SAP UI changes or you need fresh test data:
 This script:
 
 1. Deletes existing HTML snapshots
-2. Sets `SAP_LANGUAGE=DE` and runs integration tests
-3. Sets `SAP_LANGUAGE=EN` and runs integration tests
-4. Restores original language setting
+2. Sets `SAP_LANGUAGE=DE` in `.env` and runs the integration tests
+3. Sets `SAP_LANGUAGE=EN` and runs the integration tests
+4. Restores the original language setting
 
-**Requires:** Active SAP session via the MCP server.
+**Requires:** a reachable SAP system, a running Chrome with remote debugging and `systems.json` (see
+[docs/SAP_TEST_PREREQUISITES.md](../docs/SAP_TEST_PREREQUISITES.md)).
 
 ## Directory Structure Rationale
 
 ```
-sapgui.mcp/
+sapwebgui.mcp/
 ├── src/sapwebguimcp/           # RUNTIME CODE - shipped with package
 │   ├── catalog/                # Runtime catalog (loader, search)
 │   │   └── scraper.py          # Dev helper, but co-located for imports
@@ -124,6 +129,8 @@ sapgui.mcp/
 ├── scripts/                    # DEVELOPMENT ONLY - NOT shipped
 │   ├── consolidate_catalog.py
 │   ├── add_inline_results.py
+│   ├── harvest_lang_texts.py
+│   ├── render_readme_demo.py
 │   ├── smoke_test_exe.py
 │   └── recapture-snapshots.ps1
 │

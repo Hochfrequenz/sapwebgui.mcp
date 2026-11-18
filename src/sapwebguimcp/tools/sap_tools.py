@@ -107,7 +107,7 @@ def _canonical_shortcut(shortcut: str) -> str | None:
     """The shortcut with canonical English key names, or ``None`` if it is no keyboard shortcut.
 
     Key names of every language pack are recognized (``lang.universal()``): ``Strg+Umschalt+F1``
-    becomes ``Ctrl+Shift+F1``, ``Eingabe`` becomes ``Enter``, as the desktop key mapping accepts them.
+    becomes ``Ctrl+Shift+F1``, ``Eingabe`` becomes ``Enter``, as the key mapping accepts them.
 
     Valid shortcuts are:
     - a function key (F1-F12)
@@ -384,16 +384,12 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
     @mcp.tool(
         description=(
             "Log into SAP. "
-            "On WebGUI: requires Chrome with --remote-debugging-port=9222 and VPN (if internal SAP). "
-            "On Desktop: opens a NEW parallel session each call — re-login does NOT replace prior "
-            "logins. You can be logged into the same SAP Logon entry as multiple distinct "
-            "(client, user) tuples concurrently. The returned LoginResult.session_id is the registry "
-            "ID ('s1', 's2', ...) you pass on subsequent tool calls to address THIS specific login. "
-            "Concurrency note: sessions on one connection share one single-threaded COM engine; "
-            "parallel scripting loops on that connection run sequentially (no speedup). "
-            "For bulk work on one connection, prefer one large loop in a single script. "
-            "Parallelism helps only across separate connections/systems. "
-            "Use sap_session_list to see all currently active sessions. "
+            "Needs Chrome (started with --remote-debugging-port=9222; on Windows it is auto-launched when not running) "
+            "and a VPN connection if the SAP system is on an internal network. "
+            "Logs in on the current browser tab (registered as session 's1' on the first login); "
+            "calling sap_login again does not open a parallel session. "
+            "To work in a second session use sap_transaction(tcode, new_window=True), "
+            "which returns its session_id. "
             "Credentials are read from ~/.config/sap-mcp/systems.json. "
             "Use system_key (dictionary key from systems.json) to select a non-default system. "
             "Call sap_list_connections first to see available system keys."
@@ -408,22 +404,18 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         """
         Log into SAP.
 
-        On WebGUI, opens the SAP Web GUI URL and automatically logs in.
-        On Desktop, opens a NEW parallel session — see the tool description
-        above for the multi-session contract. Credentials are read from
-        ~/.config/sap-mcp/systems.json.
+        Opens the SAP Web GUI URL in the browser and automatically logs in.
+        Credentials are read from ~/.config/sap-mcp/systems.json.
 
         Args:
-            url: SAP Web GUI URL (WebGUI only). If not provided, derived from system host.
+            url: SAP Web GUI URL. If not provided, derived from system host.
             client: SAP client/mandant (3-digit string, e.g. '200'). Overrides config value.
             system_key: Dictionary key from systems.json (e.g. "dev", "qa").
                 Use sap_list_connections to see available keys. Defaults to default_system.
 
         Returns:
-            LoginResult with ``session_id`` set to the registry ID of the
-            new session ('s1', 's2', ...). Subsequent tools that take a
-            ``session`` / ``session_id`` parameter can use that ID to
-            address this specific login when multiple sessions are active.
+            LoginResult. Its session_id is not set by the Web GUI backend;
+            use sap_session_list for session IDs.
         """
         session_id = get_mcp_session_id(ctx)
         return await sap_login_impl(url=url, client=client, system_key=system_key, session_id=session_id)
@@ -432,15 +424,13 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         description=(
             "List available SAP systems. Returns two sections: "
             "'configured_systems' from systems.json (pass the 'key' field as "
-            "system_key to sap_login), and 'connections' from SAP Logon "
-            "(SAPUILandscape.xml, Desktop only). "
-            "IMPORTANT: pass a configured_systems 'key' as system_key to sap_login, "
-            "NOT a SAP Logon entry name. "
+            "system_key to sap_login), and 'connections' (always empty here, there is no SAP Logon pad). "
+            "IMPORTANT: pass a configured_systems 'key' as system_key to sap_login. "
             "If configured_systems is empty, check config_error."
         )
     )
     async def sap_list_connections() -> ConnectionListResult:
-        """List configured systems and SAP Logon entries."""
+        """List the systems configured in systems.json."""
         return await sap_list_connections_impl()
 
     @mcp.tool(
@@ -451,10 +441,6 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "sap_se93_lookup.\n\n"
             "**Multi-Session Support (for parallel agents):** `new_window=True` opens a new SAP "
             "session and returns `session_id`/`session_count`; pass `session` on later calls to target it.\n\n"
-            "Concurrency note: SAP GUI COM scripting is single-threaded per connection. "
-            "Running parallel scripting loops across `new_window=True` sessions of the same "
-            "connection is serialized (no speedup). For bulk work on one connection, use one "
-            "script with a larger loop; parallelize only across separate connections.\n\n"
             "⚠️ **CRITICAL: Always close sessions you opened!** Close `new_window=True` sessions with "
             "`sap_session_close` to avoid hitting SAP session limits. Use `sap_session_list` to review open IDs."
         )
@@ -603,10 +589,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
     @mcp.tool(
         description=(
             "Send a keyboard shortcut to SAP\n\n"
-            "Note on 'Escape': on the desktop backend it sends SAP VKey 12 (F12 / Cancel), not the Windows "
-            "Esc key; its meaning is screen dependent (some editor screens open an 'Exit editor' dialog). "
-            "On the WebGUI backend the key is passed to the browser as a normal key press (no VKey mapping). "
-            "To dismiss a popup use sap_close_popup.\n\n"
+            "Note on 'Escape': the key is passed to the browser as a normal key press (no SAP VKey mapping); "
+            "its meaning is screen dependent. To dismiss a popup use sap_close_popup.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
             '- session="s2": Targets specific session (for parallel agents)'
@@ -630,8 +614,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         - "Ctrl+Y" - Select text mode (Markieren)
         - "Shift+F3" - Exit (Beenden)
         - "Enter" - Confirm
-        - "Escape" - Desktop: SAP VKey 12 (F12/Cancel), not the Windows Esc key; screen dependent.
-          WebGUI: sent to the browser as a normal key press, no VKey mapping.
+        - "Escape" - sent to the browser as a normal key press, no SAP VKey mapping; screen dependent.
           To dismiss a popup use sap_close_popup.
 
         Args:
@@ -880,9 +863,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
     @mcp.tool(
         description=(
             "Read the current message from SAP's status bar\n\n"
-            "Also returns message_id / message_number (desktop only), which identify the message "
-            "independently of the logon language, plus message_parameters (its &1-&4 runtime values, "
-            "which may themselves be translated).\n\n"
+            "The message_id, message_number and message_parameters fields are currently always empty "
+            "(the Web GUI status bar does not expose them); read the message text.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
             '- session="s2": Targets specific session (for parallel agents)'
@@ -907,12 +889,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             StatusBarInfo with:
             - type: "S" (success), "E" (error), "W" (warning), "I" (info), or "none"
             - message: The status bar text
-            - message_id / message_number: T100 message class and zero-padded number. Together
-              they identify a message independently of the logon language - check these instead
-              of the text.
-            - message_parameters: the message variables &1-&4 (index 0 is &1, trailing empties
-              removed). Runtime values that may themselves be translated.
-              All three are desktop backend only; None / [] on WebGUI or when the bar is empty.
+            - message_id / message_number / message_parameters: currently always None / [] on the
+              Web GUI, which does not expose the T100 message identity. Read the message text.
         """
         try:
             backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_read_status_bar")
@@ -972,23 +950,23 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
     @mcp.tool(
         description=(
-            "Look up known field CSS selectors for an SAP transaction (WebGUI only). "
+            "Look up known field CSS selectors for an SAP transaction. "
             "Returns pre-discovered selectors from a static registry. "
-            "On Desktop, use sap_discover_fields instead — it discovers fields dynamically."
+            "For fields not in the registry, use sap_discover_fields, which discovers fields dynamically."
         )
     )
     async def sap_lookup_fields(transaction: str) -> FieldLookupResult:  # pylint: disable=too-many-return-statements
         """
         Look up known field CSS selectors for an SAP transaction.
 
-        This tool returns pre-discovered CSS selectors for WebGUI only.
-        On the Desktop backend, use sap_discover_fields instead.
+        This tool returns pre-discovered CSS selectors from a static registry.
+        For other fields, use sap_discover_fields.
 
         Args:
             transaction: Transaction code (e.g., SE16, VA01, BP)
 
         Returns:
-            FieldLookupResult with known CSS selectors (WebGUI only).
+            FieldLookupResult with known CSS selectors.
         """
         tcode_upper = transaction.upper().strip()
 
@@ -999,8 +977,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Discover input fields on the current SAP screen (or active popup dialog). "
             "Returns fields with label, name, value, and a selector/ID for targeting the field. "
             "Automatically targets the active window — if a popup is open, shows popup fields. "
-            "Use the label with sap_fill_form or sap_set_field to fill fields (works on both backends). "
-            "The 'selector' field is a CSS selector on WebGUI or a SAP GUI element ID on Desktop. "
+            "Use the label with sap_fill_form or sap_set_field to fill fields. "
+            "The 'selector' field is a CSS selector. "
             "For buttons, use sap_discover_buttons instead.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
@@ -1015,7 +993,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         Discover all input fields on the current SAP screen.
 
         Returns information about all visible input fields. Use the 'label'
-        field with sap_fill_form to fill fields reliably on any backend.
+        field with sap_fill_form to fill fields reliably.
 
         Args:
             session: Session ID (e.g., "s1", "s2"). None uses primary session.
@@ -1025,7 +1003,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             DiscoveredFields with list of fields including:
             - field_id: SAP field ID (e.g., 'NAME_FIRST', 'STREET')
             - label: Associated label text (for sap_fill_form)
-            - selector: CSS selector on WebGUI, or SAP GUI element ID on Desktop
+            - selector: CSS selector
             - type: Input type (text, checkbox, etc.)
             - value: Current value (if any)
         """
@@ -1049,8 +1027,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Discover clickable buttons on the current SAP screen. "
             "Returns buttons with label, selector/ID, shortcut (e.g. F3), and accesskey. "
             "Prefer keyboard shortcuts (sap_press_key) when available — they're faster and more reliable. "
-            "To press a discovered button: use browser_click(selector) on WebGUI, "
-            "or sap_com_evaluate(element_id, action='call', method='Press') on Desktop. "
+            "To press a discovered button: use browser_click(selector). "
             "For input fields use sap_discover_fields instead.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
@@ -1195,9 +1172,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Fill multiple SAP form fields in a single call. "
             "Use this when filling 2+ fields on the SAME screen without UI navigation between them.\n\n"
             "Keys can be:\n"
-            "- Visible label text (e.g., 'First Name', 'Straße') — works on both backends\n"
-            "- CSS selectors starting with '#' (WebGUI, e.g., '#M0:46:1:1::0:21')\n"
-            "- SAP GUI element names (Desktop, e.g., 'BUT000-NAME_LAST')\n\n"
+            "- Visible label text (e.g., 'First Name', 'Straße')\n"
+            "- CSS selectors starting with '#' (e.g., '#M0:46:1:1::0:21')\n\n"
             "When to use:\n"
             "- Filling a form with multiple input fields\n"
             "- All fields visible on current screen\n"
@@ -1233,8 +1209,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         Args:
             fields: Dictionary mapping field identifiers to values.
                     Keys can be visible label text (e.g., 'First Name'),
-                    CSS selectors on WebGUI (e.g., '#M0:46:1:1::0:21'),
-                    or SAP GUI element names on Desktop (e.g., 'BUT000-NAME_LAST').
+                    or CSS selectors (e.g., '#M0:46:1:1::0:21').
             strict: If True, fail if any field is not found.
                     If False, skip missing fields and report them.
             session: Session ID (e.g., "s1", "s2"). None uses primary session.
@@ -1284,9 +1259,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Set a single SAP form field by label, CSS selector, or element name. "
             "Finds the field dynamically and fills it with the given value.\n\n"
             "The label parameter can be:\n"
-            "- Visible label text (e.g., 'Last Name', 'Nachname') — works on both backends\n"
-            "- CSS selector (WebGUI, e.g., '#M0:46:1:1::0:21')\n"
-            "- SAP GUI element name (Desktop, e.g., 'BUT000-NAME_LAST')\n\n"
+            "- Visible label text (e.g., 'Last Name', 'Nachname')\n"
+            "- CSS selector (e.g., '#M0:46:1:1::0:21')\n\n"
             "This is simpler than sap_fill_form for single fields.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
@@ -1311,8 +1285,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         Args:
             label: Field label text (e.g., 'Last Name'),
-                   CSS selector on WebGUI (e.g., '#M0:46:1:1::0:21'),
-                   or SAP GUI element name on Desktop (e.g., 'BUT000-NAME_LAST')
+                   or CSS selector (e.g., '#M0:46:1:1::0:21')
             value: Value to set in the field (for dropdowns: exact option text)
             session: Session ID (e.g., "s1", "s2"). None uses primary session.
             agent_id: Agent identifier for binding check. Optional.
@@ -1362,9 +1335,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Args:\n"
             "- label: Checkbox label text (e.g., 'Workbench-Aufträge', 'Freigegeben')\n"
             "- checked: True to check, False to uncheck\n\n"
-            "Only label lookup is supported. If the label is ambiguous or not found: on the desktop backend "
-            "use sap_com_evaluate or sap_run_script and set ``.selected = True/False`` on the element by id "
-            "(both are desktop-only); on the WebGUI backend use browser_evaluate.\n\n"
+            "Only label lookup is supported. If the label is ambiguous or not found, use browser_evaluate.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
             '- session="s2": Targets specific session'
@@ -1610,7 +1581,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
         description=(
             "Take a screenshot of the current SAP screen.\n\n"
-            "Returns a PNG screenshot as an image. Works on both WebGUI and Desktop backends.\n"
+            "Returns a PNG screenshot as an image.\n"
             "⚠️ Screenshots consume significant context tokens. "
             "Prefer sap_get_screen_text or sap_get_form_fields for reading screen content.\n"
             "Use screenshots only for visual debugging or when the user explicitly requests one.\n\n"
@@ -1642,16 +1613,9 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 Returns session IDs, current transaction, screen title, client, user, and
 system_name for each. Use this to see what sessions exist before targeting one.
 
-The first sap_login() registers "s1". Additional sessions come from:
-- repeated sap_login() calls (parallel multi-mandant — each new login adds
-  a session alongside the existing ones, not replacing them — see #671)
-- sap_transaction(tcode, new_window=True) (a /o sub-session of an existing
-  connection, sharing its login)
-
-Desktop: when another call has been running on the connection's single COM
-engine for a while, the result carries a `com_engine` block saying which
-connection is busy and since when. That running call is why other tool calls
-on the same connection hang — wait for it instead of retrying."""
+The first sap_login() registers "s1". Additional sessions come from
+sap_transaction(tcode, new_window=True) (a /o sub-session of an existing
+connection, sharing its login)."""
     )
     async def sap_session_list() -> SessionListResult:
         """List all active sessions."""
@@ -1660,15 +1624,11 @@ on the same connection hang — wait for it instead of retrying."""
     @mcp.tool(
         description="""Close a SAP session.
 
-Closes the underlying SAP GUI session/tab and removes it from the registry.
-Any session ID can be closed, including "s1". With the parallel-multi-mandant
-contract (#671), the registry can hold multiple concurrent logins and you may
-legitimately want to close any of them — including the lowest-numbered one.
+Closes the session's browser tab and removes it from the registry.
+Any session ID can be closed, including "s1".
 If you close the only remaining session, the next tool call will fail with
 a clear "no session" error and you should call sap_login() again.
 
-Sessions with origin "attached" (a window the user already had open) are never
-closed by this server: the call is refused and points at sap_session_detach.
 
 Args:
     session_id: Session to close (e.g. "s1", "s2", ...)
@@ -1679,13 +1639,9 @@ Args:
         return await sap_session_close_impl(session_id)
 
     @mcp.tool(
-        description="""Stop using a session WITHOUT closing it (desktop backend only).
-
-Removes the session from the registry, drops its agent binding and stops watching
-its connection. No SAP GUI call is made: the SAP window stays open. This is the
-only way to drop an "attached" session (a window the user already had open, which
-sap_session_close refuses to close); it also works on sessions this server opened.
-The WebGUI backend has no detach; use sap_session_close there.
+        description="""Not supported: this server only drives SAP Web GUI, whose sessions are browser tabs
+owned by the server, so there is nothing to detach. The call always returns an error;
+use sap_session_close to close a session.
 
 Args:
     session_id: Session to detach (e.g. "s2")

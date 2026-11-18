@@ -2,8 +2,7 @@
 
 A context variable, so concurrent tool calls on different sessions never see each other's
 language. ``BackendManager.get_or_create`` sets it for every tool call, ``sap_login`` sets it for
-the session it just opened, and desktop recovery clears it. ``ComThread.run`` copies the caller's
-context to the COM worker, so the value is visible inside COM closures too.
+the session it just opened.
 
 Limitation: session tools that take an explicit ``session_id`` (``tools/session_tools.py``: close,
 detach, bind, release, reset_to_primary) resolve the backend without a session, so the variable

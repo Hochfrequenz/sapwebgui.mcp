@@ -355,8 +355,7 @@ def register_quick_report_tools(mcp: FastMCP) -> None:
             "- SE16 (use sap_se16_query instead)\n"
             "- SM37 (use sap_sm37_lookup instead — has job log support)\n"
             "- Transactions without selection screens (e.g., BP, VA01)\n"
-            "- SE11/SE24/SE37 (use dedicated lookup tools)\n\n"
-            "WebGUI-only. Returns an error on desktop backend."
+            "- SE11/SE24/SE37 (use dedicated lookup tools)"
         ),
         annotations=ToolAnnotations(read_only_hint=False, open_world_hint=False),
     )
