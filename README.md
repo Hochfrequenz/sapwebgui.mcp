@@ -65,7 +65,7 @@ Docker users follow the [Docker section](#docker) instead of steps 1 and 4; they
 
 ### Step 1: Install the server
 
-Pick one way to get the server. Each release on [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest) provides standalone executables and a Docker image.
+Pick one way to get the server. Each release on [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest) provides standalone executables; each release also publishes a Docker image on ghcr.io.
 
 Until the first release is published, the release links and the Docker image below do not exist yet: install from source (Option B), or build the image yourself with `docker build -t ghcr.io/hochfrequenz/sapwebgui.mcp:latest .` in a clone.
 
@@ -149,7 +149,7 @@ On **Windows**, open Windows Explorer and paste `%USERPROFILE%\.config\sap-mcp` 
 - You do **not** need `connection_name` (that field belongs to SAP Logon, which this server does not use).
 
 > [!NOTE]
-> If your SAP system uses a self-signed or internally-signed certificate (common for VPN/intranet systems), add `"tls_skip_verify": true` to the system entry. Leave it out if your system has a publicly-trusted certificate. Chrome itself is started with `--ignore-certificate-errors` in [Step 3](#step-3-start-chrome-with-remote-debugging).
+> This server does not read `tls_skip_verify`: the browser accepts self-signed certificates (Chrome is started with `--ignore-certificate-errors` in [Step 3](#step-3-start-chrome-with-remote-debugging)). Other tools that share `systems.json` may need `"tls_skip_verify": true` for a self-signed or internally-signed certificate.
 
 > [!IMPORTANT]
 > After editing `systems.json`, restart Claude Desktop, Claude Code, or opencode for the changes to take effect.
@@ -487,7 +487,7 @@ All of these are optional. The server reads them from its process environment an
 | `BROWSER_HEADLESS`     | No                          | Run the browser in headless mode (applies to `BROWSER_MODE=launch`)                                                                                | `false`                          |
 | `CDP_URL`              | When `BROWSER_MODE=connect` | Chrome DevTools Protocol URL                                                                                                                       | `http://localhost:9222`          |
 | `CHROME_PATH`          | No                          | Windows only: explicit path to the Chrome binary for auto-launch. Ignored on macOS and Linux.                                                      | `""` (auto-detect)               |
-| `CHROME_USER_DATA_DIR` | No                          | User data directory for auto-launched Chrome                                                                                                       | `<tempdir>/chrome-debug`         |
+| `CHROME_USER_DATA_DIR` | No                          | Windows only: user data directory for auto-launched Chrome                                                                                         | `<tempdir>/chrome-debug`         |
 | `GITHUB_PAT`           | No                          | GitHub PAT for `log_feedback` issues and abapGit auth                                                                                              | -                                |
 | `GITHUB_USER`          | No                          | GitHub username for abapGit (falls back to `x-access-token`)                                                                                       | -                                |
 | `GITHUB_REPO`          | No                          | Repository for feedback issues                                                                                                                     | `Hochfrequenz/sapwebgui.mcp`     |
@@ -550,7 +550,7 @@ To let the server find Chrome (when it auto-launches it), set `CHROME_PATH` to t
 1. Make sure Chrome is running with `--remote-debugging-port=9222`
 2. Make sure you used `--user-data-dir` (required, otherwise Chrome joins the existing instance)
 3. Verify with: `Invoke-WebRequest -Uri 'http://localhost:9222/json/version' -UseBasicParsing` (macOS/Linux: `curl http://localhost:9222/json/version`)
-4. On macOS and Linux the server cannot start Chrome for you: start it yourself ([Step 3](#step-3-start-chrome-with-remote-debugging))
+4. On macOS and Linux the server cannot start Chrome for you: start it yourself ([Step 3](#step-3-start-chrome-with-remote-debugging)). An error that asks you to set `CHROME_PATH` means Chrome is not reachable on port 9222; `CHROME_PATH` does not help there.
 
 ### SAP login fails
 

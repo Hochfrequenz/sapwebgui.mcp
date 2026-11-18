@@ -1624,10 +1624,8 @@ connection, sharing its login)."""
     @mcp.tool(
         description="""Close a SAP session.
 
-Closes the underlying SAP GUI session/tab and removes it from the registry.
-Any session ID can be closed, including "s1". With the parallel-multi-mandant
-contract (#671), the registry can hold multiple concurrent logins and you may
-legitimately want to close any of them — including the lowest-numbered one.
+Closes the session's browser tab and removes it from the registry.
+Any session ID can be closed, including "s1".
 If you close the only remaining session, the next tool call will fail with
 a clear "no session" error and you should call sap_login() again.
 
