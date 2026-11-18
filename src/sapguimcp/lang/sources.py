@@ -115,22 +115,14 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "common.initial_screen": Manual("title fragment shared by the initial screens of several transactions"),
         "common.not_found": Message("EU", "046", relation="fragment"),
         "common.does_not_exist": Message("TK", "054", relation="fragment"),
-        "common.no_entries": Manual(
-            "SAP text differs: ECC release has 'Es wurden keine Einträge gemäß Selektion gefunden' (SV 004),"
-            " pack DE has 'Keine Einträge gefunden'"
-        ),
         "common.row_select_hint": Manual("WebGUI framework text: ARIA hint of a selectable table row"),
         "common.user": DataElement("XUBNAME", "medium"),
         "common.program": DataElement("PROGNAME", "short"),
-        "popup.type_error": Manual("keyword list classifying popups by title or text"),
-        "popup.type_info": Manual("keyword list classifying popups by title or text"),
-        "popup.type_confirm": Manual("keyword list classifying popups by title or text"),
         "popup.inactive_objects": Manual("popup title seen live; no matching text in D021T, T100 or RSMPTEXTS"),
         "popup.original_language_title": Manual(
             "GUI title of screen SAPLSETX 0100 (title bar, not a D021T text); the T100 messages about the"
             " original language have other wording"
         ),
-        "popup.original_language_hint": Manual("regex over the desktop window title of the same popup"),
         "popup.maintain_in_original": ScreenText("SAPLSETX", "0100", "PUSH1"),
         "popup.button_labels": Manual("standard popup button labels, several GUI statuses"),
         "popup.close": Manual("WebGUI framework tooltip of a popup's close control"),
@@ -143,15 +135,12 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "status_type.message_bar": Manual("WebGUI framework text: the message bar's ARIA label"),
         "status_type.check_success": Manual("fragments of several syntax check and activation messages"),
         "status_type.check_error": Manual("fragment of several syntax check messages"),
-        "status_type.activation_confirmed": Manual("fragment of several activation messages"),
-        "status_type.activation_denied": Manual("negating fragments of activation messages"),
         "session_pages.already_logged_on": Manual("WebGUI logon page (ICF), not in SAP's text tables"),
         "session_pages.continue_button": Manual("WebGUI logon page (ICF), not in SAP's text tables"),
         "session_pages.timed_out": Manual("WebGUI timeout and logoff pages (ICF), not in SAP's text tables"),
         "session_pages.settings_menu": Manual("WebGUI framework tooltip of the settings menu"),
         "session_pages.settings_stem": Manual("stem of the WebGUI settings menu tooltip"),
         "session_pages.okcode_option": Manual("WebGUI framework settings menu entry"),
-        "session_pages.debugger_window": Manual("SAP GUI window title of the ABAP debugger"),
         "keys.names[Ctrl]": Manual("keyboard key name of the SAP GUI client, not in SAP's text tables"),
         "keys.names[Shift]": Manual("keyboard key name of the SAP GUI client, not in SAP's text tables"),
         "keys.names[Alt]": Manual("keyboard key name of the SAP GUI client, not in SAP's text tables"),
@@ -169,8 +158,6 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
             "SAP text differs: TRFUNCTION W is the singular 'Customizing-Auftrag' / 'Customizing Request'; the"
             " SE09 tree node holds the plural"
         ),
-        "se09.expand": Manual("tree toolbar tooltip, generic text of many GUI statuses"),
-        "se09.compress": Manual("tree toolbar tooltip, generic text of many GUI statuses"),
         "se09.list_region": Manual("WebGUI ARIA label of the ABAP list region; EN value not yet read live (#1044)"),
         "se09.organizer_title": Transaction("SE09"),
         "se09.request_word": Manual("word inside SE09 list texts and messages, no single source"),
@@ -195,7 +182,6 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se16.empty_cell": Manual("WebGUI framework text of empty grid rows"),
         "se16.table_not_found": Message("TK", "054", relation="fragment"),
         "se16.selection_columns": Manual("column headers of the selection grid, composed from several data elements"),
-        "se16.results_title": Manual("composed title fragment of the result list"),
         "se24.class_builder": Manual(
             "SAP text differs: transaction SE24 is 'ABAP Class Builder' in both languages; pack DE has 'Klassenpflege'"
         ),
@@ -216,15 +202,7 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se24.methods_tab": Manual("tab title of the class builder tab strip"),
         "se24.attributes_tab": Manual("tab title of the class builder tab strip"),
         "se24.interfaces_tab": Manual("tab title of the class builder tab strip"),
-        "se24.properties_tab": Manual("tab title of the class builder tab strip"),
         "se24.source_button": Manual("button text of the class builder method list"),
-        "se24.method_column": Manual("table control column title of the methods tab"),
-        "se24.attribute_column": Manual("table control column title of the attributes tab"),
-        "se24.kind_column": Manual("table control column title of the methods and attributes tabs"),
-        "se24.visibility_column": Manual("table control column title of the methods and attributes tabs"),
-        "se24.description_column": Manual("table control column title of the class builder tabs"),
-        "se24.type_ref_column": Manual("table control column title of the attributes tab"),
-        "se24.initial_value_column": Manual("table control column title of the attributes tab"),
         "se37.initial_screen": Manual(
             "window title of the function builder initial screen (titlebar, not in the supported text tables)"
         ),
@@ -232,20 +210,12 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se37.function_builder": Manual("title fragment of the function builder"),
         "se37.fm_field_label": ScreenText("SAPLSEUF", "0100", "NAME1"),
         "se37.not_found": Message("FL", "110", relation="fragment"),
-        "se37.attributes_tab": Manual("tab title of the function builder tab strip"),
         "se37.import_tab": Manual("tab title of the function builder tab strip"),
         "se37.export_tab": Manual("tab title of the function builder tab strip"),
         "se37.changing_tab": Manual("tab title of the function builder tab strip"),
         "se37.tables_tab": Manual("tab title of the function builder tab strip"),
         "se37.exceptions_tab": Manual("tab title of the function builder tab strip"),
         "se37.source_tab": Manual("tab title of the function builder tab strip"),
-        "se37.parameter_name_column": Manual("table control column title of the signature tabs"),
-        "se37.typing_column": Manual("table control column title of the signature tabs"),
-        "se37.type_ref_column": Manual("table control column title of the signature tabs"),
-        "se37.default_column": Manual("table control column title of the signature tabs"),
-        "se37.optional_column": Manual("table control column title of the signature tabs"),
-        "se37.pass_value_column": Manual("table control column title of the signature tabs"),
-        "se37.short_text_column": Manual("table control column title of the signature and exception tabs"),
         "se37.exception_column": Manual("table control column title of the exceptions tab"),
         "se38.initial_screen": Manual("title fragment of the ABAP editor initial screen"),
         "se38.program_field_title": Manual("title attribute of the program name input"),
@@ -280,9 +250,6 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "slg1.from_datetime": Manual("selection text of report SBAL_DISPLAY (text pool), not in D021T"),
         "slg1.to_datetime": Manual("selection text of report SBAL_DISPLAY (text pool), not in D021T"),
         "slg1.log_number": Manual("list column title of the log grid, not looked up"),
-        "slg1.col_date": Manual("list column title of the log grid, not looked up"),
-        "slg1.col_time": Manual("list column title of the log grid, not looked up"),
-        "slg1.col_messages": Manual("list column title of the log grid, not looked up"),
         "slg1.empty_cell": Manual("WebGUI framework text for an empty grid cell"),
         "sm30.initial_screen": Manual(
             "SAP text differs: transaction SM30 is 'Call View Maintenance' / 'Aufruf View-Pflege'; pack has"
@@ -306,7 +273,6 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "sm37.status[Active]": ScreenText("SAPLBTCH", "2170", "BTCH2170-RUNNING"),
         "sm37.status[Finished]": ScreenText("SAPLBTCH", "2170", "BTCH2170-FINISHED"),
         "sm37.status[Canceled]": ScreenText("SAPLBTCH", "2170", "BTCH2170-ABORTED"),
-        "sm37.col_status": Manual("list column title of the job overview, not looked up"),
         "sm37.job_name": ScreenText("SAPLBTCH", "2170", "JOBNAME"),
         "sm37.user_name": ScreenText("SAPLBTCH", "2170", "USERNAME"),
         "sm37.from_date": Manual("WebGUI label: 'von' / 'From' (SAPLBTCH 2170 FROM) plus the date field's own label"),
@@ -320,11 +286,6 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "sm37.selected_hint": Manual("footer line of the classic list, not looked up"),
         "sm37.event_driven": Manual("start condition line of the classic list, not looked up"),
         "sm37.abap_program": Manual("step line of the classic list, not looked up"),
-        "sm37.col_start_date": Manual("list column title of the job overview, not looked up"),
-        "sm37.col_start_time": Manual("list column title of the job overview, not looked up"),
-        "sm37.col_duration": Manual("list column title of the job overview, not looked up"),
-        "sm37.col_created_by": Manual("list column title of the job overview, not looked up"),
-        "sm37.col_client": Manual("list column title of the job overview, not looked up"),
         "spro.initial_screen": Manual(
             "SAP text differs: transaction SPRO is 'Customizing - Edit Project' in both languages; pack has the"
             " screen titles 'Customizing: Projektbearbeitung' / 'Customizing: Execute Project'"

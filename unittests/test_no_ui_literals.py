@@ -63,14 +63,9 @@ BASELINE = Path(__file__).with_name("lang_baseline.json")
 MIN_VALUE_LENGTH = 5
 GENERIC_WORDS = frozenset(
     {
-        "popup.type_error",
-        "popup.type_info",
-        "popup.type_confirm",
         "status_type.error",
         "status_type.warning",
         "status_type.success",
-        "status_type.activation_confirmed",
-        "status_type.activation_denied",
         "status_type.error_prefix",
         "status_type.success_prefix",
     }
@@ -685,8 +680,10 @@ def test_generic_fields_copied_from_en_stay_exempt() -> None:
         leaf = en[path]
         return {v.casefold() for v in getattr(leaf, "variants", ()) if len(v.strip()) >= MIN_VALUE_LENGTH}
 
-    generic = [path for path in sorted(GENERIC_WORDS) if long_variants(path)]
-    copied, translated = generic[0], generic[1]
+    # Words that no other pack field repeats: a shared word such as "not found" would be found through that field.
+    copied, translated = "status_type.warning", "status_type.success_prefix"
+    assert long_variants(copied)
+    assert long_variants(translated)
     other = next(p for p, leaf in en.items() if p not in GENERIC_WORDS and isinstance(leaf, Text) and long_variants(p))
     pack = synthetic_pack(same_as_en=SAME_AS_EN | {copied})
     pack_variants.cache_clear()

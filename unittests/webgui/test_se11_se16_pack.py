@@ -52,11 +52,6 @@ def test_no_values_found_in_both_languages(lang_de: LanguagePack, lang_en: Langu
     assert not _check_no_entries_found("statusbar: 5 hits", lang_en)
 
 
-@pytest.mark.parametrize("title", ["Anzahl Treffer: 5", "Number of hits", "Display of Entries Found"])
-def test_results_title_matches_the_old_fragments(title: str, lang_de: LanguagePack) -> None:
-    assert lang_de.se16.results_title.contains(title)
-
-
 # ---------------------------------------------------------------------------
 # Hit count group separators (single-language bug: only "." was accepted)
 # ---------------------------------------------------------------------------
