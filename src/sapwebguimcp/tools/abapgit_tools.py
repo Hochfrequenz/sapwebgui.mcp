@@ -67,7 +67,7 @@ async def validate_github_pat(pat: str) -> tuple[bool, str]:
                 "https://api.github.com/user",
                 headers={
                     "Authorization": f"token {pat}",
-                    "User-Agent": "sapgui-mcp",
+                    "User-Agent": "sapwebgui-mcp",
                 },
                 timeout=5.0,
             )

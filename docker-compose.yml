@@ -11,9 +11,9 @@ services:
 
   # SAP WebGUI MCP Server (for manual testing only)
   # Claude Desktop runs its own container with --network sapwebguimcp_default
-  sapgui-mcp:
+  sapwebgui-mcp:
     build: .
-    image: sapgui-mcp:test
+    image: sapwebgui-mcp:test
     stdin_open: true
     environment:
       - BROWSER_MODE=connect
