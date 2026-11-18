@@ -303,7 +303,7 @@ class SapGuiSettings(BaseSettings):
         json_schema_extra={"env": "GITHUB_USER"},
     )
     github_repo: str = Field(
-        default="Hochfrequenz/sapgui.mcp",
+        default="Hochfrequenz/sapwebgui.mcp",
         description="GitHub repository for feedback issues (format: owner/repo)",
         json_schema_extra={"env": "GITHUB_REPO"},
     )

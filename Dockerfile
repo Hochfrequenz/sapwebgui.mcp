@@ -3,7 +3,7 @@ FROM python:3.15-slim
 # Pin the uv version (matches ebd_toolchain); the base image ships pip but no uv.
 COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /bin/
 
-LABEL org.opencontainers.image.source="https://github.com/Hochfrequenz/sapgui.mcp"
+LABEL org.opencontainers.image.source="https://github.com/Hochfrequenz/sapwebgui.mcp"
 LABEL org.opencontainers.image.description="MCP server for SAP Web GUI browser automation"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL authors="Hochfrequenz Unternehmensberatung GmbH"

@@ -5,18 +5,18 @@ Invoked by ``tox -e build_executable``. Two variants are produced by the CI
 jobs in ``.github/workflows/build_executable.yml`` — they differ only in
 whether ``.env.production`` is present on disk at build time:
 
-* **Public** (``sapgui_mcp_windows.exe``) — ``.env.production`` absent.
+* **Public** (``sapwebgui_mcp_windows.exe``) — ``.env.production`` absent.
   No remote-logging defaults are baked into the binary. Papertrail stays
   off unless the user sets ``PAPERTRAIL_HOST`` + ``PAPERTRAIL_PORT`` in
   their own ``.env`` / environment.
-* **With remote logging** (``sapgui_mcp_windows_with_remote_logging.exe``)
+* **With remote logging** (``sapwebgui_mcp_windows_with_remote_logging.exe``)
   — the CI job writes ``.env.production`` from repository secrets before
   running ``pyinstaller``, so the resulting binary ships with Hochfrequenz's
   Papertrail endpoint as the default destination. End users can still
   override by putting an empty ``PAPERTRAIL_HOST=`` in their own ``.env``.
 
 Set ``SAPGUI_BUILD_NAME`` to control the output filename (defaults to
-``sapgui_mcp_windows`` — public variant).
+``sapwebgui_mcp_windows`` — public variant).
 """
 
 import os
@@ -42,7 +42,7 @@ hiddenimports += collect_submodules("lupa")
 if os.path.exists(".env.production"):
     datas += [(".env.production", ".")]
 
-name = os.environ.get("SAPGUI_BUILD_NAME", "sapgui_mcp_windows")
+name = os.environ.get("SAPGUI_BUILD_NAME", "sapwebgui_mcp_windows")
 
 a = Analysis(
     ["src\\sapguimcp\\server.py"],

@@ -10,8 +10,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture overview — la
 
 ```bash
 # Clone the repository
-git clone https://github.com/Hochfrequenz/sapgui.mcp.git
-cd sapgui.mcp
+git clone https://github.com/Hochfrequenz/sapwebgui.mcp.git
+cd sapwebgui.mcp
 
 # Install uv first: https://docs.astral.sh/uv/getting-started/installation/
 # Then create the development environment

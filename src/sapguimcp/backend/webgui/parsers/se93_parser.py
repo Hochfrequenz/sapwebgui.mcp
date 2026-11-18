@@ -155,7 +155,7 @@ def parse_se93_snapshot(snapshot: AriaSnapshot, tcode: str, t: LanguagePack) -> 
                 f"Unsupported transaction type for '{tcode}'. "
                 "Only 'dialog' and 'report' transactions are currently supported. "
                 "Please report this transaction code to help improve support: "
-                "https://github.com/Hochfrequenz/sapgui.mcp/issues"
+                "https://github.com/Hochfrequenz/sapwebgui.mcp/issues"
             ),
             retrieved_at=now,
         )
