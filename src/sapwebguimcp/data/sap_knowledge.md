@@ -289,21 +289,21 @@ Use `log_feedback` to report if you encounter a transaction that needs paginatio
 
 ## Multi-Session Support (Parallel Agents)
 
-For bulk operations, keep in mind that sessions opened on the **same SAP GUI connection** share one
-single-threaded COM scripting engine. Parallel `sap_run_script` / COM loops on that connection are
-serialized (no speedup). For one connection, prefer a single script with a larger loop.
-Parallel sub-agents help only across genuinely separate connections (different systems/clients).
+Each SAP session is a browser tab, so parallel sub-agents can work in separate sessions at the same
+time. Give every sub-agent its own session and bind it (see below).
 
 ### Session Management Tools
 
-| Tool                                      | Purpose                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------ |
-| `sap_transaction(tcode, new_window=True)` | Open a new SAP session with a transaction, returns `session_id`          |
-| `sap_session_list()`                      | List all active sessions with IDs and titles                             |
-| `sap_session_close(session_id)`           | Close a specific session by ID                                           |
-| `sap_session_detach(session_id)`          | Drop a session from the registry, leaving its window open (desktop only) |
-| `sap_session_bind(session_id, agent_id)`  | Bind a session to an agent for parallel workflows                        |
-| `sap_session_release(session_id)`         | Unbind a session from an agent without closing it                        |
+| Tool                                      | Purpose                                                         |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| `sap_transaction(tcode, new_window=True)` | Open a new SAP session with a transaction, returns `session_id` |
+| `sap_session_list()`                      | List all active sessions with IDs and titles                    |
+| `sap_session_close(session_id)`           | Close a specific session by ID                                  |
+| `sap_session_bind(session_id, agent_id)`  | Bind a session to an agent for parallel workflows               |
+| `sap_session_release(session_id)`         | Unbind a session from an agent without closing it               |
+| `sap_session_reset_to_primary()`          | Close every session except the primary one (`s1`)               |
+
+`sap_session_detach` is registered but not supported (it always returns an error): use `sap_session_close`.
 
 ### Workflow Example
 
@@ -395,5 +395,5 @@ if result.session_id is None:
 
 # Use the new session (now guaranteed to be valid)
 sap_fill_form({"Name": "Customer 1"}, session=result.session_id)
-sap_press_key("Control+s", session=result.session_id)
+sap_press_key("Ctrl+S", session=result.session_id)
 ```

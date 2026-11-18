@@ -2,12 +2,20 @@
 
 Guidance for AI coding agents working in this repository.
 
+## Project Scope
+
+This repository is the MCP server for **SAP Web GUI** (browser automation with Playwright and Chrome, all
+operating systems). It has no SAP GUI for Windows (COM) code; that lives in
+[sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp). The package is `sapwebguimcp`, the command is
+`run-sapwebgui-mcp-server`. Run tools through `uv run ...`; the offline tests are
+`uv run --group tests python -m pytest unittests/ -m "not integration"`.
+
 ## Project Documentation
 
 This file only holds agent-specific rules. For everything else, read the existing documentation:
 
-- [`README.md`](README.md) — what the server does, installation, `systems.json` setup, and the
-  configuration reference
+- [`README.md`](README.md) — what the server does, setup (Chrome, `systems.json`, MCP client
+  registration), and the configuration reference
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — development setup, running unit and integration tests,
   HTML snapshot testing, and code style
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — layers, request flow, file organization, and how to add

@@ -59,8 +59,7 @@ verification. Design and rationale: `docs/superpowers/specs/2026-11-10-language-
    `uv run --group tests pytest unittests/lang unittests/test_no_ui_literals.py -q`. This covers
    completeness, equal flags across packs, regex and JS portability (Node), the pseudo-locale
    tests and the no-literal scanner.
-7. **Live tests logged on in the new language**, on desktop and WebGUI and on every release you
-   support. Point `SAP_CONFIG_FILE` at a copy of `systems.json` whose system has the new logon
+7. **Live tests logged on in the new language**, on every release you support. Point `SAP_CONFIG_FILE` at a copy of `systems.json` whose system has the new logon
    language, set `SAP_LANGUAGE=<XX>` as well, and run the integration tests of every transaction. Compare each failure with the
    same test in DE or EN before calling it a language problem.
 
@@ -98,36 +97,32 @@ These are lessons from migrating DE and EN (#1044, PRs #1055–#1061):
 - **Numbers and dates.** Hit counts accept every group separator. The date format still comes
   from the pack's `date_format`, not from the user's own settings (#1043).
 
-## Backend tags and the split of the packs (#1099)
+## Backend tags (#1099)
 
-Every field of a pack section is tagged with the backend that reads it in `lang/backends.py`
-(`BACKEND_OF`: `"se16.hit_count_label": Backend.WEBGUI`). `Backend.BOTH` marks texts that shared
-code or both backends read, and is also the safe tag when unsure. A new field needs a tag in the
-same change as its entry in `schema.py`; `unittests/lang/test_backend_tags.py` derives the tag from
-the source (where the field is read, see the docstring of that test) and fails on a missing tag, on
-a wrong tag and on a field nothing reads.
+Every field of a pack section is tagged in `lang/backends.py` with who reads it (`BACKEND_OF`:
+`"se16.hit_count_label": Backend.WEBGUI`). `Backend.WEBGUI` marks texts only the WebGUI code reads
+(including the JavaScript under `backend/webgui/js/` through `Text.for_js()`); `Backend.BOTH` marks
+texts that shared code reads, and is also the safe tag when unsure. The enum still has a `DESKTOP`
+member from the time the server had a second backend; no field carries it any more.
 
-The reason is the desktop/WebGUI split: each repository deletes the fields tagged for the other
-backend from `schema.py`, `de.py`, `en.py`, `it.py`, `sources.py` and `backends.py`. A field tagged
-`BOTH` stays on both sides.
+A new field needs a tag in the same change as its entry in `schema.py`.
+`unittests/lang/test_backend_tags.py` derives the tag from the source (where the field is read, see
+the docstring of that test) and fails on a missing tag, on a wrong tag and on a field nothing reads.
 
-## WebGUI-only language machinery
+## JavaScript and Node machinery
 
-None of the following is needed by the desktop backend. A repository without the WebGUI backend
-deletes all of it (#1108):
+Pack texts reach the browser through these parts; keep them in mind when you change `lang/text.py`:
 
 - `Text.for_js()` and `RegexText.for_js()` in `lang/text.py`, with the JS escaper and builder
   behind them (`_JS_SYNTAX`, `_JS_WORD`, `_JS_UNPORTABLE`, `JsPattern`, `JsText`), and their only
   caller, `backend/webgui/js_helpers.py`, which hands pack texts to the JS files in
   `backend/webgui/js/`.
 - `unittests/lang/node_runner.py`: runs JS patterns in Node (the Node of Playwright's driver, or
-  `node` on `PATH`). Also used by `unittests/test_extract_status_bar_js.py` and
-  `unittests/lang/test_se11_se16_pack.py`.
+  `node` on `PATH`). Also used by `unittests/webgui/test_extract_status_bar_js.py` and
+  `unittests/webgui/test_se11_se16_pack.py`.
 - `unittests/lang/test_text_js.py` (the JS escaper and builder) and
   `unittests/lang/test_js_pack_guard.py` (every pack text compiles in Node and matches its own
   variants).
 - `JS_DIR` in `unittests/test_no_ui_literals.py` (`backend/webgui/js`): the no-literal scanner
   reads the JS files through it.
 - The `prettier src/**/*.js` part of the `format` and `format:check` scripts in `package.json`.
-  The `**/*.md` part stays, and so does `prettier` itself while Markdown is formatted with it.
-- Fields tagged `Backend.WEBGUI` in `lang/backends.py`.

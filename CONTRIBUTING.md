@@ -1,6 +1,8 @@
-# Contributing to SAP MCP Server
+# Contributing to SAP Web GUI MCP Server
 
 Thank you for contributing to this project! This guide covers development setup, testing, and coding standards.
+
+This project looks for a maintainer and may not receive updates. It drives SAP Web GUI in a browser. For SAP GUI for Windows, use [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp).
 
 ## Architecture
 
@@ -22,7 +24,8 @@ source .venv/bin/activate  # Linux/macOS
 # or
 .venv\Scripts\activate  # Windows
 
-# Install Playwright browsers (WebGUI backend only)
+# Install the Playwright Chromium used by the browser unit tests
+# (the server itself connects to your own Chrome, see the README)
 uv run playwright install chromium
 ```
 
@@ -32,17 +35,16 @@ uv run playwright install chromium
 
 To run integration tests, you need a configured SAP system. See **[docs/SAP_TEST_PREREQUISITES.md](docs/SAP_TEST_PREREQUISITES.md)** for:
 
-- SAP GUI Scripting configuration (RZ11 + client settings)
-- Required test objects (report, class, function module)
+- Chrome with remote debugging and the `systems.json` credentials file
+- Required test objects (report, class) and abapGit test repositories
 - `.env` file configuration
 
 ## Running Tests
 
 This project uses [uv](https://docs.astral.sh/uv/) to run all tests and checks. The test suite includes:
 
-- **Unit tests**: Offline tests using HTML snapshots and mocked COM (no SAP required)
-- **WebGUI integration tests**: Tests against real SAP Web GUI (auto-skipped on non-SAP machines)
-- **Desktop integration tests**: Tests against SAP GUI via COM (auto-skipped without SAP credentials)
+- **Unit tests**: Offline tests using HTML snapshots and mocks (no SAP required)
+- **Integration tests**: Tests against a real SAP Web GUI in Chrome (marked `integration`, auto-skipped without SAP credentials)
 
 ### Commands
 
@@ -57,7 +59,7 @@ uv run --group tests python -m pytest unittests/ -m "not integration"
 uv run --group tests python -m pytest unittests/ -m integration
 ```
 
-Language and credentials are loaded from your `.env` file.
+SAP credentials and the logon language of the system come from `~/.config/sap-mcp/systems.json`. The integration tests also read `SAP_LANGUAGE` (`DE`, `EN` or `IT`) from your `.env` file to pick their expected UI texts.
 
 **Other checks:**
 
@@ -77,7 +79,7 @@ You can run tests directly in PyCharm. Settings are loaded from your `.env` file
 1. **Unit tests**: Right-click `unittests/webgui/test_selectors.py` → Run
 2. **Integration tests**: Right-click any `unittests/webgui/test_*_integration.py` file → Run
 
-To change language, edit `SAP_LANGUAGE` in your `.env` file.
+To change the test language, edit `SAP_LANGUAGE` in your `.env` file (and use a system with that `language` in `systems.json`).
 
 **uv vs PyCharm**: uv creates an isolated virtualenv (good for CI), PyCharm uses your current interpreter (faster for development).
 
@@ -89,7 +91,7 @@ We use HTML snapshots captured from real SAP Web GUI sessions to test CSS select
 2. **Validates selectors** against snapshots in fast unit tests (no SAP needed)
 3. **Supports multiple languages** (snapshots named `*_en.html`, `*_de.html`)
 
-To capture new snapshots, set `SAP_LANGUAGE` in your `.env` file and run integration tests:
+To capture new snapshots, set `SAP_LANGUAGE` in your `.env` file and run integration tests (or run `scripts/recapture-snapshots.ps1`, which does it for DE and EN):
 
 ```bash
 uv run --group tests python -m pytest unittests/ -m integration   # Captures snapshots in configured language
@@ -126,45 +128,35 @@ async def test_my_feature(sap_mcp_client: ClientSession) -> None:
     await capture_html_snapshot(sap_mcp_client, "my_feature_result")
 ```
 
-### Desktop Integration Tests
-
-Desktop integration tests run against SAP GUI via COM. They:
-
-- Live in `unittests/desktop/`
-- Use the shared `backend` fixture from `conftest.py` (logs in once per module)
-- Auto-skip on non-Windows or when SAP credentials are missing
-- Are marked `integration` automatically (any test requesting `backend` or `sap_mcp_client`), so `-m "not integration"` excludes them and `-m integration` selects only them
-- Test object names are centralized in `conftest.py` (`TEST_REPORT`, `TEST_CLASS`, etc.)
-
-```python
-from unittests.desktop.conftest import go_home, skip_no_sap
-
-@skip_no_sap
-@pytest.mark.anyio
-async def test_my_desktop_feature(backend):
-    await backend.enter_transaction("SE16")
-    # ... test logic
-    await go_home(backend)  # Always return to Easy Access
-```
-
-See [docs/SAP_TEST_PREREQUISITES.md](docs/SAP_TEST_PREREQUISITES.md) for system setup.
-
 ### Unit Tests
 
-Unit tests use HTML snapshots (WebGUI) or mocked COM objects (Desktop). No SAP connection needed.
+Unit tests use HTML snapshots and mocks. No SAP connection needed.
 
 ```python
-# WebGUI: HTML snapshot tests
+# HTML snapshot test of a parser
 def test_my_parser():
     html = load_snapshot("bp_person_form_de.html")
     result = parse_something(html)
     assert result == expected
+```
 
-# Desktop: mocked COM tests
-def test_my_com_feature():
-    session = MagicMock()
-    result = my_function(session)
-    assert result == expected
+Every test that requests the `sap_mcp_client` fixture is marked `integration` automatically (see
+`unittests/conftest.py`), so `-m "not integration"` excludes exactly the live tests.
+
+See [docs/SAP_TEST_PREREQUISITES.md](docs/SAP_TEST_PREREQUISITES.md) for the system setup the live tests need.
+
+### Executable and Docker Image
+
+CI builds a standalone executable (PyInstaller) and a Docker image; see `.github/workflows/build_executable.yml`,
+`.github/workflows/python-publish.yml` and the `Dockerfile`. To try them locally:
+
+```bash
+# Windows executable (writes dist/sapwebgui_mcp_windows.exe), then the smoke test CI runs
+uv run --locked --group build_executable pyinstaller --noconfirm sapwebgui_mcp_windows.spec
+uv run --no-project python scripts/smoke_test_exe.py dist/sapwebgui_mcp_windows.exe
+
+# Docker image
+docker build -t sapwebgui-mcp:local .
 ```
 
 ## Code Style
@@ -193,7 +185,7 @@ uv run --group type_check mypy --show-error-codes src/sapwebguimcp --strict
 
 ### JavaScript and Markdown
 
-Use Prettier for formatting:
+Use Prettier for formatting (run `npm ci` once to install it):
 
 ```bash
 npm run format
@@ -236,7 +228,7 @@ Both are sent to the AI client. Without the Args section, the LLM doesn't know w
     description=(
         "Discover clickable buttons on the current SAP screen. "
         "Prefer keyboard shortcuts (sap_press_key) when available — "
-        "they're faster and work on all backends. "
+        "they're faster and more reliable. "
         "For input fields use sap_discover_fields instead."
     )
 )
@@ -263,9 +255,9 @@ async def sap_discover_buttons(session: str | None = None) -> DiscoveredButtons:
 
 ### JavaScript Files
 
-- Place JavaScript in `src/sapwebguimcp/js/`
+- Place JavaScript in `src/sapwebguimcp/backend/webgui/js/`
 - Use IIFE pattern: `() => { ... }`
-- Load with `_load_js("filename.js")` in Python
+- Load with `load_js("filename.js")` from `sapwebguimcp.backend.webgui.js_helpers` in Python
 - Document SAP-specific quirks in comments
 
 ### Pydantic Models and DTOs

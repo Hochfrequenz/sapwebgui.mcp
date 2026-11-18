@@ -4,45 +4,41 @@ This document explains how the SAP MCP Server is structured so you can navigate 
 
 ## SAP in 30 Seconds
 
-SAP GUI is a desktop application for interacting with SAP ERP systems. Users navigate by entering **transaction codes** (tcodes like `SE16`, `VA01`, `SM37`) into the **OK-Code field** and pressing Enter. Each transaction shows a different screen with fields, tables, and buttons. The **status bar** at the bottom shows success/error messages after each action.
+SAP Web GUI is the browser version of SAP GUI for interacting with SAP ERP systems. Users navigate by entering **transaction codes** (tcodes like `SE16`, `VA01`, `SM37`) into the **OK-Code field** and pressing Enter. Each transaction shows a different screen with fields, tables, and buttons. The **status bar** at the bottom shows success/error messages after each action.
 
-This MCP server automates that interaction — it enters tcodes, fills fields, reads tables, and returns structured results. It works through two backends: browser automation (WebGUI) or direct COM scripting (Desktop).
+This MCP server automates that interaction — it enters tcodes, fills fields, reads tables, and returns structured results. It does so by driving SAP Web GUI in Chrome with Playwright. There is exactly one backend, the `WebGuiBackend`. SAP GUI for Windows is not supported here; see [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp).
 
 ## Layers
 
 ```mermaid
 graph TD
-    Client["MCP Client<br/>(Claude Desktop, Claude Code)"]
+    Client["MCP Client<br/>(Claude Desktop, Claude Code, opencode)"]
     Server["FastMCP Server<br/>server.py"]
-    Tools["Tools Layer<br/>tools/*.py — ~27 tool modules"]
+    Tools["Tools Layer<br/>tools/*.py — one module per tool group"]
     Manager["Backend Manager<br/>backend/manager.py"]
     WebGUI["WebGuiBackend<br/>backend/webgui/backend.py<br/>(Playwright + Chrome)"]
-    Desktop["DesktopBackend<br/>backend/desktop/__init__.py<br/>(COM + sapsucker)"]
     Parsers["HTML Parsers<br/>backend/webgui/parsers/*.py"]
     Models["Result Models<br/>models/*.py — Pydantic"]
 
-    Client -->|stdio/SSE| Server
+    Client -->|stdio| Server
     Server --> Tools
     Tools --> Manager
     Manager --> WebGUI
-    Manager --> Desktop
     WebGUI --> Parsers
     Tools --> Models
     WebGUI --> Models
-    Desktop --> Models
 ```
 
 ### Layer Responsibilities
 
-| Layer               | Key Files                                        | What It Does                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Server**          | `server.py`                                      | Creates the FastMCP app, registers all tools/resources/prompts, manages lifecycle                                                                                                                |
-| **Tools**           | `tools/sap_tools.py`, `tools/se16_tools.py`, ... | Define MCP tools the LLM can call. Each tool gets a backend via `get_backend()` (typed `WebGuiBackend \| DesktopBackend`), calls its methods, returns a Pydantic result model                    |
-| **Backend Manager** | `backend/manager.py`                             | Singleton that creates/caches the WebGUI backend. Routes session IDs to backend instances                                                                                                        |
-| **WebGUI Backend**  | `backend/webgui/backend.py`, `browser.py`        | Playwright page automation (`WebGuiBackend`). Fills fields with JavaScript, reads screens with ARIA snapshots                                                                                    |
-| **Desktop Backend** | `backend/desktop/__init__.py`                    | `DesktopBackend`: COM scripting through [sapsucker](https://github.com/Hochfrequenz/sapsucker). Dispatches all COM calls to a dedicated thread (`_com_thread.py`) for apartment-threading safety |
-| **Parsers**         | `backend/webgui/parsers/*.py`                    | WebGUI-specific HTML-to-structured-data extraction. One parser per transaction (e.g., `se16_parser.py`, `se24_parser.py`)                                                                        |
-| **Models**          | `models/*.py`                                    | Pydantic models for tool results, screen state, and config. Shared by both backends. Result models never import from backend or tools                                                            |
+| Layer               | Key Files                                        | What It Does                                                                                                                                                  |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Server**          | `server.py`                                      | Creates the FastMCP app, registers all tools/resources/prompts, manages lifecycle                                                                             |
+| **Tools**           | `tools/sap_tools.py`, `tools/se16_tools.py`, ... | Define MCP tools the LLM can call. Each tool gets the backend via `get_backend()` (typed `WebGuiBackend`), calls its methods, returns a Pydantic result model |
+| **Backend Manager** | `backend/manager.py`                             | Singleton that creates/caches the WebGUI backend. Routes session IDs to backend instances                                                                     |
+| **WebGUI Backend**  | `backend/webgui/backend.py`, `browser.py`        | Playwright page automation (`WebGuiBackend`). Fills fields with JavaScript, reads screens with ARIA snapshots                                                 |
+| **Parsers**         | `backend/webgui/parsers/*.py`                    | WebGUI-specific HTML-to-structured-data extraction. One parser per transaction (e.g., `se16_parser.py`, `se24_parser.py`)                                     |
+| **Models**          | `models/*.py`                                    | Pydantic models for tool results, screen state, and config. Result models never import from backend or tools                                                  |
 
 ## Request Flow
 
@@ -53,7 +49,7 @@ sequenceDiagram
     participant LLM as MCP Client
     participant Tool as se16_tools.py
     participant Mgr as BackendManager
-    participant BE as WebGUI/Desktop Backend
+    participant BE as WebGuiBackend
     participant SAP as SAP System
 
     LLM->>Tool: sap_se16_query(table="MARA")
@@ -73,13 +69,13 @@ sequenceDiagram
 
 ## File Organization
 
-Core packages only — helper packages (`catalog/`, `classcatalog/`, `fmcatalog/`, `tables/`) provide offline SAP metadata search; `middleware/`, `resources/`, `prompts/`, `workflows/`, `loghandlers/` handle cross-cutting concerns.
+Core packages only — helper packages (`catalog/`, `classcatalog/`, `fmcatalog/`, `tables/`) provide offline SAP metadata search; `middleware/`, `resources/`, `prompts/`, `skills/`, `loghandlers/` handle cross-cutting concerns; `lang/` holds the language packs (see below); `data/` holds the offline catalogs and the SAP knowledge base.
 
 ```
 src/sapwebguimcp/
   server.py                    # FastMCP app, tool registration, lifecycle
   models/
-    config.py                  # SapGuiSettings (all env vars)
+    config.py                  # SapGuiSettings (server env vars) and the systems.json loader
     base.py                    # ToolResult base class, TCode type, PopupInfo
     sap_results.py             # Shared results (LoginResult, ScreenInfo, ...)
     se16_models.py             # SE16-specific result models
@@ -87,23 +83,15 @@ src/sapwebguimcp/
     ...                        # One model file per transaction
   backend/
     manager.py                 # Backend factory + session routing
-    types.py                   # ScreenSnapshot, AriaSnapshot, ComTreeSnapshot aliases
     webgui/
       backend.py               # WebGuiBackend implementation
       browser.py               # Chrome/Playwright lifecycle management
-      chrome_finder.py         # Auto-detect Chrome installation
+      chrome_finder.py         # Auto-detect the Chrome installation (Windows only)
       js_helpers.py            # JavaScript helper loader
+      models/                  # browser_results, session_registry
+      types.py                 # AriaSnapshot
       js/*.js                  # Injected JS for field filling, screen reading
       parsers/                 # HTML → structured data (one per transaction)
-    desktop/
-      __init__.py              # DesktopBackend implementation
-      _com_thread.py           # Dedicated COM thread (apartment-threading)
-      _session_registry.py     # Multi-session tracking + per-session origin (opened/attached)
-      _element_finder.py       # COM tree traversal helpers
-      _tree_helpers.py         # GuiTree locator and node reader (sap_tree_read)
-      _key_mapping.py          # Key name → SAP VKey mapping
-      _landscape.py            # SAP Logon XML parsing
-      _discovery.py            # Client/system discovery via SE16N
   tools/
     sap_tools.py               # Core tools: login, transaction, screen, keyboard, ...
     se16_tools.py              # SE16N data browser (query tables)
@@ -114,28 +102,9 @@ src/sapwebguimcp/
     se38_edit_tools.py         # SE38 report editing
     ...                        # More transaction tools (se09, se11, se93, sm30, sm37, slg1, spro, st22)
     field_helpers.py           # Shared field-filling logic
-    session_tools.py           # Multi-session management (list/close/detach/bind/release/reset)
+    session_tools.py           # Multi-session management (list/close/bind/release/reset; detach is unsupported)
     feedback_tools.py          # LLM feedback logging → GitHub issues
 ```
-
-## Session Ownership (desktop)
-
-`DesktopSessionRegistry` records an origin per session: `opened` (created by `sap_login` or
-`open_new_session`) or `attached` (a window the user already had open; nothing creates these yet,
-see issue #1009). Every destructive path asks `registry.is_attached(sid)` first:
-
-- `DesktopBackend._close_session_locked` refuses attached ids (returns `False`, no COM call), and
-  closes an opened session through the session's **own** connection (`session.Parent`), not the
-  primary's.
-- `reset_to_primary` skips attached sessions and reports them in `skipped_attached`.
-- `detach_session` (tool `sap_session_detach`) unregisters, unwatches and unbinds with zero COM calls;
-  the SAP window stays open. The WebGUI backend has no detach (its sessions are tabs the server owns),
-  the tool returns a clear "not supported" failure there.
-- `ComThread.shutdown()` / `BackendManager.close()` never close SAP sessions.
-
-`unittests/test_close_call_sites.py` greps `src/` for `CloseSession` / `CloseConnection` and allows
-only the single ownership-checked site. A new close path must be checked against the registry and
-added to that allow-list deliberately.
 
 ## SAP UI Texts and Language Packs
 
@@ -159,16 +128,16 @@ Guards:
   `unittests/lang_baseline.json` is shrink-only and empty.
 - `unittests/lang/` checks pack completeness, flag consistency, regex/JS portability, and
   `test_pseudo_locale.py` round-trips a pseudo pack (every text replaced by a marker) through its
-  helpers (the parser tests against the pseudo pack are a follow-up).
+  helpers (`unittests/webgui/test_pseudo_locale_parsers.py` runs the parsers against it).
 
-### Backend tags and WebGUI-only machinery
+### Backend tags and the JavaScript machinery
 
-`lang/backends.py` tags every pack field as `DESKTOP`, `WEBGUI` or `BOTH` (the backend that reads
-it); `unittests/lang/test_backend_tags.py` derives the tag from the source and fails on a missing or
-wrong tag and on unused fields. After the desktop/WebGUI split, each repository deletes the fields
-tagged for the other backend. The WebGUI-only language machinery (`for_js()`, the Node runner and
-JS pack tests, `JS_DIR`, the JS prettier script) is listed in
-[`ADDING_A_LANGUAGE.md`](src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md#webgui-only-language-machinery).
+`lang/backends.py` tags every pack field as `WEBGUI` (only the WebGUI code reads it) or `BOTH` (shared
+code reads it); the enum still has a `DESKTOP` member that no field uses any more.
+`unittests/lang/test_backend_tags.py` derives the tag from the source and fails on a missing or wrong tag
+and on unused fields. Pack texts reach the browser through `for_js()` and the Node runner of the JS pack
+tests; the pieces are listed in
+[`ADDING_A_LANGUAGE.md`](src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md#javascript-and-node-machinery).
 
 ### Adding a login language
 
@@ -242,53 +211,45 @@ def register_se99_tools(mcp: FastMCP) -> None:
         return SE99Result(data=[...])
 ```
 
-### 3. One backend
+### 3. Add a WebGUI parser (if needed)
 
-This project drives only the Web GUI. Tools call `WebGuiBackend` directly. The `_desktop` functions and their dispatch, which some tools still carry from before the split, are being deleted (#54). Do not add new ones.
+`src/sapwebguimcp/backend/webgui/parsers/se99_parser.py` — for extracting structured data from HTML/ARIA snapshots.
 
-### 4. Add a WebGUI parser (if needed)
-
-`src/sapwebguimcp/backend/webgui/parsers/se99_parser.py` — for extracting structured data from HTML/ARIA snapshots. Only needed for WebGUI; desktop reads data via COM.
-
-### 5. Register the tool
+### 4. Register the tool
 
 In `server.py`, add the import and call `register_se99_tools(mcp)` alongside the existing registrations. Also export the registration function from `tools/__init__.py`.
 
-### 6. Add tests
+### 5. Add tests
 
 - `unittests/test_se99_models.py` — model validation (offline)
-- `unittests/desktop/test_se99_integration.py` — desktop integration (needs SAP, auto-skipped)
-- `unittests/webgui/test_se99_integration.py` — webgui integration (needs SAP, auto-skipped)
+- `unittests/webgui/test_se99_parser.py` — parser test against an HTML snapshot (offline)
+- `unittests/webgui/test_se99_integration.py` — integration test (needs SAP, auto-skipped)
 
 ## Tests
 
 ### Categories
 
-Tests are marked `integration` automatically when they use a live SAP fixture (`backend` or `sap_mcp_client`), not by file name; file names below are only examples.
+Tests are marked `integration` automatically when they use the live SAP fixture (`sap_mcp_client`), not by file name; file names below are only examples.
 
-| Category                | Examples                                                                                                                | Needs SAP?       | How to run                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
-| **Root unit tests**     | `unittests/test_models.py`, `test_config.py`, `test_catalog.py`, ...                                                    | No               | `uv run --group tests python -m pytest unittests/ -m "not integration"` |
-| **Desktop unit tests**  | `unittests/desktop/test_desktop_backend.py`, `test_com_thread.py`, `test_element_finder.py`, `test_key_mapping.py`, ... | No (mocked)      | `uv run --group tests python -m pytest unittests/ -m "not integration"` |
-| **Desktop integration** | `unittests/desktop/test_se16_integration.py`, `test_se24_integration.py`, ...                                           | Yes (SAP GUI)    | `uv run --group tests python -m pytest unittests/ -m integration`       |
-| **WebGUI integration**  | `unittests/webgui/test_se16_integration.py`, `test_*_exploration.py`, ...                                               | Yes (SAP WebGUI) | `uv run --group tests python -m pytest unittests/ -m integration`       |
+| Category               | Examples                                                                          | Needs SAP?       | How to run                                                              |
+| ---------------------- | --------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------- |
+| **Root unit tests**    | `unittests/test_models.py`, `test_config.py`, `test_catalog.py`, ...              | No               | `uv run --group tests python -m pytest unittests/ -m "not integration"` |
+| **WebGUI unit tests**  | `unittests/webgui/test_se16_parser.py`, `test_selectors.py`, ... (HTML snapshots) | No               | `uv run --group tests python -m pytest unittests/ -m "not integration"` |
+| **WebGUI integration** | `unittests/webgui/test_se16_integration.py`, `test_*_exploration.py`, ...         | Yes (SAP WebGUI) | `uv run --group tests python -m pytest unittests/ -m integration`       |
 
 ### Where a test lives
 
-- A test that imports `sapwebguimcp.backend.desktop` lives in `unittests/desktop/`, one that imports `sapwebguimcp.backend.webgui` in `unittests/webgui/`. A file never imports from the other backend's test directory.
-- Backend-neutral tests stay in `unittests/` and `unittests/lang/`.
-- Assets shared by both backends sit in `unittests/testdata/` (`lang_test.py`, `html_snapshots/`, the abapGit submodules in `abapgit_repos/`). Assets of one backend stay in that backend's `testdata/` directory.
+- A test that imports `sapwebguimcp.backend.webgui` lives in `unittests/webgui/`.
+- Tests that need no backend stay in `unittests/` and `unittests/lang/`.
+- Assets shared by several tests sit in `unittests/testdata/` (`lang_test.py`, `html_snapshots/`, the abapGit submodules in `abapgit_repos/`).
 - The release smoke test of the binary is `scripts/smoke_test_exe.py`.
 
 ### Skip Mechanism
 
 Integration tests auto-skip based on **credential detection** — no hardcoded hostnames or machine lists.
 
-- **Desktop tests** use `skip_no_sap` (defined in `unittests/desktop/conftest.py`): skips when SAP credentials are not configured in `~/.config/sap-mcp/systems.json`
-- **WebGUI tests** use `has_sap_webgui_creds()` (defined in `unittests/conftest.py`): skips when SAP credentials are not configured in `~/.config/sap-mcp/systems.json` or SAP URL is missing
-- Both check functions are in `unittests/conftest.py` — configure your `systems.json` file and tests run automatically
-
-Desktop test files include `pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows only")` to skip on Linux/macOS CI.
+- **WebGUI tests** use `has_sap_webgui_creds()` (defined in `unittests/conftest.py`): skips when SAP credentials are not configured in `~/.config/sap-mcp/systems.json`
+- Configure your `systems.json` file and the tests run automatically
 
 ### Running Tests
 
@@ -305,21 +266,14 @@ uv run --group linting ruff format --check .                             # ruff 
 
 All settings are in `src/sapwebguimcp/models/config.py` and loaded from environment variables or `.env` files.
 
-### Core (have defaults, but needed for SAP operations)
-
-| Variable       | Description        | Default |
-| -------------- | ------------------ | ------- |
-| `SAP_LANGUAGE` | `DE`, `EN` or `IT` | `EN`    |
-
-`SAP_URL` — Web GUI URL (e.g., `https://server/sap/bc/gui/sap/its/webgui`)
-
-SAP credentials (user, password, mandant) are loaded from `~/.config/sap-mcp/systems.json` (or the path set via `SAP_CONFIG_FILE`). See the [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config) package.
+SAP credentials (user, password, client, language, host) are loaded from `~/.config/sap-mcp/systems.json` (or the path set via `SAP_CONFIG_FILE`). See the [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config) package. `SAP_URL` (Web GUI URL, for example `https://server/sap/bc/gui/sap/its/webgui`) is only a fallback for systems without a `host`.
 
 ### Optional
 
-| Group          | Variables                                                                                            | Purpose                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Browser**    | `BROWSER_MODE`, `BROWSER_TYPE`, `CDP_URL`, `CHROME_PATH`, `CHROME_USER_DATA_DIR`, `BROWSER_HEADLESS` | Chrome/Playwright configuration                           |
-| **GitHub**     | `GITHUB_PAT`, `GITHUB_USER`, `GITHUB_REPO`, `ABAPGIT_PAT`                                            | Feedback issue creation, abapGit operations               |
+| Group       | Variables                                                                                            | Purpose                                     |
+| ----------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **Browser** | `BROWSER_MODE`, `BROWSER_TYPE`, `CDP_URL`, `CHROME_PATH`, `CHROME_USER_DATA_DIR`, `BROWSER_HEADLESS` | Chrome/Playwright configuration             |
+| **GitHub**  | `GITHUB_PAT`, `GITHUB_USER`, `GITHUB_REPO`, `ABAPGIT_PAT`                                            | Feedback issue creation, abapGit operations |
+| **Other**   | `OUTPUT_DIR`, `LOG_FORMAT`, `LOG_LEVEL`                                                              | Sandbox for `output_file`, logging          |
 
 See `.env.example` for a complete template with descriptions.
