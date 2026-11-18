@@ -6,10 +6,12 @@ Tools are organized in separate modules under sapguimcp.tools.
 """
 
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
+from dotenv import dotenv_values
 from fastmcp import FastMCP
 from fastmcp.apps.choice import Choice
 from fastmcp.server.middleware.logging import LoggingMiddleware
@@ -23,21 +25,17 @@ from sapguimcp.prompts import register_prompts
 from sapguimcp.resources import (
     register_feedback_resources,
     register_intent_resources,
-    register_sandbox_resources,
 )
 from sapguimcp.tools import (
     register_abapgit_tools,
-    register_breakpoint_tools,
     register_browser_tools,
     register_catalog_tools,
     register_class_tools,
-    register_com_tools,
     register_feedback_tools,
     register_fm_tools,
     register_intent_tools,
     register_quick_report_tools,
     register_sap_tools,
-    register_script_tools,
     register_se09_tools,
     register_se11_tools,
     register_se16_tools,
@@ -53,7 +51,6 @@ from sapguimcp.tools import (
     register_spro_tools,
     register_st22_tools,
     register_table_tools,
-    register_tree_tools,
 )
 from sapguimcp.tools.abapgit_tools import validate_github_pat
 
@@ -87,6 +84,48 @@ async def _check_cdp_available(cdp_url: str) -> bool:
         return False
 
 
+_DESKTOP_MOVED_NOTICE = (
+    "NOTICE: SAP GUI for Windows (desktop) support moved to a separate project, sapgui.mcp "
+    "(https://github.com/Hochfrequenz/sapgui.mcp). This server only drives SAP WebGUI in a browser and "
+    "ignores BACKEND_TYPE. Use sapgui.mcp for SAP GUI for Windows automation."
+)
+
+
+def _env_files() -> tuple[str, ...]:
+    """The .env files the settings load (``SapGuiSettings.model_config['env_file']``)."""
+    return (".env",)
+
+
+def _legacy_setting_values() -> dict[str, str]:
+    """The settings from the .env files the settings load, overridden by the process environment (keys upper-cased)."""
+    values: dict[str, str] = {}
+    for env_file in _env_files():
+        try:
+            loaded = dotenv_values(env_file)
+        except OSError:
+            continue
+        values.update({k.upper(): v for k, v in loaded.items() if v is not None})
+    values.update({k.upper(): v for k, v in os.environ.items()})
+    return values
+
+
+def _legacy_desktop_setting() -> bool:
+    """Whether BACKEND_TYPE=desktop is set, in the environment or a .env file (key and value case-insensitive)."""
+    return _legacy_setting_values().get("BACKEND_TYPE", "").strip().lower() == "desktop"
+
+
+def _warn_legacy_desktop_setting() -> bool:
+    """Log a warning when BACKEND_TYPE=desktop is set. Never fails; returns whether it is set."""
+    found = _legacy_desktop_setting()
+    if found:
+        logger.warning(
+            "Legacy setting BACKEND_TYPE=desktop detected. SAP GUI for Windows support moved to the separate "
+            "project sapgui.mcp (https://github.com/Hochfrequenz/sapgui.mcp); this server uses SAP WebGUI only "
+            "and ignores it."
+        )
+    return found
+
+
 @asynccontextmanager
 async def app_lifespan(_server: FastMCP) -> AsyncIterator[None]:
     """
@@ -99,15 +138,12 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[None]:
         from _sapguimcp_version import version as _server_version  # pylint: disable=import-outside-toplevel
     except (ImportError, SyntaxError):
         _server_version = "unknown"
-    logger.info("[STARTING] SAP MCP Server v%s initializing (backend=%s)...", _server_version, _settings.backend_type)
-    if _settings.backend_type == "webgui":
-        cdp_ok = await _check_cdp_available(_settings.cdp_url)
-        if cdp_ok:
-            logger.info("[READY] Server started successfully. Waiting for MCP client connection on stdio.")
-        else:
-            logger.info("[READY] Server started. Chrome not detected yet — will auto-launch when browser is needed.")
+    logger.info("[STARTING] SAP MCP Server v%s initializing...", _server_version)
+    cdp_ok = await _check_cdp_available(_settings.cdp_url)
+    if cdp_ok:
+        logger.info("[READY] Server started successfully. Waiting for MCP client connection on stdio.")
     else:
-        logger.info("[READY] Server started (backend=%s). Waiting for MCP client connection.", _settings.backend_type)
+        logger.info("[READY] Server started. Chrome not detected yet — will auto-launch when browser is needed.")
 
     # Validate GitHub PAT if configured (non-blocking, warns only)
     _current_settings = get_settings()
@@ -133,7 +169,7 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[None]:
         logger.info("[STOPPED] Server shutdown complete.")
 
 
-# Instructions for the LLM about this MCP server — backend-specific
+# Instructions for the LLM about this MCP server
 _WEBGUI_INSTRUCTIONS = """
 SAP Web GUI automation server. Controls SAP through a Chrome browser with remote debugging enabled.
 
@@ -185,7 +221,7 @@ If sap-adt (SAP ADT MCP) tools are available, prefer them for:
 - Debugging (breakpoints, stepping, variable inspection)
 - DDIC lookups (get_object_info, get_ddic_info)
 
-Use THIS server (sap-desktop/sap-webgui) for:
+Use THIS server (sap-webgui) for:
 - Customizing transactions (SPRO, SM30, SM34)
 - Transport release on ECC (SE09 — ADT release may silently fail on ECC)
 - Complex GUI interactions (popups, drag-and-drop, tree navigation)
@@ -198,83 +234,11 @@ TRANSACTION SELECTION:
 - SE80 has a complex split-screen layout that tools struggle to parse
 """
 
-_DESKTOP_INSTRUCTIONS = """
-SAP GUI Desktop automation server. Controls SAP GUI for Windows via COM Scripting (ActiveX/OLE).
-
-PREREQUISITES:
-- SAP GUI for Windows installed and running
-- SAP GUI Scripting enabled on the server (RZ11 parameter: sapgui/user_scripting = TRUE)
-- SAP GUI Scripting enabled on the client (SAP GUI Options > Accessibility & Scripting > Enable Scripting)
-- SAP Logon landscape configured with the target connection name
-
-CONNECTION:
-The server connects using the default_system from ~/.config/sap-mcp/systems.json.
-Each system entry has a sap_logon_entry field (the bold description text in the SAP Logon pad).
-Override via the system_key parameter in sap_login() (pass the dictionary key from systems.json).
-
-IF CONNECTION FAILS:
-Ask the user to verify:
-1. "Is SAP GUI running?" (SAP Logon must be open)
-2. "Is scripting enabled?" (both server-side RZ11 and client-side SAP GUI Options)
-3. "Does the sap_logon_entry in systems.json match the SAP Logon pad description exactly?"
-
-COMMON ERROR CAUSES:
-- RPC_E_DISCONNECTED: SAP GUI closed or session timed out — call sap_login() again.
-  If sap_login itself fails with an HRESULT and "SAP Logon not reachable or connection lost",
-  start or restart SAP Logon and call sap_login again
-- "Scripting disabled": Enable in SAP GUI Options > Accessibility & Scripting
-- Login fails: Check user/password/client in ~/.config/sap-mcp/systems.json
-
-WORKFLOW:
-1. Call sap_login first to open SAP and authenticate
-2. Use sap_transaction to navigate to transactions (e.g., VA01, SE16, BP)
-3. Use sap_com_snapshot to see the SAP GUI element tree with element IDs
-4. Use SAP-specific tools (sap_fill_form, sap_click_button, sap_press_key) for interactions
-5. Use sap_com_evaluate as escape hatch for operations not covered by SAP-specific tools
-
-MULTI-SESSION SUPPORT (#671):
-sap_login() opens a NEW parallel session each call — re-login does NOT
-replace prior logins. You can be logged in as multiple distinct
-(client, user) tuples on the same SAP Logon entry concurrently. The
-LoginResult.session_id field carries the registry ID ('s1', 's2', ...)
-of the new session; pass that as the `session` / `session_id` parameter
-on subsequent tool calls to address THIS specific login. Use
-sap_session_list to see all currently active sessions, and
-sap_session_close to close any session the server opened (including 's1' if you want).
-Sessions have an origin: "opened" (created by this server) or "attached" (a
-window the user already had open). The server never closes an attached
-session: sap_session_close and sap_session_reset_to_primary leave it open
-(reset reports it in skipped_attached). Use sap_session_detach to drop any
-session from the registry without closing its SAP window (desktop only).
-Concurrency rule: ONE SAP GUI connection = ONE COM engine. All SAP work on
-the same connection — every tool call, of every session and every agent —
-runs sequentially through it. A long sap_run_script blocks all other calls
-on that connection until it finishes; if calls hang, sap_session_list
-reports the running call in its com_engine field. Run SAP work of multiple
-agents sequentially, not in parallel. Parallelism helps only across
-separate connections or separate systems (or on the WebGUI backend, which
-can use several browser tabs).
-
-ESCAPE HATCHES (when SAP-specific tools are insufficient):
-- sap_com_snapshot: Get element tree with IDs (e.g., wnd[0]/usr/txtFIELD_NAME)
-- sap_com_evaluate: Execute COM operations on elements by ID
-  - action="get": Read a property (e.g., Text, Selected, Value)
-  - action="set": Write a property (args=["value"])
-  - action="call": Invoke a method (e.g., SendVKey on wnd[0], Press on buttons)
-  - Use element IDs from sap_com_snapshot (e.g., "wnd[0]/usr/cmbFIELD")
-  - VKey codes: 0=Enter, 3=F3/Back, 8=F8/Execute, 11=F11/Save, 12=F12/Cancel
-- sap_run_script: Run a Python script against the live session in one round-trip
-  - Use when the number of operations depends on a runtime value (rows in a grid,
-    nodes in a tree, status-conditional branching) — replaces many sap_com_evaluate
-    calls with a single script. Faster and uses fewer tokens.
-  - Provides: session (GuiSession), output(value) to collect results
-  - import and print are not available; use output() instead
-"""
-
 
 def _build_instructions() -> str:
-    base = _DESKTOP_INSTRUCTIONS if _settings.backend_type == "desktop" else _WEBGUI_INSTRUCTIONS
-    base = _CROSS_SERVER_GUIDANCE + base
+    base = _CROSS_SERVER_GUIDANCE + _WEBGUI_INSTRUCTIONS
+    if _warn_legacy_desktop_setting():
+        base += "\n" + _DESKTOP_MOVED_NOTICE + "\n"
     sap_cfg, config_error = try_get_sap_config()
     if config_error:  # invalid config: don't crash startup, but say why
         logger.error("SAP config file could not be loaded, no systems listed: %s", config_error)
@@ -303,7 +267,7 @@ def _build_instructions() -> str:
 SERVER_INSTRUCTIONS = _build_instructions()
 
 # Create the FastMCP server instance with strict input validation
-_SERVER_NAME = "sap-desktop-mcp" if _settings.backend_type == "desktop" else "sap-webgui-mcp"
+_SERVER_NAME = "sap-webgui-mcp"
 mcp = FastMCP(
     _SERVER_NAME,
     instructions=SERVER_INSTRUCTIONS,
@@ -322,10 +286,9 @@ mcp.add_middleware(
     LoggingMiddleware(include_payloads=True, max_payload_length=1000, payload_serializer=masked_payload_serializer)
 )
 
-# Register tools — conditionally based on backend type
-_backend = _settings.backend_type
+# Register tools (WebGUI only)
 
-# Always available: SAP tools + transaction-specific tools
+# SAP tools + transaction-specific tools
 register_sap_tools(mcp)
 register_se11_tools(mcp)
 register_se16_tools(mcp)
@@ -344,24 +307,16 @@ register_fm_tools(mcp)
 register_class_tools(mcp)
 register_se24_edit_tools(mcp)
 register_se38_edit_tools(mcp)
-register_breakpoint_tools(mcp)
 
-# Always available: logging, abapgit
+# Logging, abapgit
 register_intent_tools(mcp)
 register_feedback_tools(mcp)
 register_abapgit_tools(mcp)
 
-# WebGUI only: browser escape hatches, SE37 editor (no desktop impl)
-if _backend == "webgui":
-    register_browser_tools(mcp)
-    register_se37_edit_tools(mcp)
-    register_quick_report_tools(mcp)
-
-if _backend == "desktop":
-    register_com_tools(mcp)
-    register_tree_tools(mcp)
-    register_script_tools(mcp)
-    register_sandbox_resources(mcp)
+# Browser escape hatches, SE37 editor, quick report
+register_browser_tools(mcp)
+register_se37_edit_tools(mcp)
+register_quick_report_tools(mcp)
 
 # Register prompts
 register_prompts(mcp)

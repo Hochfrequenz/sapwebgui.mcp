@@ -67,7 +67,6 @@ from sapguimcp.models import (
     TableData,
     ToolInfo,
     TransactionResult,
-    get_settings,
 )
 from sapguimcp.tools.sap_list_connections_impl import ConnectionListResult, sap_list_connections_impl
 from sapguimcp.tools.sap_login_impl import sap_login_impl
@@ -326,15 +325,6 @@ async def _transaction_webgui(
         new_window=True,
         session_id=new_session_id,
         session_count=session_count,
-    )
-
-
-def _lookup_fields_desktop(tcode_upper: str) -> FieldLookupResult:
-    """sap_lookup_fields on the Desktop backend: the registry holds WebGUI CSS selectors, which do not apply."""
-    return FieldLookupResult.failure(
-        "sap_lookup_fields returns WebGUI CSS selectors which don't work on Desktop. "
-        "Use sap_discover_fields to find fields dynamically.",
-        transaction=tcode_upper,
     )
 
 
@@ -1088,8 +1078,6 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         """
         tcode_upper = transaction.upper().strip()
 
-        if get_settings().backend_type == "desktop":
-            return _lookup_fields_desktop(tcode_upper)
         return _lookup_fields_webgui(tcode_upper)
 
     @mcp.tool(

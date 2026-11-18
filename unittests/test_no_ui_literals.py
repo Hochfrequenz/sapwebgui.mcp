@@ -23,9 +23,8 @@ are code (no letters, one character, ``snake_case``, ALL CAPS, only DOM/ARIA voc
 
 Exemptions are keyed by file and literal, never by line:
 
-- ``unittests/lang_baseline.json`` holds only ``src/sapguimcp/tools/breakpoint_tools.py`` (#1025), the one
-  documented exception; that file is deliberately left unmigrated. Everything else is clean, so a new hit anywhere
-  else is fixed with a pack entry or ``# lang-ok``, never a baseline entry.
+- ``unittests/lang_baseline.json`` is empty: everything is clean, so a new hit anywhere is fixed with a pack
+  entry or ``# lang-ok``, never a baseline entry.
   The file is shrink-only: ``{file: {literal: count}}``, where ``count`` is
   how many (not skipped, not ``lang-ok``) literals in that file have exactly that value, so the
   count includes every non-exempt occurrence of a baselined literal, flagged or not. A new hit
@@ -592,8 +591,12 @@ def _in_array_receiver(tokens: list[_Tok], index: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
+# Not registered on the server (desktop only) and left unmigrated; deleted together with the other desktop modules.
+UNREGISTERED_DESKTOP_MODULES = (SRC / "tools" / "breakpoint_tools.py",)
+
+
 def scanned_files() -> list[Path]:
-    python = [p for p in SRC.rglob("*.py") if not p.is_relative_to(LANG_DIR)]
+    python = [p for p in SRC.rglob("*.py") if not p.is_relative_to(LANG_DIR) and p not in UNREGISTERED_DESKTOP_MODULES]
     return sorted([*python, *JS_DIR.glob("*.js")])
 
 
@@ -706,11 +709,6 @@ def test_generic_fields_copied_from_en_stay_exempt() -> None:
 
 def test_baseline_is_canonical() -> None:
     assert BASELINE.read_text(encoding="utf-8") == canonical_json(load_baseline())
-
-
-def test_breakpoint_tools_stays_on_the_baseline() -> None:
-    """``breakpoint_tools.py`` is off-limits (spec, Goal): its literals stay exempt via the baseline."""
-    assert "src/sapguimcp/tools/breakpoint_tools.py" in load_baseline()
 
 
 def test_every_lang_ok_names_a_reason() -> None:

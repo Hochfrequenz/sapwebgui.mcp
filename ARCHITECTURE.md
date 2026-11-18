@@ -38,7 +38,7 @@ graph TD
 | ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Server**          | `server.py`                                      | Creates the FastMCP app, registers all tools/resources/prompts, manages lifecycle                                                                                                                |
 | **Tools**           | `tools/sap_tools.py`, `tools/se16_tools.py`, ... | Define MCP tools the LLM can call. Each tool gets a backend via `get_backend()` (typed `WebGuiBackend \| DesktopBackend`), calls its methods, returns a Pydantic result model                    |
-| **Backend Manager** | `backend/manager.py`                             | Singleton that creates/caches the right backend based on `BACKEND_TYPE`. Routes session IDs to backend instances                                                                                 |
+| **Backend Manager** | `backend/manager.py`                             | Singleton that creates/caches the WebGUI backend. Routes session IDs to backend instances                                                                                                        |
 | **WebGUI Backend**  | `backend/webgui/backend.py`, `browser.py`        | Playwright page automation (`WebGuiBackend`). Fills fields with JavaScript, reads screens with ARIA snapshots                                                                                    |
 | **Desktop Backend** | `backend/desktop/__init__.py`                    | `DesktopBackend`: COM scripting through [sapsucker](https://github.com/Hochfrequenz/sapsucker). Dispatches all COM calls to a dedicated thread (`_com_thread.py`) for apartment-threading safety |
 | **Parsers**         | `backend/webgui/parsers/*.py`                    | WebGUI-specific HTML-to-structured-data extraction. One parser per transaction (e.g., `se16_parser.py`, `se24_parser.py`)                                                                        |
@@ -245,18 +245,9 @@ def register_se99_tools(mcp: FastMCP) -> None:
         return SE99Result(data=[...])
 ```
 
-### 3. Add a desktop and a WebGUI path (if the backends differ)
+### 3. One backend
 
-`get_backend()` returns `WebGuiBackend | DesktopBackend`. If the backends need different logic (e.g., COM table reading instead of HTML parsing), dispatch once at the top of the tool to one function per backend, so that nothing interleaves the two paths and either side can be deleted on its own:
-
-```python
-if backend.backend_type == "desktop":
-    result = await _query_se99_desktop(cast("DesktopBackend", backend), param)
-else:
-    result = await _query_se99_webgui(cast("WebGuiBackend", backend), param)
-```
-
-Steps both paths share (argument checks, building the result) stay in the dispatching function.
+This project drives only the Web GUI. Tools call `WebGuiBackend` directly. The `_desktop` functions and their dispatch, which some tools still carry from before the split, are being deleted (#54). Do not add new ones.
 
 ### 4. Add a WebGUI parser (if needed)
 
@@ -319,14 +310,11 @@ All settings are in `src/sapguimcp/models/config.py` and loaded from environment
 
 ### Core (have defaults, but needed for SAP operations)
 
-| Variable       | Description           | Default  |
-| -------------- | --------------------- | -------- |
-| `BACKEND_TYPE` | `desktop` or `webgui` | `webgui` |
-| `SAP_LANGUAGE` | `DE`, `EN` or `IT`    | `EN`     |
+| Variable       | Description        | Default |
+| -------------- | ------------------ | ------- |
+| `SAP_LANGUAGE` | `DE`, `EN` or `IT` | `EN`    |
 
-**Desktop-only:** Connection name is configured in `~/.config/sap-mcp/systems.json`
-
-**WebGUI-only:** `SAP_URL` — Web GUI URL (e.g., `https://server/sap/bc/gui/sap/its/webgui`)
+`SAP_URL` — Web GUI URL (e.g., `https://server/sap/bc/gui/sap/its/webgui`)
 
 SAP credentials (user, password, mandant) are loaded from `~/.config/sap-mcp/systems.json` (or the path set via `SAP_CONFIG_FILE`). See the [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config) package.
 
