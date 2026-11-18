@@ -62,12 +62,10 @@ __all__ = ["main", "mcp"]
 # Get settings (needed for logging configuration)
 _settings = get_settings()
 
-# Configure logging (including optional Papertrail)
+# Configure logging
 configure_logging(
     log_format=_settings.log_format,
     log_level=_settings.log_level,
-    papertrail_host=_settings.papertrail_host,
-    papertrail_port=_settings.papertrail_port,
 )
 logger = logging.getLogger(__name__)
 

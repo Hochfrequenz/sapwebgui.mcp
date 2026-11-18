@@ -6,7 +6,6 @@ SAP system credentials are loaded from the shared ``sap-mcp-config`` JSON file
 (``~/.config/sap-mcp/systems.json`` by default, or via ``SAP_CONFIG_FILE`` env var).
 """
 
-import sys
 import tempfile
 from enum import StrEnum
 from pathlib import Path
@@ -111,26 +110,6 @@ def try_get_sap_config() -> tuple[SapMcpConfig | None, str | None]:
 BackendType = Literal["webgui", "desktop"]
 
 
-def _env_files() -> tuple[str, ...]:
-    """Return env file paths, accounting for PyInstaller bundles.
-
-    In a frozen .exe, PyInstaller extracts bundled data files to a temp
-    directory (``sys._MEIPASS``).  We look for ``.env.production`` there
-    first, then always include the user's ``.env`` (resolved from cwd).
-
-    Priority (later files override earlier):
-      1. ``.env.production`` from ``_MEIPASS`` (if present)
-      2. ``.env`` from the current working directory
-    """
-    base = Path(getattr(sys, "_MEIPASS", "."))
-    production = base / ".env.production"
-    files: list[str] = []
-    if production.is_file():
-        files.append(str(production))
-    files.append(".env")
-    return tuple(files)
-
-
 # TODO(split): BrowserMode and BrowserType are webgui-only — move to webgui
 # project's own config when splitting.
 
@@ -191,7 +170,7 @@ class SapGuiSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="",
-        env_file=_env_files(),  # called at import time
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -318,20 +297,6 @@ class SapGuiSettings(BaseSettings):
         default="INFO",
         description="Log level: DEBUG, INFO, WARNING, or ERROR.",
         json_schema_extra={"env": "LOG_LEVEL"},
-    )
-
-    # Papertrail Logging (optional)
-    # Defaults are empty — Papertrail is OFF everywhere (source, pip install, and .exe).
-    # Set PAPERTRAIL_HOST + PAPERTRAIL_PORT in your .env (or environment) to enable.
-    papertrail_host: str = Field(
-        default="",
-        description="Papertrail syslog destination host. Leave empty to disable.",
-        json_schema_extra={"env": "PAPERTRAIL_HOST"},
-    )
-    papertrail_port: int = Field(
-        default=0,
-        description="Papertrail syslog destination port.",
-        json_schema_extra={"env": "PAPERTRAIL_PORT"},
     )
 
     # abapGit Integration

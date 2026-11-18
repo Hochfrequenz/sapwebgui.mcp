@@ -17,9 +17,6 @@ LOG_FORMAT and LOG_LEVEL are read from SapGuiSettings (pydantic-settings).
 import importlib.metadata
 import json
 import logging
-import socket
-import ssl
-import time
 import traceback
 from datetime import datetime, timezone
 from typing import Any
@@ -220,105 +217,10 @@ class StructuredFormatter(logging.Formatter):
         return json.dumps(data, default=str)
 
 
-class _PapertrailTlsHandler(logging.Handler):
-    """Send syslog messages to Papertrail over TCP+TLS.
-
-    Each log record is sent as a newline-terminated BSD syslog message
-    (RFC 3164 with PRI, timestamp, hostname) over a persistent TLS
-    connection.  The connection is established lazily on the first
-    emit() call and automatically reconnected on failure with
-    exponential backoff to avoid flooding stderr or blocking threads
-    when Papertrail is unreachable.
-
-    Newlines in messages are replaced with spaces to prevent syslog
-    injection and message splitting.
-
-    This replaces the previous UDP SysLogHandler which silently dropped
-    messages without delivery confirmation.
-    """
-
-    # Syslog facility USER (1) and default severity INFO (6) → PRI = 1*8+6 = 14
-    FACILITY_USER = 1
-    _SEVERITY_MAP = {
-        logging.DEBUG: 7,  # syslog debug
-        logging.INFO: 6,  # syslog info
-        logging.WARNING: 4,  # syslog warning
-        logging.ERROR: 3,  # syslog err
-        logging.CRITICAL: 2,  # syslog crit
-    }
-    _MAX_BACKOFF = 300  # 5 minutes
-
-    def __init__(self, host: str, port: int) -> None:
-        super().__init__()
-        self._host = host
-        self._port = port
-        self._sock: ssl.SSLSocket | None = None
-        self._ctx = ssl.create_default_context()
-        self._backoff_until: float = 0.0
-        self._consecutive_failures: int = 0
-
-    def _connect(self) -> None:
-        # socket.create_connection handles IPv4/IPv6 resolution
-        raw = socket.create_connection((self._host, self._port), timeout=5.0)
-        try:
-            raw.settimeout(None)  # blocking mode after connect
-            self._sock = self._ctx.wrap_socket(raw, server_hostname=self._host)
-        except Exception:
-            raw.close()  # prevent FD leak if TLS handshake fails
-            raise
-
-    def _priority(self, record: logging.LogRecord) -> int:
-        """Compute syslog PRI value from facility and log level."""
-        severity = self._SEVERITY_MAP.get(record.levelno, 6)
-        return self.FACILITY_USER * 8 + severity
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            if self._sock is None:
-                if time.monotonic() < self._backoff_until:
-                    return  # silently drop during backoff
-                self._connect()
-                self._consecutive_failures = 0
-            msg = self.format(record)
-            # Sanitize newlines to prevent syslog injection / message splitting
-            msg = msg.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
-            # BSD syslog: <PRI>TIMESTAMP HOSTNAME MSG\n
-            pri = self._priority(record)
-            ts = time.strftime("%b %d %H:%M:%S")
-            payload = f"<{pri}>{ts} {msg}\n".encode("utf-8")
-            self._sock.sendall(payload)  # type: ignore[union-attr]  # _connect() ensures not None
-        except Exception:  # pylint: disable=broad-exception-caught
-            self._close_socket()
-            self._consecutive_failures += 1
-            delay = min(2**self._consecutive_failures, self._MAX_BACKOFF)
-            self._backoff_until = time.monotonic() + delay
-            # Only log the first failure to stderr; suppress subsequent noise
-            if self._consecutive_failures <= 1:
-                self.handleError(record)
-
-    def _close_socket(self) -> None:
-        if self._sock is not None:
-            try:
-                self._sock.close()
-            except OSError:
-                pass
-            self._sock = None
-
-    def close(self) -> None:
-        self.acquire()
-        try:
-            self._close_socket()
-        finally:
-            self.release()
-        super().close()
-
-
 def configure_logging(
     *,
     log_format: str = "",
     log_level: str = "INFO",
-    papertrail_host: str = "",
-    papertrail_port: int = 0,
 ) -> None:
     """Configure root logger with structured formatter.
 
@@ -327,11 +229,9 @@ def configure_logging(
     Args:
         log_format: Set to "json" for JSON output. Default is human-readable console.
         log_level: Log level (DEBUG, INFO, WARNING, ERROR). Default is INFO.
-        papertrail_host: Papertrail syslog destination host. Empty to disable.
-        papertrail_port: Papertrail syslog destination port.
 
     Build context (version + commit) is attached to every record passing
-    through the StreamHandler and Papertrail TLS handler installed here, via
+    through the StreamHandler installed here, via
     a ``_BuildContextFilter``. This is intentional handler-scoped behaviour:
     handlers added externally to the root logger (e.g. a user-installed
     ``FileHandler`` for local file logging) will **not** receive the filter
@@ -360,31 +260,3 @@ def configure_logging(
     ]
     root.addHandler(handler)
     root.setLevel(level)
-
-    # Remove any previous Papertrail handler before (re-)adding
-    root.handlers = [h for h in root.handlers if not isinstance(h, _PapertrailTlsHandler)]
-
-    if papertrail_host and not 1 <= papertrail_port <= 65535:
-        logging.getLogger(__name__).warning(
-            "Papertrail host set to %s but port %d is invalid (must be 1-65535). Papertrail logging disabled.",
-            papertrail_host,
-            papertrail_port,
-        )
-    elif papertrail_host:
-        logging.getLogger(__name__).info(
-            "[OK] Papertrail logging configured (TLS): %s:%d", papertrail_host, papertrail_port
-        )
-        tls_handler = _PapertrailTlsHandler(papertrail_host, papertrail_port)
-        # Filter MUST be added before the formatter renders, since
-        # %(version)s/%(commit)s in the format string would KeyError if the
-        # attributes weren't set on the record yet. Python runs handler
-        # filters before the formatter, so this ordering is correct.
-        tls_handler.addFilter(build_filter)
-        syslog_formatter = logging.Formatter(
-            fmt=(
-                f"{socket.gethostname()} sapguimcp: %(name)s [%(levelname)s] "
-                "version=%(version)s commit=%(commit)s %(message)s"
-            ),
-        )
-        tls_handler.setFormatter(syslog_formatter)
-        root.addHandler(tls_handler)
