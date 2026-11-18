@@ -337,6 +337,5 @@ SAP credentials (user, password, mandant) are loaded from `~/.config/sap-mcp/sys
 | **Browser**    | `BROWSER_MODE`, `BROWSER_TYPE`, `CDP_URL`, `CHROME_PATH`, `CHROME_USER_DATA_DIR`, `BROWSER_HEADLESS` | Chrome/Playwright configuration                           |
 | **COM timing** | `COM_MIN_INTERVAL_MS`                                                                                | Minimum ms between COM calls (desktop, prevents overload) |
 | **GitHub**     | `GITHUB_PAT`, `GITHUB_USER`, `GITHUB_REPO`, `ABAPGIT_PAT`                                            | Feedback issue creation, abapGit operations               |
-| **Logging**    | `PAPERTRAIL_HOST`, `PAPERTRAIL_PORT`                                                                 | Remote syslog (optional)                                  |
 
 See `.env.example` for a complete template with descriptions.

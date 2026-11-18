@@ -910,8 +910,6 @@ An unset or empty variable makes the config invalid, so the first tool call that
 | `GITHUB_USER`          | No                          | GitHub username for abapGit (falls back to `x-access-token`)                                                                                                                                                                                                                                                                                                                                                                                                    | -                                |
 | `GITHUB_REPO`          | No                          | Repository for feedback issues                                                                                                                                                                                                                                                                                                                                                                                                                                  | `Hochfrequenz/sapwebgui.mcp`     |
 | `ABAPGIT_PAT`          | No                          | Separate PAT for abapGit (overrides `GITHUB_PAT` if set)                                                                                                                                                                                                                                                                                                                                                                                                        | -                                |
-| `PAPERTRAIL_HOST`      | No                          | Papertrail syslog host (empty to disable)                                                                                                                                                                                                                                                                                                                                                                                                                       | `""` (off)                       |
-| `PAPERTRAIL_PORT`      | No                          | Papertrail syslog port                                                                                                                                                                                                                                                                                                                                                                                                                                          | `0` (off)                        |
 | `LOG_FORMAT`           | No                          | Set to `json` for JSON log output                                                                                                                                                                                                                                                                                                                                                                                                                               | `""` (human-readable)            |
 | `LOG_LEVEL`            | No                          | `DEBUG`, `INFO`, `WARNING`, or `ERROR`                                                                                                                                                                                                                                                                                                                                                                                                                          | `INFO`                           |
 
@@ -919,28 +917,12 @@ An unset or empty variable makes the config invalid, so the first tool call that
 
 The server logs to **stdout** by default using a structured text format. Set `LOG_FORMAT=json` for machine-readable JSON output.
 
-### Papertrail (remote logging)
-
-Remote logging to [Papertrail](https://www.papertrail.com/) is **disabled by default**. No telemetry is sent unless you explicitly opt in.
-
-To enable it, set both `PAPERTRAIL_HOST` and `PAPERTRAIL_PORT` in your `.env` file or environment:
-
-```
-PAPERTRAIL_HOST=logs.example.com
-PAPERTRAIL_PORT=12345
-```
-
-When enabled, tool call names, SAP hostnames, and operational metadata are sent to the configured Papertrail endpoint for monitoring and debugging. No SAP credentials or business data are transmitted.
-
 Each release publishes binaries for Windows and macOS:
 
-| Binary                                          | Papertrail default                           | Intended audience                    |
-| ----------------------------------------------- | -------------------------------------------- | ------------------------------------ |
-| `sapwebgui_mcp_windows.exe`                     | **off** - no defaults bundled                | Public / external users              |
-| `sapwebgui_mcp_windows_with_remote_logging.exe` | Hochfrequenz endpoint baked in at build time | Hochfrequenz-internal use            |
-| `sapwebgui_mcp_macos_arm64`                     | **off** - no defaults bundled                | Public / macOS (Apple Silicon) users |
+- `sapwebgui_mcp_windows.exe` (Windows)
+- `sapwebgui_mcp_macos_arm64` (macOS, Apple Silicon)
 
-Both binaries honour user overrides via `.env` or environment variables.
+The binaries honour user overrides via `.env` or environment variables.
 
 ## Troubleshooting
 
