@@ -9,7 +9,7 @@ import pytest
 from dotenv import load_dotenv
 
 if TYPE_CHECKING:
-    from sapguimcp.lang import LanguagePack
+    from sapwebguimcp.lang import LanguagePack
 
 # Load .env file if it exists (for local development and integration tests)
 load_dotenv()
@@ -27,7 +27,7 @@ SESSION_SAP_CONFIG_FILE = os.environ.get("SAP_CONFIG_FILE", "")
 def _has_sap_config() -> bool:
     """Check if a valid sap-mcp-config systems.json is available."""
     try:
-        from sapguimcp.models.config import get_sap_config
+        from sapwebguimcp.models.config import get_sap_config
 
         cfg = get_sap_config()
         default = cfg.get_default()
@@ -51,19 +51,19 @@ def has_sap_webgui_creds() -> bool:
 @pytest.fixture(autouse=True)
 def reset_settings() -> Generator[None, None, None]:
     """Reset global settings before each test."""
-    import sapguimcp.models.config
+    import sapwebguimcp.models.config
 
-    sapguimcp.models.config._settings = None
-    sapguimcp.models.config._sap_config = None
+    sapwebguimcp.models.config._settings = None
+    sapwebguimcp.models.config._sap_config = None
     yield
-    sapguimcp.models.config._settings = None
-    sapguimcp.models.config._sap_config = None
+    sapwebguimcp.models.config._settings = None
+    sapwebguimcp.models.config._sap_config = None
 
 
 @pytest.fixture(autouse=True)
 def reset_session_language() -> Generator[None, None, None]:
     """Reset the session-language context variable around every test (#1044)."""
-    from sapguimcp.session_language import use_language
+    from sapwebguimcp.session_language import use_language
 
     with use_language(None):
         yield
@@ -72,7 +72,7 @@ def reset_session_language() -> Generator[None, None, None]:
 @pytest.fixture
 def lang_de() -> Generator["LanguagePack", None, None]:
     """Run the test in a German session; yields the merged view ``lang.current()`` returns."""
-    from sapguimcp import lang
+    from sapwebguimcp import lang
 
     with lang.use("DE"):
         yield lang.current()
@@ -81,7 +81,7 @@ def lang_de() -> Generator["LanguagePack", None, None]:
 @pytest.fixture
 def lang_en() -> Generator["LanguagePack", None, None]:
     """Run the test in an English session; yields the merged view ``lang.current()`` returns."""
-    from sapguimcp import lang
+    from sapwebguimcp import lang
 
     with lang.use("EN"):
         yield lang.current()

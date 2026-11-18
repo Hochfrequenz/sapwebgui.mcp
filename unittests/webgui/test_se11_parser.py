@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang.schema import LanguagePack
-from sapguimcp.models.se11_models import SE11Entry, SE11Error, SE11Field
-from sapguimcp.tools.se11_tools import _parse_se11_fields, _parse_se11_yaml
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import LanguagePack
+from sapwebguimcp.models.se11_models import SE11Entry, SE11Error, SE11Field
+from sapwebguimcp.tools.se11_tools import _parse_se11_fields, _parse_se11_yaml
 
 YAML_SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "yaml_snapshots"
 

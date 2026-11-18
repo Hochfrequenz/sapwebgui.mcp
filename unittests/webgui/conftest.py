@@ -14,7 +14,7 @@ from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from pydantic import BaseModel
 
-from sapguimcp.models import LoginResult
+from sapwebguimcp.models import LoginResult
 from unittests.conftest import SESSION_SAP_CONFIG_FILE, has_sap_webgui_creds
 from unittests.testdata.lang_test import UI_TEST_PACKS, UiTestPack, resolve_sap_language
 
@@ -28,7 +28,7 @@ def resolve_login_user(login: LoginResult) -> str:
     if login.user:
         return login.user
     try:
-        from sapguimcp.models.config import get_sap_config
+        from sapwebguimcp.models.config import get_sap_config
 
         configured = get_sap_config().get_default().user
     except Exception:  # pylint: disable=broad-except
@@ -242,7 +242,7 @@ async def sap_mcp_client() -> AsyncGenerator[ClientSession, None]:
     This fixture:
     1. Skips if SAP WebGUI credentials are not configured
     2. Skips if SAP_URL environment variable is not set
-    3. Starts the sapguimcp server as a subprocess
+    3. Starts the sapwebguimcp server as a subprocess
     4. Connects an MCP client via stdio
     5. Yields the client session for tests to call tools
     6. Cleans up on teardown
@@ -277,7 +277,7 @@ async def sap_mcp_client() -> AsyncGenerator[ClientSession, None]:
     }
     server_params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "sapguimcp.server"],
+        args=["-m", "sapwebguimcp.server"],
         env=server_env,
     )
 

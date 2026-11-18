@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from sapguimcp.tools.feedback_tools import Tags, _coerce_tags
+from sapwebguimcp.tools.feedback_tools import Tags, _coerce_tags
 
 
 class TestCoerceTags:

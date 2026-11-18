@@ -30,7 +30,7 @@ class TestWebGuiGetSessionStatusPerID:
 
     @staticmethod
     def _make_backend() -> Any:
-        from sapguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
 
         backend = WebGuiBackend.__new__(WebGuiBackend)
         backend._page = MagicMock()

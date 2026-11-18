@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang import LanguagePack
-from sapguimcp.tools.field_helpers import fill_and_display, toggle_to_change_mode
+from sapwebguimcp import lang
+from sapwebguimcp.lang import LanguagePack
+from sapwebguimcp.tools.field_helpers import fill_and_display, toggle_to_change_mode
 
 
 def _make_backend(

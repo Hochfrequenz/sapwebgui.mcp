@@ -4,10 +4,10 @@ import dataclasses
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang.schema import iter_leaves
-from sapguimcp.lang.sources import SOURCES, Manual, Message
-from sapguimcp.lang.text import Template
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import iter_leaves
+from sapwebguimcp.lang.sources import SOURCES, Manual, Message
+from sapwebguimcp.lang.text import Template
 
 
 def _paths(code: str) -> set[str]:

@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import SecretStr
 
-_PATCH_GET_BACKEND = "sapguimcp.tools.sap_list_connections_impl.get_backend"
-_PATCH_GET_SAP_CONFIG = "sapguimcp.models.config.get_sap_config"
+_PATCH_GET_BACKEND = "sapwebguimcp.tools.sap_list_connections_impl.get_backend"
+_PATCH_GET_SAP_CONFIG = "sapwebguimcp.models.config.get_sap_config"
 
 
 class TestSapListConnectionsTool:
@@ -15,7 +15,7 @@ class TestSapListConnectionsTool:
     @pytest.mark.anyio
     async def test_returns_connection_list(self) -> None:
         """Tool calls backend.list_connections and returns results."""
-        from sapguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
+        from sapwebguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
 
         backend = AsyncMock()
         backend.list_connections.return_value = [
@@ -68,7 +68,7 @@ class TestConfiguredSystems:
     """configured_systems exposes systems.json entries without passwords."""
 
     def test_get_configured_systems_returns_safe_fields(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import _get_configured_systems
+        from sapwebguimcp.tools.sap_list_connections_impl import _get_configured_systems
 
         with patch(_PATCH_GET_SAP_CONFIG, return_value=_make_sap_config()):
             systems, error = _get_configured_systems()
@@ -84,7 +84,7 @@ class TestConfiguredSystems:
         assert "user" not in s4
 
     def test_get_configured_systems_no_config(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import _get_configured_systems
+        from sapwebguimcp.tools.sap_list_connections_impl import _get_configured_systems
 
         with patch(_PATCH_GET_SAP_CONFIG, side_effect=FileNotFoundError):
             systems, error = _get_configured_systems()
@@ -93,7 +93,7 @@ class TestConfiguredSystems:
         assert error is None  # no config file is a legitimate setup, not an error
 
     def test_get_configured_systems_invalid_config_reports_error(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import _get_configured_systems
+        from sapwebguimcp.tools.sap_list_connections_impl import _get_configured_systems
 
         message = 'system "dev": language must be one of "DE", "EN", got "IT"'
         with patch(_PATCH_GET_SAP_CONFIG, side_effect=ValueError(message)):
@@ -104,7 +104,7 @@ class TestConfiguredSystems:
 
     @pytest.mark.anyio
     async def test_tool_reports_invalid_config_instead_of_silent_empty_list(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
+        from sapwebguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
 
         message = 'system "dev": language must be one of "DE", "EN", got "IT"'
         with (
@@ -119,7 +119,7 @@ class TestConfiguredSystems:
 
     @pytest.mark.anyio
     async def test_tool_includes_configured_systems(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
+        from sapwebguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
 
         backend = AsyncMock()
         backend.list_connections.return_value = [
@@ -141,7 +141,7 @@ class TestConfiguredSystems:
 
     @pytest.mark.anyio
     async def test_tool_returns_systems_even_when_backend_fails(self) -> None:
-        from sapguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
+        from sapwebguimcp.tools.sap_list_connections_impl import sap_list_connections_impl
 
         with (
             patch(_PATCH_GET_BACKEND, new=AsyncMock(side_effect=RuntimeError("no backend"))),

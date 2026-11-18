@@ -1,0 +1,1501 @@
+# pylint: disable=too-many-lines
+"""
+abapGit integration tools for SAP (WebGUI and desktop backends).
+
+This module provides:
+- List: Enumerate all registered abapGit repositories and their metadata
+- Pull: Fetch and apply changes from a remote git repository via Z_ABAPGIT_PULL_MCP
+- SE38 Verification: Read ABAP report source code to verify pulls
+
+The pull operation uses the Z_ABAPGIT_PULL_MCP transaction which calls the abapGit
+ABAP API directly, avoiding fragile UI automation. The ABAP report source is
+maintained in:
+  https://github.com/Hochfrequenz/Z_ABAPGIT_PULL_MCP_SHORTCUT/blob/main/src/z_abapgit_pull_mcp_shortcut.prog.abap
+
+If the Z_ABAPGIT_PULL_MCP transaction is not found, you need to create it in SAP.
+The tool will provide a link to the source code.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
+
+import httpx
+from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+
+from sapwebguimcp import lang
+from sapwebguimcp.backend.manager import get_backend
+from sapwebguimcp.lang import INVARIANT
+from sapwebguimcp.models.abapgit_models import (
+    AbapGitActionResult,
+    AbapGitListResult,
+    AbapGitRepoInfo,
+    AbapGitRepoSummary,
+)
+from sapwebguimcp.models.config import get_settings
+from sapwebguimcp.tools.sap_tools import _TRANSACTION_NOT_FOUND_MESSAGE
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+    from sapwebguimcp.lang.schema import LanguagePack
+    from sapwebguimcp.models.base import PopupInfo
+    from sapwebguimcp.models.sap_results import StatusBarInfo
+
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["parse_repo_list_output", "parse_repo_list_total", "register_abapgit_tools", "validate_github_pat"]
+
+
+async def validate_github_pat(pat: str) -> tuple[bool, str]:
+    """
+    Validate a GitHub PAT by calling GET /user.
+
+    Returns:
+        (True, github_username) if the token is valid.
+        (False, error_message) if the token is invalid or unreachable.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.github.com/user",
+                headers={
+                    "Authorization": f"token {pat}",
+                    "User-Agent": "sapwebgui-mcp",
+                },
+                timeout=5.0,
+            )
+        if resp.status_code == 200:
+            login = resp.json().get("login", "unknown")
+            return True, login
+        try:
+            msg = resp.json().get("message", f"HTTP {resp.status_code}")
+        except (ValueError, KeyError):  # non-JSON error responses (e.g. 502 proxy)
+            msg = f"HTTP {resp.status_code}"
+        return False, msg
+    except (httpx.HTTPError, OSError) as exc:
+        return False, f"GitHub API unreachable: {exc}"
+
+
+# Helper Data Structures
+
+
+@dataclass
+class PullParams:
+    """Parameters for pull operation after validation."""
+
+    repo: str | None
+    trkorr: str | None
+    username: str | None
+    pat: str | None
+    tcode_with_params: str
+    branch: str | None = None  # short name as sent in the OK-code
+    expected_ref: str | None = None  # refs/heads/<branch>: what the report must echo
+    key: str | None = None  # the 12-digit key as sent (pull by key); then repo is None
+    label: str = ""  # the repo_name to report: the repo, or ``key <12 digits>``
+
+
+# Error Detection Helpers
+
+_TRANSPORT_REQUIRED_GUIDANCE = (
+    "A transport request (TRKORR) is required for this pull. "
+    "Look up an open transport request (e.g. via SE09/SE10) and "
+    "retry: sap_abapgit_pull(repo=..., trkorr='<TRKORR>')"
+)
+
+_NO_TASK_GUIDANCE = (
+    "The logged-in user has no modifiable task (Aufgabe) in the specified transport. "
+    "Create a task under this transport in SE09, or use a different transport "
+    "where you have a modifiable task."
+)
+
+
+def _is_transport_required_error(error_text: str) -> bool:
+    """Check if an error message indicates a transport request is required."""
+    return lang.universal().popup.abapgit_transport_required.contains(
+        error_text
+    ) or INVARIANT.abapgit_trkorr_hint.contains(error_text)
+
+
+def _is_no_task_error(error_text: str) -> bool:
+    """Check if an error message indicates the user has no task in the transport."""
+    return lang.universal().popup.abapgit_no_task.contains(error_text)
+
+
+def _is_transaction_not_found(status: StatusBarInfo, t: LanguagePack) -> bool:
+    """Check if the status bar says the pull transaction does not exist.
+
+    The desktop status bar carries the message ID (S# 343), which does not depend on the logon language. The text
+    check stays for the WebGUI, whose status bar has no message ID (and for the desktop until a live run shows the ID
+    arrives after an OK-code entry too).
+    """
+    if (status.message_id, status.message_number) == _TRANSACTION_NOT_FOUND_MESSAGE:
+        return True
+    message = status.message or ""
+    return t.common.not_found.contains(message) or t.common.does_not_exist.contains(message)
+
+
+_CREDENTIALS_POPUP_NAME = "password_popup"
+
+# The report passes the exception text as one MESSAGE ... WITH parameter, which is cut at 50 characters,
+# so an English logon can end right after "PA". Only match that when the text ends there, so that other
+# missing forms ("Could not find the form PAYMENT_X") do not get the credentials hint.
+_CREDENTIALS_POPUP_CUT_ENGLISH = "could not find the form pa"
+
+_CREDENTIALS_POPUP_GUIDANCE = (
+    "abapGit tried to ask for credentials, most likely because the git host answered HTTP 401, and its "
+    "password popup cannot be shown when abapGit is called through the API. "
+    "Check that the token is valid and not expired (GitHub rejects an invalid token even for public "
+    "repositories): the `pat` argument if you passed one (it takes precedence), otherwise ABAPGIT_PAT / "
+    "GITHUB_PAT. Otherwise check that the SAP system can reach the git host."
+)
+
+
+def _is_credentials_popup_error(error_text: str) -> bool:
+    """Check if an error message is abapGit's missing password popup (a rejected or missing login)."""
+    lower = error_text.lower()
+    return _CREDENTIALS_POPUP_NAME in lower or lower.rstrip(". ").endswith(_CREDENTIALS_POPUP_CUT_ENGLISH)
+
+
+def _enrich_transport_error(error_text: str) -> str:
+    """If the error is transport- or credentials-related, append actionable guidance."""
+    if _is_credentials_popup_error(error_text):
+        return f"{error_text.rstrip('. ')}. {_CREDENTIALS_POPUP_GUIDANCE}"
+    if _is_transport_required_error(error_text):
+        return f"{error_text.rstrip('. ')}. {_TRANSPORT_REQUIRED_GUIDANCE}"
+    if _is_no_task_error(error_text):
+        return f"{error_text.rstrip('. ')}. {_NO_TASK_GUIDANCE}"
+    return error_text
+
+
+async def _check_for_error_popup(backend: "WebGuiBackend") -> str | None:
+    """Check for SAP error popup dialog and extract message text."""
+    try:
+        text = await _check_for_error_popup_webgui(backend)
+        if not text:
+            return None
+        popup = lang.universal().popup
+        if not (popup.abapgit_error_keywords.contains(text) or INVARIANT.abapgit_error_words.contains(text)):
+            return None
+        lines = text.split("\n")
+        message_lines = [
+            line.strip() for line in lines if line.strip() and not popup.abapgit_button_labels.equals(line.strip())
+        ]
+        if message_lines:
+            logger.info("Found error popup", extra={"popup_message": message_lines[0]})
+            return " ".join(message_lines)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Checking for popup", extra={"error": str(e)})
+    return None
+
+
+async def _check_for_error_popup_webgui(backend: "WebGuiBackend") -> str | None:
+    """Check for error popup via JavaScript (WebGUI only)."""
+    js_code = """
+    () => {
+        const selectors = [
+            '.urMessageBox', '.urPopup', '[id*="PopupWindow"]',
+            '[id*="ModalWindow"]', '.lsPopup', '[role="alertdialog"]',
+            '.urMsgArea', '#MESSAGE_POPUP', '[id*="MESSAGE"]'
+        ];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden') continue;
+            const text = (el.innerText || '').trim();
+            if (!text) continue;
+            return text;
+        }
+        return null;
+    }
+    """
+    result: str | None = await backend.evaluate_javascript(js_code)
+    return result
+
+
+async def _read_screen_text_webgui(backend: "WebGuiBackend") -> str:
+    """The text to scan for errors on the WebGUI backend: the inner text of the page body."""
+    body_text: str = await backend.evaluate_javascript("() => document.body.innerText || ''")
+    return body_text
+
+
+async def _check_screen_for_errors(backend: "WebGuiBackend", t: LanguagePack) -> str | None:
+    """Check the entire screen for error indicators as a fallback."""
+    try:
+        body_text = await _read_screen_text_webgui(backend)
+        body_lower = body_text.lower()
+
+        for pattern in (*t.abapgit.screen_errors, *INVARIANT.abapgit_screen_errors):
+            idx = body_lower.find(pattern.lower())
+            if idx >= 0:
+                start = max(0, idx - 50)
+                end = min(len(body_text), idx + 150)
+                context = " ".join(body_text[start:end].split())
+                if context:
+                    logger.info("Found error on screen", extra={"context": context[:100]})
+                    return context
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Checking screen for errors", extra={"error": str(e)})
+    return None
+
+
+# Pull Parameter Validation
+
+
+# Repository selector: an abapGit name (hyphens and dots allowed, "/NS/NAME" namespaces) or an https URL
+# without userinfo, query or fragment. Allow-listed so that no OK-code separator can slip through.
+_REPO_NAME_PATTERN = re.compile(r"[A-Za-z0-9_/.-]{1,255}")
+_REPO_URL_PATTERN = re.compile(r"https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/[A-Za-z0-9._/-]+")
+_MAX_REPO_LENGTH = 255
+
+# Cap for the whole OK-code. 255 is the cap from the implementation plan (#996), not a verified limit: the field
+# accepted 1000 characters when set via scripting, but where it truncates on send was not measured.
+_MAX_OKCODE_LENGTH = 255
+
+
+def _display_value(value: str) -> str:
+    """Render a rejected value for an error message; values that may carry credentials are not echoed."""
+    return "<redacted>" if "@" in value else repr(value)
+
+
+def _validate_repo_selector(repo: str) -> str | None:
+    """Validate the repository name or URL. Returns an error message if invalid, None if OK."""
+    if len(repo) > _MAX_REPO_LENGTH:
+        shown = "<redacted>" if "@" in repo else f"{repo[:40]!r}..."
+        return f"Invalid repository: {shown} is {len(repo)} characters long, maximum {_MAX_REPO_LENGTH}."
+    valid = (
+        not repo.startswith("-")
+        and ".." not in repo.split("/")
+        and (_REPO_NAME_PATTERN.fullmatch(repo) is not None or _REPO_URL_PATTERN.fullmatch(repo) is not None)
+    )
+    if valid:
+        return None
+    return (
+        f"Invalid repository: {_display_value(repo)}. "
+        "Use the abapGit name (letters, digits, `_` `-` `.` `/`) or an https:// Git URL. "
+        "`;`, `=`, spaces and line breaks are not allowed."
+    )
+
+
+def _validate_param(value: str, param_name: str, pattern: str, description: str) -> str | None:
+    """Validate a parameter value against a pattern. Returns error message if invalid, None if OK."""
+    if not re.fullmatch(pattern, value):
+        return f"Invalid {param_name}: contains forbidden characters. {description}"
+    return None
+
+
+_BRANCH_PATTERN = re.compile(r"[A-Za-z0-9._/-]{1,200}")
+_BRANCH_PREFIX = "refs/heads/"
+
+
+def _validate_branch(branch: str) -> tuple[str, str] | str:
+    """Validate a branch. Returns ``(short_name, full_ref)``, or an error message starting with ``Invalid branch:``."""
+    shown = repr(branch if len(branch) <= 80 else branch[:80] + "...")
+    hint = (
+        "Use a branch name such as `main`, `feature/x` or `refs/heads/x` "
+        "(letters, digits, `_` `-` `.` `/`, at most 200 characters; `;`, `=`, spaces and line breaks are not allowed)."
+    )
+
+    def invalid(reason: str) -> str:
+        return f"Invalid branch: {shown}: {reason}. {hint}"
+
+    if not branch.strip():
+        return invalid("a branch must not be blank")
+    short = branch.removeprefix(_BRANCH_PREFIX)
+    if short.startswith("refs/"):
+        return invalid("only branches (refs/heads/) are supported")
+    if _BRANCH_PATTERN.fullmatch(short) is None:
+        return invalid("contains characters that are not allowed or is too long")
+    parts = short.split("/")
+    if (
+        short.startswith(("-", "/"))
+        or short.endswith(("/", "."))
+        or ".." in short
+        or "" in parts
+        or any(part.startswith(".") or part.endswith(".lock") for part in parts)
+        or short == "HEAD"
+    ):
+        return invalid("not a valid git branch name")
+    return short, _BRANCH_PREFIX + short
+
+
+_KEY_PATTERN = re.compile(r"[0-9]{1,12}")
+
+
+def _validate_key(key: str) -> str | None:
+    """Validate a repository key (1 to 12 digits, nothing else, not stripped). Returns an error message or None."""
+    if _KEY_PATTERN.fullmatch(key) is not None:
+        return None
+    return f"Invalid key: {key[:40]!r}: must be 1 to 12 digits (the key from sap_abapgit_list_repos)."
+
+
+def _failure_label(repo: str | None, key: str | None) -> str:
+    """The ``repo_name`` of a result when the parameters could not be validated (or before the report answered)."""
+    if repo is not None:
+        return "<redacted>" if "@" in repo else repo[:80]
+    if key is None:
+        return "(none)"
+    return f"key {key.zfill(12)}" if _KEY_PATTERN.fullmatch(key) else "key"
+
+
+def _validate_selector(repo: str | None, key: str | None) -> str | None:
+    """Exactly one of repo and key must be given and valid; returns an error message otherwise."""
+    given = [value for value in (repo, key) if value is not None]
+    if not given:
+        return "Give exactly one of repo or key (from sap_abapgit_list_repos)."
+    if len(given) > 1:
+        return "Give only one of repo or key, not both (omit the unused one, do not pass an empty string)."
+    if repo is not None:
+        return _validate_repo_selector(repo)
+    if key is None:  # unreachable: exactly one selector is given
+        return "Give exactly one of repo or key (from sap_abapgit_list_repos)."
+    return _validate_key(key)
+
+
+def _validate_and_prepare_params(  # pylint: disable=too-many-return-statements,too-many-locals
+    repo: str | None,
+    trkorr: str | None,
+    username: str | None,
+    pat: str | None,
+    branch: str | None = None,
+    key: str | None = None,
+) -> PullParams | AbapGitActionResult:
+    """Validate inputs and prepare pull parameters. Returns error result if validation fails."""
+    label = _failure_label(repo, key)
+    selector_error = _validate_selector(repo, key)
+    if selector_error:
+        return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=selector_error)
+    # The selector is valid from here on: report a valid repo in full, only rejected input is cut or redacted.
+    if repo is not None:
+        label = repo
+
+    short_branch: str | None = None
+    expected_ref: str | None = None
+    if branch is not None:
+        branch_result = _validate_branch(branch)
+        if isinstance(branch_result, str):
+            return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=branch_result)
+        short_branch, expected_ref = branch_result
+
+    # Validate other parameters to prevent command injection via semicolons/special chars
+    if trkorr:
+        # SAP transport requests: alphanumeric only (e.g., "XYZK900010")
+        error = _validate_param(trkorr, "trkorr", r"[A-Za-z0-9]+", "Only alphanumeric allowed.")
+        if error:
+            return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=error)
+
+    # Get credentials from settings if not provided
+    settings = get_settings()
+    effective_pat = pat or settings.abapgit_pat or settings.github_pat
+    effective_username = username
+    if not effective_username and effective_pat:
+        effective_username = settings.github_user or "x-access-token"
+
+    # Validate all OK-code parameters
+    for value, name, pattern, description in (
+        (effective_username, "username", r"[A-Za-z0-9_-]+", "Only alphanumeric, underscores, hyphens allowed."),
+        (effective_pat, "pat", r"[A-Za-z0-9_]+", "Only alphanumeric and underscores allowed."),
+    ):
+        if value:
+            error = _validate_param(value, name, pattern, description)
+            if error:
+                return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=error)
+
+    # Build transaction command
+    # Note: All params are validated above to contain only safe characters (no semicolons/spaces)
+    # so they won't break the semicolon-separated OK-Code command syntax.
+    # A pull by key sends only P_KEY, never P_REPO: an old report without P_KEY then stops at "P_REPO is required".
+    padded_key = key.zfill(12) if key is not None else None
+    params = [f"P_KEY={padded_key}"] if padded_key is not None else [f"P_REPO={repo}"]
+    if short_branch:
+        params.append(f"P_BRANCH={short_branch}")
+    if trkorr:
+        params.append(f"P_TRKORR={trkorr}")
+    if effective_username:
+        params.append(f"P_USER={effective_username}")
+    if effective_pat:
+        params.append(f"P_TOKEN={effective_pat}")
+
+    tcode_with_params = f"/nZ_ABAPGIT_PULL_MCP {'; '.join(params)};"
+    if len(tcode_with_params) > _MAX_OKCODE_LENGTH:
+        return AbapGitActionResult.failure_result(
+            action="pull",
+            repo_name=label,
+            error=(
+                f"The pull command is too long ({len(tcode_with_params)} characters, maximum {_MAX_OKCODE_LENGTH}). "
+                "Use the abapGit repository name instead of the URL, or a shorter branch name."
+            ),
+        )
+
+    return PullParams(
+        repo=repo,
+        trkorr=trkorr,
+        username=effective_username,
+        pat=effective_pat,
+        tcode_with_params=tcode_with_params,
+        branch=short_branch,
+        expected_ref=expected_ref,
+        key=padded_key,
+        label=label,
+    )
+
+
+# OK-Code Field Handling — delegates to backend.enter_transaction()
+
+
+async def _enter_tcode_via_okcode(
+    backend: "WebGuiBackend", tcode_with_params: str, repo: str
+) -> AbapGitActionResult | None:
+    """Enter a parameterised transaction via the OK-Code field. Returns error or None."""
+    result = await backend.enter_transaction(tcode_with_params)
+    if not result.success:
+        return AbapGitActionResult.failure_result(
+            action="pull",
+            repo_name=repo,
+            error=result.error or "Failed to enter transaction via OK-Code field",
+        )
+    return None
+
+
+# Pull Result Analysis
+
+
+async def _analyze_pull_result(backend: "WebGuiBackend", repo: str, t: LanguagePack) -> AbapGitActionResult:
+    """Analyze status bar and screen to determine pull result."""
+    status = await backend.get_status_bar()
+    msg = status.message or ""
+    msg_type = status.type or ""
+
+    logger.info("Pull result", extra={"status_type": msg_type, "status_message": msg})
+
+    # Check for explicit success or error on first read
+    is_success = INVARIANT.abapgit_pull_successful.contains(msg) or (
+        INVARIANT.abapgit_successful.contains(msg) and msg_type in ("S", "I")
+    )
+    is_error = msg_type in ("E", "A") or t.abapgit.status_error.contains(msg) or INVARIANT.abapgit_error.contains(msg)
+
+    if is_success:
+        return AbapGitActionResult.success_result(action="pull", repo_name=repo, message=msg)
+    if is_error:
+        return AbapGitActionResult.failure_result(action="pull", repo_name=repo, error=_enrich_transport_error(msg))
+
+    # Retry status bar read
+    await backend.wait(2000)
+    status = await backend.get_status_bar()
+    final_msg = status.message or msg
+    final_type = status.type or msg_type
+    logger.info("Final status check", extra={"status_type": final_type, "status_message": final_msg})
+
+    # Check final status
+    is_final_success = INVARIANT.abapgit_pull_successful.contains(final_msg)
+    is_final_error = final_type in ("E", "A")
+    screen_error = None if final_msg and final_type != "none" else await _check_screen_for_errors(backend, t)
+
+    if is_final_success:
+        return AbapGitActionResult.success_result(action="pull", repo_name=repo, message=final_msg)
+    if is_final_error or screen_error:
+        return AbapGitActionResult.failure_result(
+            action="pull", repo_name=repo, error=_enrich_transport_error(screen_error or final_msg)
+        )
+
+    # Treat ambiguous result based on whether we got any status message.
+    # Empty status bar is ambiguous: the pull may or may not have run (an expired PAT ends in cx_root in ABAP,
+    # but an empty bar has also been seen after a pull that went through).
+    if not final_msg:
+        return AbapGitActionResult.failure_result(
+            action="pull",
+            repo_name=repo,
+            error="Pull status unknown: SAP status bar was empty after pull. "
+            "The pull may have run: an empty status bar has also been seen after a pull that went through. "
+            "Check the repository in abapGit (last pull time) or the transport task before retrying. "
+            "If the pull did not run, an invalid or expired token is one possible cause: "
+            "the `pat` argument if you passed one (it takes precedence), otherwise ABAPGIT_PAT / GITHUB_PAT.",
+        )
+    return AbapGitActionResult.success_result(
+        action="pull", repo_name=repo, message=f"Pull completed. Status: {final_msg}"
+    )
+
+
+# Main Pull Implementation
+
+
+async def _handle_popup_error(backend: "WebGuiBackend", repo: str) -> AbapGitActionResult | None:
+    """Check for error popup and return failure if found, None otherwise."""
+    popup_error = await _check_for_error_popup(backend)
+    if popup_error:
+        await backend.press_key("Enter")
+        await backend.wait(500)
+        return AbapGitActionResult.failure_result(
+            action="pull", repo_name=repo, error=_enrich_transport_error(popup_error)
+        )
+    return None
+
+
+async def _execute_pull_transaction(
+    backend: "WebGuiBackend", params: PullParams, repo: str, t: LanguagePack
+) -> AbapGitActionResult | None:
+    """Execute pull transaction and return failure result if error, None if OK to continue."""
+    okcode_error = await _enter_tcode_via_okcode(backend, params.tcode_with_params, repo)
+    if okcode_error:
+        return okcode_error
+
+    # Check if transaction was found
+    status = await backend.get_status_bar()
+    if _is_transaction_not_found(status, t):
+        return AbapGitActionResult.failure_result(
+            action="pull",
+            repo_name=repo,
+            error=(
+                "Transaction Z_ABAPGIT_PULL_MCP not found. Create this transaction in your SAP system. "
+                "See https://github.com/Hochfrequenz/Z_ABAPGIT_PULL_MCP_SHORTCUT for the ABAP source code."
+            ),
+        )
+    return None
+
+
+def _is_inactive_objects_popup(popup: PopupInfo) -> bool:
+    """Return True if the popup is the "Inaktive Objekte" / "Inactive Objects" dialog.
+
+    The phrase may be in the window title (desktop: the message is built from the dialog's
+    labels, not its title) or in the message (WebGUI: the message comes from the header title).
+    """
+    return lang.universal().popup.abapgit_inactive_objects.contains(f"{popup.title or ''} {popup.message or ''}")
+
+
+async def _run_pull_and_check_errors(backend: "WebGuiBackend", repo: str) -> AbapGitActionResult | None:
+    """Execute F8 and wait for SAP to finish processing. Returns error if found."""
+    await backend.press_key("F8")
+
+    # Fast-fail: check for immediate error popups (bad transport, auth error)
+    await backend.wait(2000)
+    popup_result = await _handle_popup_error(backend, repo)
+    if popup_result:
+        return popup_result
+
+    # Wait for deserialization to finish (networkidle = 500ms with no requests).
+    try:
+        await backend.wait_for_ready(timeout_ms=120_000)
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.warning("networkidle timeout after F8 -- pull may still be running")
+
+    # SAP may show an "Inaktive Objekte" / "Inactive Objects" popup after pull.
+    # Detect via check_popup() instead of parsing snapshot text.
+    popup = await backend.check_popup()
+    if popup and _is_inactive_objects_popup(popup):
+        logger.info("Detected inactive objects popup, confirming with Enter")
+        await backend.press_key("Enter")
+        await backend.wait(2000)
+        try:
+            await backend.wait_for_ready(timeout_ms=30_000)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+    return await _handle_popup_error(backend, repo)
+
+
+def _clean_timestamp(value: str) -> str | None:
+    """Return None for empty or initial ABAP TIMESTAMPL values (all zeros)."""
+    if not value or value.replace("0", "").replace(".", "") == "":
+        return None
+    return value
+
+
+_LIST_TOTAL_LINE = re.compile(r"^TOTAL~(\d+)(?:~|$)")
+
+
+_LIST_KEY_PATTERN = re.compile(r"[0-9]{12}")
+
+
+def _list_key(field: str) -> str | None:
+    """The key of a LIST row: exactly 12 digits, else None (a row clipped at the window width cuts the key first)."""
+    key = field.strip()
+    return key if _LIST_KEY_PATTERN.fullmatch(key) else None
+
+
+def _parse_repo_lines(raw_output: str) -> tuple[list[AbapGitRepoInfo], int]:
+    """Parse tilde-delimited WRITE output from Z_ABAPGIT_PULL_MCP_SHORTCUT LIST mode.
+
+    Expected format per line: name~url~package~branch~deserialized_at~deserialized_by~offline[~key]
+    The trailing repository key must be exactly 12 digits, else ``key=None`` (older reports do not write it).
+    Uses ~ as delimiter because SAP WebGUI strips | (pipe) characters from WRITE output.
+    Lines that don't match (headers, empty, UI noise) are skipped. Returns the repositories and the number of skipped
+    lines that look like repository lines (at least four fields, not the TOTAL header), which are registered but cannot
+    be listed, such as an online repository without a usable URL.
+    """
+    repos: list[AbapGitRepoInfo] = []
+    skipped = 0
+    for line in raw_output.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("~")
+        if len(parts) < 4 or _LIST_TOTAL_LINE.match(line):
+            continue
+        name = parts[0].strip()
+        url = parts[1].strip()
+        package = parts[2].strip()
+        is_offline = parts[6].strip().upper() == "X" if len(parts) > 6 else False
+        if is_offline:
+            # An offline repository has no remote URL, and often no name either: list it under its package.
+            name = name or package
+            if not name:
+                skipped += 1
+                continue
+        elif not name or not url:
+            skipped += 1
+            continue
+        repos.append(
+            AbapGitRepoInfo(
+                name=name,
+                url=url,
+                package=package,
+                branch=parts[3].strip(),
+                last_pull_at=(_clean_timestamp(parts[4].strip())) if len(parts) > 4 else None,
+                last_pull_by=(parts[5].strip() or None) if len(parts) > 5 else None,
+                is_offline=is_offline,
+                key=_list_key(parts[7]) if len(parts) > 7 else None,
+            )
+        )
+    return repos, skipped
+
+
+def parse_repo_list_output(raw_output: str) -> list[AbapGitRepoInfo]:
+    """Parse tilde-delimited WRITE output from Z_ABAPGIT_PULL_MCP_SHORTCUT LIST mode (see `_parse_repo_lines`)."""
+    return _parse_repo_lines(raw_output)[0]
+
+
+def parse_repo_list_total(raw_output: str) -> int | None:
+    """Return the repository count from the ``TOTAL~<n>`` header line of the LIST output, if there is one.
+
+    The companion report writes the number of registered repositories as the first line, so that a reader can
+    tell a complete list from a short read. Older versions of the report do not write it.
+    """
+    for line in raw_output.splitlines():
+        match = _LIST_TOTAL_LINE.match(line.strip())
+        if match:
+            return int(match.group(1))
+    return None
+
+
+_FILTER_MAX_LENGTH = 200
+_KEY_FILTER = re.compile(r"[0-9]{1,12}")
+
+
+def _validate_list_filters(name: str | None, package: str | None, url: str | None, key: str | None) -> str | None:
+    """Return an error message when a list filter is blank, too long or (key) malformed, else None."""
+    for label, value in (("name", name), ("package", package), ("url", url), ("key", key)):
+        if value is None:
+            continue
+        if not value.strip():
+            return f"Invalid filter: {label} must not be empty"  # lang-ok: our own message
+        if len(value) > _FILTER_MAX_LENGTH:
+            return f"Invalid filter: {label} is longer than {_FILTER_MAX_LENGTH} characters"
+    if key is not None and not _KEY_FILTER.fullmatch(key.strip()):
+        return "Invalid filter: key must be 1 to 12 digits"
+    return None
+
+
+def _glob_match(pattern: str, text: str) -> bool:
+    """Match ``text`` against ``pattern`` where ``*`` is any run of characters and ``?`` any single one.
+
+    Iterative with a single backtrack point (O(len(pattern) * len(text)) worst case), so user input cannot cause
+    catastrophic backtracking as a regex built from it could.
+    """
+    p = t = 0
+    star = -1
+    mark = 0
+    while t < len(text):
+        if p < len(pattern) and pattern[p] == "*":
+            star = p
+            mark = t
+            p += 1
+        elif p < len(pattern) and pattern[p] in ("?", text[t]):
+            p += 1
+            t += 1
+        elif star >= 0:
+            p = star + 1
+            mark += 1
+            t = mark
+        else:
+            return False
+    return pattern[p:].strip("*") == ""
+
+
+def _text_matcher(value: str) -> Callable[[str], bool]:
+    """Case-insensitive matcher: a value with ``*`` or ``?`` is a glob for the whole string, else a substring.
+
+    Only ``*`` and ``?`` are wildcards; everything else, including ``[`` and ``.``, is literal.
+    """
+    needle = value.strip().casefold()
+    if "*" not in needle and "?" not in needle:
+        return lambda text: needle in text.casefold()
+    return lambda text: _glob_match(needle, text.casefold())
+
+
+def _filter_repos(
+    repos: list[AbapGitRepoInfo],
+    name: str | None = None,
+    package: str | None = None,
+    url: str | None = None,
+    key: str | None = None,
+) -> list[AbapGitRepoInfo]:
+    """Keep the repositories that match all given filters (AND).
+
+    ``name``, ``package`` and ``url`` are case-insensitive substrings or globs, ``key`` is an exact match on the key
+    zero-padded to 12 digits (so ``12`` finds ``000000000012``). An offline
+    repository has an empty URL, so a ``url`` filter never matches it, and a repository without a key never matches
+    a ``key`` filter.
+    """
+    checks: list[Callable[[AbapGitRepoInfo], bool]] = []
+    if name is not None:
+        matches_name = _text_matcher(name)
+        checks.append(lambda repo: matches_name(repo.name))
+    if package is not None:
+        matches_package = _text_matcher(package)
+        checks.append(lambda repo: matches_package(repo.package))
+    if url is not None:
+        matches_url = _text_matcher(url)
+        checks.append(lambda repo: bool(repo.url) and matches_url(repo.url))
+    if key is not None:
+        wanted = key.strip().zfill(12)
+        checks.append(lambda repo: repo.key == wanted)
+    return [repo for repo in repos if all(check(repo) for check in checks)]
+
+
+def _apply_list_filters(
+    result: AbapGitListResult,
+    name: str | None = None,
+    package: str | None = None,
+    url: str | None = None,
+    key: str | None = None,
+    compact: bool = False,
+) -> AbapGitListResult:
+    """Filter a successful, complete list result (after the read and its completeness check) and shape it."""
+    if not result.success:
+        return result
+    # Safe: a result straight from _abapgit_list_repos only ever holds AbapGitRepoInfo (summaries are
+    # built below, after filtering), so the cast only narrows the declared union type.
+    all_repos = cast("list[AbapGitRepoInfo]", result.repos)
+    matched = _filter_repos(all_repos, name, package, url, key)
+    total = result.total_count if result.total_count is not None else len(all_repos)
+    shaped: list[AbapGitRepoInfo | AbapGitRepoSummary] = (
+        [AbapGitRepoSummary(name=r.name, package=r.package, key=r.key) for r in matched] if compact else list(matched)
+    )
+    filtered = any(value is not None for value in (name, package, url, key))
+    message = f"0 of {total} repositories match the filters" if filtered and not matched else None
+    return AbapGitListResult(success=True, repos=shaped, total_count=total, matched_count=len(matched), message=message)
+
+
+async def _read_report_screen(backend: "WebGuiBackend") -> str:
+    """Read the report's WRITE output from the screen (after F8)."""
+    await backend.wait(3000)
+    text = await backend.evaluate_javascript("""
+        () => {
+            const body = document.querySelector('#sapwd_main_window_root_contents') || document.body;
+            return body.innerText || body.textContent || '';
+        }
+    """)
+    return str(text or "")
+
+
+async def _abapgit_list_repos(backend: "WebGuiBackend") -> AbapGitListResult:
+    """List all registered abapGit repositories via Z_ABAPGIT_PULL_MCP P_ACTION=LIST."""
+    logger.info("Listing abapGit repositories")
+    # Resolved outside the try: an unsupported session language must reach the caller, not become a failure result.
+    t = lang.current("sap_abapgit_list_repos")
+
+    try:
+        tcode_with_params = "/nZ_ABAPGIT_PULL_MCP P_ACTION=LIST;"
+        okcode_error = await _enter_tcode_via_okcode(backend, tcode_with_params, "LIST")
+        if okcode_error:
+            return AbapGitListResult(success=False, error=okcode_error.error or "Failed to enter transaction")
+
+        # Check if transaction was found
+        status = await backend.get_status_bar()
+        if _is_transaction_not_found(status, t):
+            return AbapGitListResult(
+                success=False,
+                error=(
+                    "Transaction Z_ABAPGIT_PULL_MCP not found. "
+                    "Ensure the report is deployed with LIST support. "
+                    "See https://github.com/Hochfrequenz/Z_ABAPGIT_PULL_MCP_SHORTCUT"
+                ),
+            )
+
+        # Execute report with F8
+        await backend.press_key("F8")
+
+        # Read the WRITE output from the screen
+        raw_output = await _read_report_screen(backend)
+
+        repos, skipped = _parse_repo_lines(raw_output or "")
+        total = parse_repo_list_total(raw_output or "")
+        logger.info("Found repositories", extra={"count": len(repos), "skipped": skipped, "total": total})
+        if skipped:
+            logger.warning("%d registered repositories cannot be listed (online without a usable URL)", skipped)
+
+        incomplete: list[str] = []
+        if total is not None and len(repos) + skipped != total:
+            # A short list must not pass as the list: "not in the list" would read as "not registered".
+            incomplete.append(
+                f"The report lists {total} repositories but only {len(repos) + skipped} could be read from the screen"
+            )
+        if incomplete:
+            return AbapGitListResult(
+                success=False,
+                repos=list(repos),
+                error="; ".join(incomplete) + ". The repositories that were read are returned, the list is incomplete.",
+            )
+        if not repos:
+            sbar = await backend.get_status_bar()
+            if sbar.type in ("E", "A"):
+                return AbapGitListResult(success=False, error=f"abapGit list failed: {sbar.message}")
+        if total is None:
+            logger.info("The report writes no TOTAL header: the completeness of the list cannot be verified")
+
+        return AbapGitListResult(
+            success=True, repos=list(repos), total_count=len(repos) + skipped, matched_count=len(repos)
+        )
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("abapGit list repos failed")
+        return AbapGitListResult(success=False, error=str(e))
+
+
+_BRANCH_ECHO = re.compile(r"BRANCH~(refs/heads/\S+)")
+
+
+async def _read_branch_echo(backend: "WebGuiBackend") -> str | None:
+    """Read the ``BRANCH~<full ref>`` line the report writes after a pull with a branch; None if not exactly one."""
+    try:
+        raw_output = await _read_report_screen(backend)
+    except Exception:  # pylint: disable=broad-exception-caught
+        # An outdated report writes no list: the screen is not a list and reading it may raise.
+        logger.warning("Could not read the branch echo of the report", exc_info=True)
+        return None
+    matches = [m for line in (raw_output or "").splitlines() if (m := _BRANCH_ECHO.fullmatch(line.strip()))]
+    return matches[0].group(1) if len(matches) == 1 else None
+
+
+async def _confirm_branch(
+    backend: "WebGuiBackend", result: AbapGitActionResult, params: PullParams
+) -> AbapGitActionResult:
+    """Turn a successful pull with a branch into a success only if the report echoed that branch."""
+    echo = await _read_branch_echo(backend)
+    if echo is not None and echo == params.expected_ref:
+        result.branch = echo
+        return result
+    found = f"the report echoed {echo!r} instead of {params.expected_ref!r}" if echo else "no readable `BRANCH~` line"
+    return AbapGitActionResult.failure_result(
+        action="pull",
+        repo_name=result.repo_name,
+        error=(
+            f"The pull ran, but the report did not confirm branch {params.branch!r} ({found}). "
+            "The report is probably outdated and ignores P_BRANCH, so the pull may have run on the previously "
+            "selected branch (or the echo could not be read from the screen). "
+            "Update Z_ABAPGIT_PULL_MCP_SHORTCUT and check the branch with sap_abapgit_list_repos."
+        ),
+    )
+
+
+def _annotate_branch_failure(result: AbapGitActionResult, params: PullParams) -> AbapGitActionResult:
+    """Add guidance to the failures that are specific to a pull with a branch."""
+    error = result.error or ""
+    if error.startswith("Branch restore failed:"):
+        result.error = (
+            f"WARNING: the repository may have been left on branch {params.branch}: "
+            f"restoring the previous branch failed. {error}"
+        )
+    elif error.startswith("Pin restore failed:"):
+        result.error = (
+            "WARNING: the previous branch was restored, but re-applying its commit pin failed, so the repository "
+            f"may no longer be pinned. Check the original pin before retrying. {error}"
+        )
+    elif error.startswith(tuple(INVARIANT.abapgit_branch_not_found)):
+        result.error = f"{error} The selected branch is unchanged; check the branch name on the remote."
+    return result
+
+
+async def _check_branch_outcome(
+    backend: "WebGuiBackend", result: AbapGitActionResult, params: PullParams
+) -> AbapGitActionResult:
+    """Apply the branch-specific checks to a pull result; a pull without a branch is returned as it is."""
+    if params.branch is None:
+        return result
+    if result.success:
+        return await _confirm_branch(backend, result, params)
+    return _annotate_branch_failure(result, params)
+
+
+_OLD_REPORT_MARKER = "p_repo is required for pull action"
+_KEY_NOT_FOUND_HINT = (
+    " The key may belong to an offline repository or not exist on this system; list the repositories to check."
+)
+_NAME_FROM_STATUS = re.compile(r"Pull successful: (?:branch=\S+ repo=(?P<b>\S+)|(?!branch=)(?P<n>\S+))")
+_MAX_TRUSTED_MESSAGE = 70  # the status bar holds about 73 characters: a longer text may be cut
+_MAX_TRUSTED_NAME = 45  # the report cuts every message field at 50 characters
+
+
+def _annotate_key_failure(result: AbapGitActionResult) -> AbapGitActionResult:
+    """Add guidance to the failures that are specific to a pull by key (old report, unknown key, transport hint)."""
+    error = result.error or ""
+    lower = error.lower()
+    if _OLD_REPORT_MARKER in lower:
+        result.error = (
+            'The report does not support pulling by key (it answered "P_REPO is required for PULL action"). '
+            "Update Z_ABAPGIT_PULL_MCP_SHORTCUT to a version with P_KEY, or pass repo instead. Nothing was pulled."
+        )
+    elif INVARIANT.abapgit_key_not_found.contains(error):
+        result.error = error.rstrip() + _KEY_NOT_FOUND_HINT
+    elif "sap_abapgit_pull(repo=..." in error:
+        result.error = error.replace("sap_abapgit_pull(repo=...", "sap_abapgit_pull(key=...")
+    return result
+
+
+def _name_from_success(result: AbapGitActionResult) -> AbapGitActionResult:
+    """After a successful pull by key, report the repository name from the status text, if it can be trusted."""
+    message = (result.message or "").strip()
+    if len(message) >= _MAX_TRUSTED_MESSAGE:
+        return result
+    match = _NAME_FROM_STATUS.fullmatch(message)
+    if match is None:
+        return result
+    name = match.group("b") or match.group("n")
+    if len(name) < _MAX_TRUSTED_NAME:
+        result.repo_name = name
+    return result
+
+
+def _check_key_outcome(result: AbapGitActionResult, params: PullParams) -> AbapGitActionResult:
+    """Apply the key-specific result handling; a pull by name is returned as it is."""
+    if params.key is None:
+        return result
+    if result.success:
+        return _name_from_success(result)
+    return _annotate_key_failure(result)
+
+
+async def _abapgit_pull_via_api(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    backend: "WebGuiBackend",
+    repo: str | None,
+    trkorr: str | None,
+    username: str | None,
+    pat: str | None,
+    branch: str | None = None,
+    key: str | None = None,
+) -> AbapGitActionResult:
+    """Pull changes using the Z_ABAPGIT_PULL_MCP transaction (abapGit ABAP API)."""
+    label = _failure_label(repo, key)
+    logger.info("Starting abapGit Pull via API", extra={"repo": label})
+    # Resolved outside the try: an unsupported session language must reach the caller, not become a failure result.
+    t = lang.current("sap_abapgit_pull")
+
+    try:
+        # Validate and prepare parameters
+        params_result = _validate_and_prepare_params(repo, trkorr, username, pat, branch, key)
+        if isinstance(params_result, AbapGitActionResult):
+            return params_result
+        params = params_result
+        label = params.label
+
+        logger.info(
+            "Calling transaction with params",
+            extra={
+                "repo": params.label,
+                "trkorr": params.trkorr,
+                "user": params.username,
+                "has_pat": bool(params.pat),
+            },
+        )
+
+        # Execute transaction
+        tx_error = await _execute_pull_transaction(backend, params, params.label, t)
+        if tx_error:
+            return _check_key_outcome(tx_error, params)
+
+        # Run pull and check for popup errors
+        popup_error = await _run_pull_and_check_errors(backend, params.label)
+        if popup_error:
+            return _check_key_outcome(popup_error, params)
+
+        outcome = await _check_branch_outcome(backend, await _analyze_pull_result(backend, params.label, t), params)
+        return _check_key_outcome(outcome, params)
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("abapGit pull via API", extra={"repo": label})
+        return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=str(e))
+
+
+# =============================================================================
+# SE38 Verification
+# =============================================================================
+
+
+async def _fill_se38_program_field(backend: "WebGuiBackend", program_name: str, t: LanguagePack) -> bool:
+    """Fill the program name field in SE38 using various strategies."""
+    input_selectors = [
+        "input[name*='PROGRAM']",
+        "input[id*='PROGRAM']",
+        "input[maxlength='40']",
+        "#M0\\:46\\:1\\:1\\:\\:0\\:12",
+    ]
+
+    for selector in input_selectors:
+        try:
+            filled = await backend.fill_element_by_locator(selector, program_name, delay_ms=30)
+            if filled:
+                logger.info("Filled program name", extra={"selector": selector})
+                return True
+        except Exception:  # pylint: disable=broad-exception-caught
+            continue
+
+    # Try backend.fill_form as fallback
+    try:
+        fill_result = await backend.fill_form(dict.fromkeys(t.common.program, program_name))
+        if fill_result.filled:
+            logger.info("Filled program name using backend.fill_form")
+            return True
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.warning("backend.fill_form fallback failed", extra={"error": str(e)})
+
+    return False
+
+
+def _is_actual_abap_source(text: str) -> bool:
+    """Check if text contains actual ABAP source code (not just UI text)."""
+    upper_text = text.upper()
+
+    # Strict patterns that indicate actual ABAP code
+    strict_patterns = [
+        "WRITE '",
+        'WRITE "',
+        "WRITE:",
+        "DATA:",
+        "TYPES:",
+        "ENDMETHOD",
+        "ENDCLASS",
+        "ENDLOOP",
+        "ENDIF",
+        "ENDFORM",
+        "FORM ",
+        "METHOD ",
+        "CLASS ",
+    ]
+
+    if any(pattern in upper_text for pattern in strict_patterns):
+        return True
+
+    # Check for REPORT statement with proper format
+    # Matches: Z/Y customer reports, standard SAP reports, and namespaced reports (/NAMESPACE/...)
+    has_report = bool(re.search(r"REPORT\s+(/[A-Z0-9_]+/)?[A-Z][A-Z0-9_]*\s*\.", upper_text))
+    has_data = "DATA " in upper_text and ("TYPE" in upper_text or "LIKE" in upper_text)
+    has_write = "WRITE " in upper_text
+    has_if = "IF " in upper_text and ("ENDIF" in upper_text or "ELSE" in upper_text)
+
+    return sum([has_report, has_data, has_write, has_if]) >= 1
+
+
+async def _navigate_to_se38(backend: "WebGuiBackend") -> str | None:
+    """Navigate to SE38 and return error message if failed, None if OK."""
+    await backend.bring_to_front()
+    await backend.press_key("Escape")
+    await backend.wait(500)
+    await backend.press_key("F3")
+    await backend.wait(3000)
+
+    # Check if OK-Code field is visible; if not, press F3 again
+    ok_code_visible = await backend.evaluate_javascript("""
+        () => {
+            const el = document.querySelector('#ToolbarOkCode');
+            if (!el) return false;
+            const style = window.getComputedStyle(el);
+            return style.display !== 'none' && style.visibility !== 'hidden';
+        }
+    """)
+    if not ok_code_visible:
+        await backend.press_key("F3")
+        await backend.wait(3000)
+
+    tx_result = await backend.enter_transaction("SE38")
+    return None if tx_result.success else f"Failed to open SE38: {tx_result.error}"
+
+
+async def _find_source_code(backend: "WebGuiBackend") -> str | None:
+    """Try various methods to find ABAP source code on the page via JavaScript."""
+    # Single comprehensive JS that searches SE38 selectors, editor elements,
+    # iframes, table cells, and text nodes — mirrors the old multi-function approach.
+    js_code = """
+    () => {
+        const ABAP_PATTERNS = [
+            "WRITE '", 'WRITE "', 'WRITE:', 'DATA:', 'TYPES:',
+            'ENDMETHOD', 'ENDCLASS', 'ENDLOOP', 'ENDIF', 'ENDFORM',
+            'FORM ', 'METHOD ', 'CLASS '
+        ];
+        const CODE_PATTERNS = ['REPORT ', 'WRITE ', 'DATA ', 'IF ', 'LOOP ', 'ENDLOOP'];
+        function isAbapSource(text) {
+            if (!text || text.length < 20) return false;
+            const upper = text.toUpperCase();
+            return ABAP_PATTERNS.some(p => upper.includes(p)) ||
+                   /REPORT\\s+(\\/[A-Z0-9_]+\\/)?[A-Z][A-Z0-9_]*\\s*\\./.test(upper);
+        }
+
+        function getTextFromEl(el) {
+            try {
+                return (el.innerText || el.textContent || el.value || '').trim();
+            } catch(e) { return ''; }
+        }
+
+        // 1. Direct SE38 selectors
+        const se38Sels = [
+            '#textedit\\\\#TEC_cnt42',
+            "[id^='textedit'][id*='TEC_cnt']",
+            "textarea[id*='textedit']",
+            "[id*='TEC_cnt']"
+        ];
+        for (const sel of se38Sels) {
+            try {
+                const el = document.querySelector(sel);
+                if (!el) continue;
+                let text = getTextFromEl(el);
+                if (!text || text.length < 20) {
+                    text = el.value || el.textContent || el.innerText || '';
+                }
+                if (text && text.length > 20 && isAbapSource(text)) return text;
+            } catch(e) {}
+        }
+
+        // 2. Editor selectors in main document
+        const editorSels = [
+            'textarea', '.ace_editor', '.ace_content', '.urPTxt', 'pre', 'code',
+            '.editor-content', "[id*='editor']", "[class*='editor']",
+            "[class*='source']", "[class*='code']", '.lsListbox__list',
+            'table.urST', '#sapwd_main_window_root_contents table'
+        ];
+        for (const sel of editorSels) {
+            try {
+                const els = document.querySelectorAll(sel);
+                for (const el of els) {
+                    const text = getTextFromEl(el);
+                    if (isAbapSource(text)) return text;
+                }
+            } catch(e) {}
+        }
+
+        // 3. Table cells for code lines
+        try {
+            const cells = document.querySelectorAll('td');
+            const codeLines = [];
+            for (const cell of cells) {
+                const text = (cell.innerText || '').trim();
+                if (text && text.length > 5) {
+                    const upper = text.toUpperCase();
+                    if (upper.includes("WRITE '") || upper.includes('WRITE "') ||
+                        (upper.includes('REPORT ') && text.includes('.')) ||
+                        upper.includes('ENDLOOP') || upper.includes('ENDIF') ||
+                        upper.includes('ENDFORM') || upper.includes('ENDMETHOD')) {
+                        codeLines.push(text);
+                    }
+                }
+            }
+            if (codeLines.length > 0) return codeLines.join('\\n');
+        } catch(e) {}
+
+        // 4. Iframes
+        const iframes = document.querySelectorAll('iframe');
+        for (const iframe of iframes) {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (!doc || !doc.body) continue;
+                const frameSels = ['textarea', '.ace_editor', '.editor-content', 'pre', '.urPTxt'];
+                for (const sel of frameSels) {
+                    const els = doc.querySelectorAll(sel);
+                    for (const el of els) {
+                        const text = getTextFromEl(el);
+                        if (isAbapSource(text)) return text;
+                    }
+                }
+                const bodyText = (doc.body.innerText || '').trim();
+                if (isAbapSource(bodyText)) return bodyText;
+            } catch(e) {}
+        }
+
+        // 5. Text node walk (fallback)
+        function getTextNodes(element) {
+            let texts = [];
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                const text = node.textContent.trim();
+                if (text.length > 5) texts.push(text);
+            }
+            return texts;
+        }
+        let allTexts = getTextNodes(document.body);
+        for (const iframe of iframes) {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (doc && doc.body) allTexts = allTexts.concat(getTextNodes(doc.body));
+            } catch(e) {}
+        }
+        const codeTexts = allTexts.filter(text => {
+            const upper = text.toUpperCase();
+            return CODE_PATTERNS.some(p => upper.includes(p));
+        });
+        if (codeTexts.length > 0) return codeTexts.sort((a, b) => b.length - a.length)[0];
+
+        return null;
+    }
+    """
+    try:
+        logger.info("Searching for ABAP source code via JavaScript")
+        result = await backend.evaluate_javascript(js_code)
+        if result and _is_actual_abap_source(result):
+            source: str = result
+            logger.info("Found ABAP source code", extra={"chars": len(source)})
+            return source
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("JavaScript source search failed", extra={"error": str(e)})
+    return None
+
+
+async def read_se38_source(backend: "WebGuiBackend", program_name: str, t: LanguagePack) -> dict[str, Any]:
+    """Read ABAP report source code from SE38."""
+    try:
+        nav_error = await _navigate_to_se38(backend)
+        if nav_error:
+            return {"success": False, "error": nav_error}
+
+        await backend.wait(2000)
+        if not await _fill_se38_program_field(backend, program_name, t):
+            return {"success": False, "error": "Could not find program input field"}
+
+        # Press F7 (Display) and handle entry screen
+        logger.info("Pressing F7 to display source code")
+        await backend.press_key("F7")
+        await backend.wait(3000)
+
+        page_title = await backend.get_page_title()
+        logger.info("Page title after F7", extra={"title": page_title})
+        if t.abapgit.se38_initial_title.contains(page_title):
+            await backend.press_key("Enter")
+            await backend.wait(2000)
+            title_after_enter = await backend.get_page_title()
+            if t.abapgit.se38_initial_title.contains(title_after_enter):
+                await backend.press_key("F8")
+                await backend.wait(3000)
+
+        await backend.wait(1000)
+        source_code = await _find_source_code(backend)
+
+        if source_code:
+            logger.info("Found valid ABAP source code", extra={"chars": len(source_code)})
+            return {"success": True, "source_code": source_code, "program_name": program_name}
+
+        logger.warning("No ABAP source code found, returning body text")
+        body_text = await backend.evaluate_javascript("() => document.body.innerText || ''")
+        return {
+            "success": True,
+            "source_code": (body_text or "")[:3000],
+            "program_name": program_name,
+            "debug_note": "No ABAP source patterns detected, returning raw body text",
+        }
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("SE38 read failed", extra={"error_type": type(e).__name__, "error": str(e)})
+        return {"success": False, "error": str(e)}
+
+
+# =============================================================================
+# Tool Registration
+# =============================================================================
+
+
+def register_abapgit_tools(mcp: FastMCP) -> None:
+    """Register abapGit tools with the MCP server."""
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="abapGit List Repositories",
+            read_only_hint=True,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        description=(
+            "List registered abapGit repositories with their metadata. "
+            "Returns repo names, Git URLs, packages, branches, last pull timestamps and (when the report "
+            "provides it) the repository key, plus total_count and matched_count. "
+            "Use name/package/url/key to filter instead of listing everything (a system can have hundreds of "
+            "repositories): name, package and url are case-insensitive substrings, or globs when they contain "
+            "* or ?; key is an exact match, digits, zero-padded to 12; all given filters must match. "
+            "compact=True returns only name, package and key. "
+            "Use this to discover the correct repo name before calling sap_abapgit_pull."
+        ),
+    )
+    async def sap_abapgit_list_repos(
+        name: str | None = None,
+        package: str | None = None,
+        url: str | None = None,
+        key: str | None = None,
+        compact: bool = False,
+        session: str | None = None,
+        agent_id: str | None = None,
+    ) -> AbapGitListResult:
+        """
+        List registered abapGit repositories, optionally filtered.
+
+        The complete list is always read from SAP (the report has no filter); filtering happens afterwards, so
+        total_count is the number of all registered repositories and matched_count the number that match.
+
+        Args:
+            name: Case-insensitive substring or glob (* and ?) for the repository name. Optional.
+            package: Same, for the ABAP package. Optional.
+            url: Same, for the Git URL (never matches offline repositories). Optional.
+            key: Exact abapGit repository key (1-12 digits, zero-padded to 12; surrounding blanks are stripped).
+                 Optional.
+            compact: Return only name, package and key per repository.
+            session: Session ID (e.g., "s1", "s2"). None uses primary session.
+            agent_id: Agent identifier for binding check. Optional.
+
+        Returns:
+            AbapGitListResult with the matching repositories (AbapGitRepoInfo objects, or AbapGitRepoSummary
+            objects when compact=True) plus total_count and matched_count
+
+        Example:
+            sap_abapgit_list_repos(package="Z_MYAPP*", compact=True)
+        """
+        error = _validate_list_filters(name, package, url, key)
+        if error:
+            return AbapGitListResult(success=False, error=error)
+        try:
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_abapgit_list_repos")
+        except ValueError as e:
+            return AbapGitListResult(success=False, error=f"Session error: {e}")
+        result = await _abapgit_list_repos(backend)
+        return _apply_list_filters(result, name, package, url, key, compact)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="abapGit Pull",
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        ),
+        description=(
+            "Pull changes from a remote git repository using abapGit API. "
+            "WARNING: overwrites local ABAP objects. "
+            "Select the repository by repo (name/URL) or by key (from sap_abapgit_list_repos), not both. "
+            "If a transport is required the error says so: retry with trkorr=... "
+            "If 'status unknown', the pull may have run: check the last pull time before retrying. "
+            "Optional branch switches the repository to that branch persistently (kept only if the pull "
+            "succeeds) and clears a commit pin."
+        ),
+    )
+    async def sap_abapgit_pull(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        repo: str | None = None,
+        trkorr: str | None = None,
+        username: str | None = None,
+        pat: str | None = None,
+        branch: str | None = None,
+        key: str | None = None,
+        session: str | None = None,
+        agent_id: str | None = None,
+    ) -> AbapGitActionResult:
+        """
+        Pull changes from a remote git repository using abapGit API.
+
+        WARNING: Pull overwrites local ABAP objects with remote versions.
+        NOTE: "Pull status unknown" means the pull may or may not have run. Check the last pull time in
+        abapGit or the transport task first; only if it did not run, call again or press F8.
+        IMPORTANT: All filenames must be lowercase (e.g., zcl_my_class.clas.abap, not uppercase).
+
+        Args:
+            repo: abapGit repository name (hyphens allowed, e.g. MY-PROJECT-ABAP) or its full https URL.
+                  Matched exactly by the report, not a pattern. Exactly one of `repo` and `key`; omit the
+                  unused one, do not pass an empty string.
+            trkorr: Transport request (optional, but error if SAP requires it).
+                    If pull fails with "Transport required", retry with trkorr.
+            username: GitHub username (optional for public repos)
+            pat: GitHub Personal Access Token (optional for public repos).
+                 Falls back to ABAPGIT_PAT env var, then GITHUB_PAT.
+            branch: Branch to pull (optional): `main`, `feature/x` or `refs/heads/x`. Without it the repository
+                    is pulled on its selected branch. SIDE EFFECT: switches the registered repository to this
+                    branch persistently (like a branch switch in the abapGit UI) and clears a commit pin; the
+                    switch is kept only if the pull succeeds and is restored on failure. The result's `branch`
+                    echoes the full branch the repository is on; `sap_abapgit_list_repos` shows it too.
+            key: abapGit repository key, 1 to 12 digits (zero-padded to 12), as shown by `sap_abapgit_list_repos`
+                 (online repositories only). Use it instead of `repo` when name or URL is not unique: abapGit
+                 allows two repositories with the same name or URL, the key is the only unique identifier.
+                 Exactly one of `repo` and `key`. Unlike the `key` filter of `sap_abapgit_list_repos`, it is not
+                 stripped: surrounding blanks are rejected. Needs a report version with P_KEY.
+            session: Session ID (e.g., "s1", "s2"). None uses primary session.
+            agent_id: Agent identifier for binding check. Optional.
+
+        Returns:
+            AbapGitActionResult with success status and details; for a pull by key `repo_name` is the
+            repository name when the status text names it reliably, else `key <12 digits>`.
+
+        Example:
+            sap_abapgit_pull(repo="Z_PUBLIC_REPO")
+            sap_abapgit_pull(repo="MY-PROJECT-ABAP")
+            sap_abapgit_pull(repo="https://github.com/org/MY-PROJECT-ABAP")
+            sap_abapgit_pull(repo="Z_PUBLIC_REPO", trkorr="XYZK900010")
+            sap_abapgit_pull(repo="Z_PUBLIC_REPO", branch="feature/x", trkorr="XYZK900010")
+            sap_abapgit_pull(key="000000000012")
+            sap_abapgit_pull(key="000000000012", branch="feature/x", trkorr="XYZK900010")
+        """
+        try:
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_abapgit_pull")
+        except ValueError as e:
+            return AbapGitActionResult.failure_result(
+                action="pull", repo_name=_failure_label(repo, key), error=f"Session error: {e}"
+            )
+        return await _abapgit_pull_via_api(backend, repo, trkorr, username, pat, branch, key)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read SE38 Source",
+            read_only_hint=True,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        description=(
+            "Read ABAP report source code from SE38. "
+            "If sap-adt is available, prefer its get_source tool. "
+            "Navigates to SE38, enters the program name, and displays the source code. "
+            "Useful for verifying abapGit pull operations."
+        ),
+    )
+    async def sap_read_se38_source(
+        program_name: str,
+        session: str | None = None,
+        agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Read ABAP report source code from SE38.
+
+        Args:
+            program_name: The ABAP program/report name (e.g., Z_REPORT_TEST)
+            session: Session ID (e.g., "s1", "s2"). None uses primary session.
+            agent_id: Agent identifier for binding check. Optional.
+
+        Returns:
+            Dict with success, source_code, program_name, error fields
+
+        Example:
+            sap_read_se38_source(program_name="Z_MY_REPORT")
+        """
+        try:
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_read_se38_source")
+        except ValueError as e:
+            return {"success": False, "error": f"Session error: {e}"}
+        return await read_se38_source(backend, program_name, lang.current("sap_read_se38_source"))

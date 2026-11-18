@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from mcp import ClientSession
 
-from sapguimcp.backend.webgui.models.browser_results import EvaluateResult, FillResult, SnapshotResult
-from sapguimcp.models import (
+from sapwebguimcp.backend.webgui.models.browser_results import EvaluateResult, FillResult, SnapshotResult
+from sapwebguimcp.models import (
     FillFormResult,
     KeyboardResult,
     LoginResult,
@@ -34,7 +34,7 @@ from .integration_helpers import (
 
 SE16_SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "se16_exploration"
 READ_SELECTION_ROWS_JS = (
-    Path(__file__).parents[2] / "src" / "sapguimcp" / "backend" / "webgui" / "js" / "read_se16n_selection_rows.js"
+    Path(__file__).parents[2] / "src" / "sapwebguimcp" / "backend" / "webgui" / "js" / "read_se16n_selection_rows.js"
 )
 
 

@@ -5,11 +5,11 @@ import sys
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang import UnsupportedLanguageError
-from sapguimcp.lang.de import DE
-from sapguimcp.lang.schema import Key
-from sapguimcp.session_language import current_language
+from sapwebguimcp import lang
+from sapwebguimcp.lang import UnsupportedLanguageError
+from sapwebguimcp.lang.de import DE
+from sapwebguimcp.lang.schema import Key
+from sapwebguimcp.session_language import current_language
 
 UNKNOWN = "QQ"  # a language key no pack will ever use, so a new pack (e.g. IT) does not break these tests
 BASE = lang.supported_languages()
@@ -106,5 +106,5 @@ def test_lang_en_fixture(lang_en: lang.LanguagePack) -> None:
 
 def test_lang_does_not_import_the_config() -> None:
     """``models.config`` imports ``lang``; the reverse would be an import cycle (spec section 1)."""
-    code = "import sys, sapguimcp.lang; sys.exit('sapguimcp.models.config' in sys.modules)"
+    code = "import sys, sapwebguimcp.lang; sys.exit('sapwebguimcp.models.config' in sys.modules)"
     assert subprocess.run([sys.executable, "-c", code], check=False).returncode == 0  # noqa: S603

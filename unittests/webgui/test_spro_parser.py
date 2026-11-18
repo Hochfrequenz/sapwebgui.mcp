@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.spro_parser import (
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.spro_parser import (
     _extract_results_section,
     parse_spro_search_results,
 )

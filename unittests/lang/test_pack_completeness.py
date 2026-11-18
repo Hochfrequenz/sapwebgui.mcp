@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang.de import DE
-from sapguimcp.lang.schema import (
+from sapwebguimcp import lang
+from sapwebguimcp.lang.de import DE
+from sapwebguimcp.lang.schema import (
     DumpSection,
     JobStatus,
     Key,
@@ -31,7 +31,7 @@ from sapguimcp.lang.schema import (
     resolve,
     sections,
 )
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp.lang.text import RegexText, Template, Text
 
 LANGUAGES = lang.supported_languages()
 EN = lang.pack_for("EN")

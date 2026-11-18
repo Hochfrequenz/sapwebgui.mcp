@@ -26,10 +26,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from playwright.async_api import async_playwright
 
-import sapguimcp
-from sapguimcp.backend.webgui.backend import WebGuiBackend
-from sapguimcp.tools import se16_tools
-from sapguimcp.tools.se16_tools import (
+import sapwebguimcp
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.tools import se16_tools
+from sapwebguimcp.tools.se16_tools import (
     _fill_se16n_filters_webgui,
     _filter_fill_failure,
     _FilterFillResult,
@@ -40,7 +40,7 @@ from sapguimcp.tools.se16_tools import (
 
 pytestmark = pytest.mark.anyio
 
-JS_DIR = Path(sapguimcp.__file__).parent / "backend" / "webgui" / "js"
+JS_DIR = Path(sapwebguimcp.__file__).parent / "backend" / "webgui" / "js"
 READ_ROWS_JS = JS_DIR / "read_se16n_selection_rows.js"
 
 

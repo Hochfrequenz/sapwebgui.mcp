@@ -6,7 +6,7 @@ import pytest
 import respx
 from httpx import ConnectError, Response
 
-from sapguimcp.server import _check_cdp_available
+from sapwebguimcp.server import _check_cdp_available
 
 
 class TestCdpCheck:

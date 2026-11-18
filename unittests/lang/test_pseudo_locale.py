@@ -18,10 +18,10 @@ from collections.abc import Iterator, Mapping
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang import _register_for_tests
-from sapguimcp.lang.schema import LanguagePack, Leaf, canonical, iter_leaves, sections
-from sapguimcp.lang.text import RegexText, Template, Text, compiled, placeholder_names
+from sapwebguimcp import lang
+from sapwebguimcp.lang import _register_for_tests
+from sapwebguimcp.lang.schema import LanguagePack, Leaf, canonical, iter_leaves, sections
+from sapwebguimcp.lang.text import RegexText, Template, Text, compiled, placeholder_names
 
 CODE = "PS"
 

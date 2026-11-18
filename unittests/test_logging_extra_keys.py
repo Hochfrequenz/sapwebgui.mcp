@@ -13,7 +13,7 @@ import ast
 import logging
 from pathlib import Path
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "sapguimcp"
+_SRC = Path(__file__).resolve().parents[1] / "src" / "sapwebguimcp"
 
 
 _RESERVED = set(logging.LogRecord("n", logging.INFO, "p", 0, "m", (), None).__dict__) | {

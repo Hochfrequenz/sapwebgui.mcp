@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp.backend.webgui.parsers.se16_parser import (
+from sapwebguimcp.backend.webgui.parsers.se16_parser import (
     parse_se16_columns,
     parse_se16_hit_count,
     parse_se16_rows,
     parse_se16_snapshot,
 )
-from sapguimcp.lang.schema import LanguagePack
+from sapwebguimcp.lang.schema import LanguagePack
 
 # Test data directory
 TESTDATA_DIR = Path(__file__).parent / "testdata" / "se16_exploration"

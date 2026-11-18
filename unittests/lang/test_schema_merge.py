@@ -6,8 +6,8 @@ from types import MappingProxyType
 
 import pytest
 
-from sapguimcp.lang.schema import JobStatus, PopupSection, canonical, merge
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp.lang.schema import JobStatus, PopupSection, canonical, merge
+from sapwebguimcp.lang.text import RegexText, Template, Text
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

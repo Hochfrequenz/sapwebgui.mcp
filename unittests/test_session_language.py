@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sapguimcp import session_language
-from sapguimcp.session_language import (
+from sapwebguimcp import session_language
+from sapwebguimcp.session_language import (
     current_language,
     normalize_language,
     session_sap_language,
@@ -61,13 +61,13 @@ def test_session_sap_language_uses_context() -> None:
 def test_session_sap_language_falls_back_to_default_system() -> None:
     cfg = MagicMock()
     cfg.get_default.return_value.language = "DE"
-    with use_language(None), patch("sapguimcp.models.config.get_sap_config", return_value=cfg):
+    with use_language(None), patch("sapwebguimcp.models.config.get_sap_config", return_value=cfg):
         assert session_sap_language() == "DE"
 
 
 def test_unsupported_session_language_collapses_to_en_with_single_warning(caplog: pytest.LogCaptureFixture) -> None:
     session_language._warned_languages.discard("FR")
-    with use_language("FR"), caplog.at_level("WARNING", logger="sapguimcp.session_language"):
+    with use_language("FR"), caplog.at_level("WARNING", logger="sapwebguimcp.session_language"):
         assert session_sap_language() == "EN"
         assert session_sap_language() == "EN"
     warnings = [r for r in caplog.records if r.getMessage() == "session language not supported, using EN"]

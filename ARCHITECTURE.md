@@ -76,7 +76,7 @@ sequenceDiagram
 Core packages only — helper packages (`catalog/`, `classcatalog/`, `fmcatalog/`, `tables/`) provide offline SAP metadata search; `middleware/`, `resources/`, `prompts/`, `workflows/`, `loghandlers/` handle cross-cutting concerns.
 
 ```
-src/sapguimcp/
+src/sapwebguimcp/
   server.py                    # FastMCP app, tool registration, lifecycle
   models/
     config.py                  # SapGuiSettings (all env vars)
@@ -141,7 +141,7 @@ added to that allow-list deliberately.
 
 Every text the server reads from or types into an SAP screen (button labels, tab titles, window
 titles, status-bar messages, column headers) depends on the SAP logon language. These texts live
-only in the language packs under `src/sapguimcp/lang/` (`de.py`, `en.py`, schema in `schema.py`);
+only in the language packs under `src/sapwebguimcp/lang/` (`de.py`, `en.py`, schema in `schema.py`);
 the session language is set at login and `lang.current()` returns the matching merged view (session
 pack, then EN). Design and rationale:
 [`docs/superpowers/specs/2026-11-10-language-packs-design.md`](docs/superpowers/specs/2026-11-10-language-packs-design.md).
@@ -152,7 +152,7 @@ never spells a screen text itself.
 
 Guards:
 
-- `unittests/test_no_ui_literals.py` scans `src/sapguimcp` (Python and the JS in `backend/webgui/js`)
+- `unittests/test_no_ui_literals.py` scans `src/sapwebguimcp` (Python and the JS in `backend/webgui/js`)
   for literals that look like SAP screen text. Fix a hit by moving the text into the packs (and a
   `SOURCES` entry in `lang/sources.py`), or, if it is code or the server's own message, mark the
   exact line with `# lang-ok: <reason>` (`// lang-ok: <reason>` in JS). The baseline
@@ -168,18 +168,18 @@ it); `unittests/lang/test_backend_tags.py` derives the tag from the source and f
 wrong tag and on unused fields. After the desktop/WebGUI split, each repository deletes the fields
 tagged for the other backend. The WebGUI-only language machinery (`for_js()`, the Node runner and
 JS pack tests, `JS_DIR`, the JS prettier script) is listed in
-[`ADDING_A_LANGUAGE.md`](src/sapguimcp/lang/ADDING_A_LANGUAGE.md#webgui-only-language-machinery).
+[`ADDING_A_LANGUAGE.md`](src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md#webgui-only-language-machinery).
 
 ### Adding a login language
 
 The full guide, including what to look out for (mixed-language screens, release differences,
 case sensitivity, short fragments), is
-[`src/sapguimcp/lang/ADDING_A_LANGUAGE.md`](src/sapguimcp/lang/ADDING_A_LANGUAGE.md). In short:
+[`src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md`](src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md). In short:
 
-1. Draft the pack: `uv run python scripts/harvest_lang_texts.py <XX> --draft --out src/sapguimcp/lang/<xx>.py`
+1. Draft the pack: `uv run python scripts/harvest_lang_texts.py <XX> --draft --out src/sapwebguimcp/lang/<xx>.py`
    on a system that has the language installed. Sourced texts come from SAP; everything else keeps
    the EN value with a `# TODO`. Set `html_lang`, `logon_dropdown` and `date_format`.
-2. Register the pack in `src/sapguimcp/lang/__init__.py` (`_PACKS`); `--verify` and the config
+2. Register the pack in `src/sapwebguimcp/lang/__init__.py` (`_PACKS`); `--verify` and the config
    accept only registered codes.
 3. Settle every `TODO` from SAP (`--print-sql` lists the queries; mypy and
    `unittests/lang/test_pack_completeness.py` list the gaps). Texts that are deliberately identical
@@ -197,11 +197,11 @@ Follow the SE16 pattern. For a new transaction `SE99`:
 
 ### 1. Create the result model
 
-`src/sapguimcp/models/se99_models.py`:
+`src/sapwebguimcp/models/se99_models.py`:
 
 ```python
 from pydantic import Field
-from sapguimcp.models.base import ToolResult
+from sapwebguimcp.models.base import ToolResult
 
 class SE99Result(ToolResult):
     """Result from sap_se99_query tool."""
@@ -213,12 +213,12 @@ Export it from `models/__init__.py`.
 
 ### 2. Create the tool file
 
-`src/sapguimcp/tools/se99_tools.py`:
+`src/sapwebguimcp/tools/se99_tools.py`:
 
 ```python
 from fastmcp import FastMCP
-from sapguimcp.backend.manager import get_backend
-from sapguimcp.models.se99_models import SE99Result
+from sapwebguimcp.backend.manager import get_backend
+from sapwebguimcp.models.se99_models import SE99Result
 
 def register_se99_tools(mcp: FastMCP) -> None:
     @mcp.tool(description="Query SE99 data")
@@ -248,7 +248,7 @@ This project drives only the Web GUI. Tools call `WebGuiBackend` directly. The `
 
 ### 4. Add a WebGUI parser (if needed)
 
-`src/sapguimcp/backend/webgui/parsers/se99_parser.py` — for extracting structured data from HTML/ARIA snapshots. Only needed for WebGUI; desktop reads data via COM.
+`src/sapwebguimcp/backend/webgui/parsers/se99_parser.py` — for extracting structured data from HTML/ARIA snapshots. Only needed for WebGUI; desktop reads data via COM.
 
 ### 5. Register the tool
 
@@ -275,7 +275,7 @@ Tests are marked `integration` automatically when they use a live SAP fixture (`
 
 ### Where a test lives
 
-- A test that imports `sapguimcp.backend.desktop` lives in `unittests/desktop/`, one that imports `sapguimcp.backend.webgui` in `unittests/webgui/`. A file never imports from the other backend's test directory.
+- A test that imports `sapwebguimcp.backend.desktop` lives in `unittests/desktop/`, one that imports `sapwebguimcp.backend.webgui` in `unittests/webgui/`. A file never imports from the other backend's test directory.
 - Backend-neutral tests stay in `unittests/` and `unittests/lang/`.
 - Assets shared by both backends sit in `unittests/testdata/` (`lang_test.py`, `html_snapshots/`, the abapGit submodules in `abapgit_repos/`). Assets of one backend stay in that backend's `testdata/` directory.
 - The release smoke test of the binary is `scripts/smoke_test_exe.py`.
@@ -297,13 +297,13 @@ uv run --group tests python -m pytest                                    # Full 
 uv run --group tests python -m pytest unittests/ -m "not integration"    # All offline tests (no SAP needed)
 uv run --group tests python -m pytest unittests/ -m integration          # SAP integration tests only
 uv run --group linting ruff check .                                      # ruff lint
-uv run --group type_check mypy --show-error-codes src/sapguimcp --strict # mypy --strict
+uv run --group type_check mypy --show-error-codes src/sapwebguimcp --strict # mypy --strict
 uv run --group linting ruff format --check .                             # ruff format check
 ```
 
 ## Configuration
 
-All settings are in `src/sapguimcp/models/config.py` and loaded from environment variables or `.env` files.
+All settings are in `src/sapwebguimcp/models/config.py` and loaded from environment variables or `.env` files.
 
 ### Core (have defaults, but needed for SAP operations)
 

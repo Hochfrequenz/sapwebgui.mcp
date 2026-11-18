@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.models import ScreenText, StatusBarInfo
-from sapguimcp.models.quick_report_models import ScreenClassification
-from sapguimcp.tools.quick_report_tools import classify_result_screen
+from sapwebguimcp import lang
+from sapwebguimcp.models import ScreenText, StatusBarInfo
+from sapwebguimcp.models.quick_report_models import ScreenClassification
+from sapwebguimcp.tools.quick_report_tools import classify_result_screen
 
 
 def _make_backend(

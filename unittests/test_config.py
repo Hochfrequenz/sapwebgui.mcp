@@ -3,7 +3,7 @@
 import os
 from unittest.mock import patch
 
-from sapguimcp.models.config import (
+from sapwebguimcp.models.config import (
     BrowserMode,
     BrowserType,
     SapGuiSettings,
@@ -72,18 +72,18 @@ class TestGetSettings:
 
     def test_returns_settings_instance(self) -> None:
         """Test that get_settings returns a SapGuiSettings instance."""
-        import sapguimcp.models.config
+        import sapwebguimcp.models.config
 
-        sapguimcp.models.config._settings = None
+        sapwebguimcp.models.config._settings = None
 
         settings = get_settings()
         assert isinstance(settings, SapGuiSettings)
 
     def test_returns_same_instance(self) -> None:
         """Test that get_settings returns the same instance on subsequent calls."""
-        import sapguimcp.models.config
+        import sapwebguimcp.models.config
 
-        sapguimcp.models.config._settings = None
+        sapwebguimcp.models.config._settings = None
 
         settings1 = get_settings()
         settings2 = get_settings()

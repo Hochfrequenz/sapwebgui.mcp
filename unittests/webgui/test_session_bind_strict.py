@@ -20,8 +20,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
-from sapguimcp.models.base import SessionBindConflictError
+from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
+from sapwebguimcp.models.base import SessionBindConflictError
 
 
 def _make_mock_page() -> MagicMock:

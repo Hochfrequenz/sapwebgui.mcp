@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sapguimcp import server
+from sapwebguimcp import server
 
 
 @pytest.fixture(autouse=True)

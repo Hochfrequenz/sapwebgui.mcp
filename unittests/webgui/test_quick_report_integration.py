@@ -12,8 +12,8 @@ import logging
 import pytest
 from mcp import ClientSession
 
-from sapguimcp.models import LoginResult
-from sapguimcp.models.quick_report_models import (
+from sapwebguimcp.models import LoginResult
+from sapwebguimcp.models.quick_report_models import (
     QuickReportResult,
     ScreenClassification,
 )

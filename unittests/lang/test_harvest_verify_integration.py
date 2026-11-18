@@ -11,7 +11,7 @@ import pytest
 from dotenv import load_dotenv
 from sap_mcp_config import load_default
 
-from sapguimcp.lang import supported_languages
+from sapwebguimcp.lang import supported_languages
 from unittests.lang.harvest_script import harvest
 
 pytestmark = pytest.mark.integration

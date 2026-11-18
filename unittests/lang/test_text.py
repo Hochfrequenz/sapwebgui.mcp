@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from sapguimcp.lang.text import RegexText, Template, Text, alt_of
+from sapwebguimcp.lang.text import RegexText, Template, Text, alt_of
 
 
 class TestTextValidation:

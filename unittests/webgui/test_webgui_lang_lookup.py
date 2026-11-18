@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.backend import WebGuiBackend, _logon_dropdown_text
-from sapguimcp.backend.webgui.js_helpers import load_js, script_arg
-from sapguimcp.lang.text import RegexText, Text
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend, _logon_dropdown_text
+from sapwebguimcp.backend.webgui.js_helpers import load_js, script_arg
+from sapwebguimcp.lang.text import RegexText, Text
 from unittests.lang.synthetic_pack import synthetic_pack
 
 

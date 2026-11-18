@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, call
 
 import pytest
 
-from sapguimcp.models.screen_state import SelectionScreenState
-from sapguimcp.tools.screen_state_helpers import ensure_screen_state
+from sapwebguimcp.models.screen_state import SelectionScreenState
+from sapwebguimcp.tools.screen_state_helpers import ensure_screen_state
 
 
 def _mock_backend(snapshot_before: str, snapshot_after: str) -> AsyncMock:

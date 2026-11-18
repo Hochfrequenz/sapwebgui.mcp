@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from sapguimcp.backend.webgui.models.browser_results import ClickResult, WaitResult
+from sapwebguimcp.backend.webgui.models.browser_results import ClickResult, WaitResult
 
 
 class TestTimedeltaSerialization:

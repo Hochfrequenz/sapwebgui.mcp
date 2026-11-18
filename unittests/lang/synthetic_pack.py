@@ -11,9 +11,9 @@ import dataclasses
 import re
 from collections.abc import Mapping
 
-from sapguimcp import lang
-from sapguimcp.lang.schema import LanguagePack, Leaf, canonical, sections
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import LanguagePack, Leaf, canonical, sections
+from sapwebguimcp.lang.text import RegexText, Template, Text
 
 CODE = "XX"
 MARK = "⟦XX⟧ "

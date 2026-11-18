@@ -1,6 +1,6 @@
 """Test-only SAP texts of the UI tests (WebGUI, and the desktop SPRO test), as one test pack per logon language (#1044).
 
-The same mechanism as the language packs in ``sapguimcp.lang``: frozen dataclass sections with
+The same mechanism as the language packs in ``sapwebguimcp.lang``: frozen dataclass sections with
 required fields only, every value a ``Text``, and a completeness test
 (``unittests/webgui/test_lang_test_pack.py``) that checks every registered language has a test
 pack with the same fields, kinds and flags. A field whose value deliberately equals EN is listed
@@ -13,7 +13,7 @@ These texts belong to the tests, not to the server, so they live here and not in
 import os
 from dataclasses import dataclass
 
-from sapguimcp.lang import Text, supported_languages
+from sapwebguimcp.lang import Text, supported_languages
 
 DEFAULT_LANGUAGE = "DE"
 

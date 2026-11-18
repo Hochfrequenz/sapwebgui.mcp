@@ -4,11 +4,11 @@ import dataclasses
 
 import pytest
 
-from sapguimcp.lang.de import DE
-from sapguimcp.lang.en import EN
-from sapguimcp.lang.invariant import INVARIANT
-from sapguimcp.lang.schema import JobStatus, LanguagePack, iter_leaves, resolve, sections
-from sapguimcp.lang.text import Template, Text
+from sapwebguimcp.lang.de import DE
+from sapwebguimcp.lang.en import EN
+from sapwebguimcp.lang.invariant import INVARIANT
+from sapwebguimcp.lang.schema import JobStatus, LanguagePack, iter_leaves, resolve, sections
+from sapwebguimcp.lang.text import Template, Text
 
 
 def test_packs_carry_their_language() -> None:

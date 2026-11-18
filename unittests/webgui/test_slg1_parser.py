@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.slg1_parser import (
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.slg1_parser import (
     is_slg1_initial_screen,
     is_slg1_log_list_screen,
     is_slg1_no_results,
     parse_slg1_log_list,
 )
-from sapguimcp.backend.webgui.types import AriaSnapshot
+from sapwebguimcp.backend.webgui.types import AriaSnapshot
 
 T = lang.view_for("DE")  # German first, English after: the snapshots of both languages are parsed
 

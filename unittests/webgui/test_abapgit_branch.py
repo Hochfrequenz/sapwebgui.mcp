@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp.backend.webgui.backend import WebGuiBackend
-from sapguimcp.models.abapgit_models import AbapGitActionResult
-from sapguimcp.models.sap_results import StatusBarInfo
-from sapguimcp.tools import abapgit_tools
-from sapguimcp.tools.abapgit_tools import _abapgit_pull_via_api
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.models.abapgit_models import AbapGitActionResult
+from sapwebguimcp.models.sap_results import StatusBarInfo
+from sapwebguimcp.tools import abapgit_tools
+from sapwebguimcp.tools.abapgit_tools import _abapgit_pull_via_api
 
 pytestmark = pytest.mark.usefixtures("lang_de")
 

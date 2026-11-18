@@ -14,18 +14,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.se24_parser import (
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.se24_parser import (
     map_visibility,
     parse_se24_attributes_snapshot,
     parse_se24_methods_snapshot,
     parse_se24_snapshot,
 )
-from sapguimcp.backend.webgui.parsers.se37_parser import parse_se37_exceptions_snapshot, parse_se37_snapshot
-from sapguimcp.models import SE24Entry, SE24Error, SE37Entry, SE37Error
+from sapwebguimcp.backend.webgui.parsers.se37_parser import parse_se37_exceptions_snapshot, parse_se37_snapshot
+from sapwebguimcp.models import SE24Entry, SE24Error, SE37Entry, SE37Error
 
 if TYPE_CHECKING:
-    from sapguimcp.lang import LanguagePack
+    from sapwebguimcp.lang import LanguagePack
 
 
 def test_map_visibility_exact_versus_contains(lang_de: LanguagePack) -> None:
@@ -174,7 +174,7 @@ def _tool_function(module: Any, register: str, tool: str) -> Any:
 async def test_a_session_without_a_language_pack_raises_instead_of_failing_quietly(
     module: str, register: str, tool: str, args: dict[str, str]
 ) -> None:
-    mod = importlib.import_module(f"sapguimcp.tools.{module}")
+    mod = importlib.import_module(f"sapwebguimcp.tools.{module}")
     fn = _tool_function(mod, register, tool)
     backend = MagicMock()
     backend.backend_type = "webgui"

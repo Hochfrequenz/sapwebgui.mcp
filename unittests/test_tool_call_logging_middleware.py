@@ -7,15 +7,15 @@ from typing import Any
 
 import pytest
 
-from sapguimcp.middleware.logging import (
+from sapwebguimcp.middleware.logging import (
     ToolCallLoggingMiddleware,
     _sessions_ref,
     new_request_id,
     set_sap_identity,
 )
 
-_LOGGER_NAME = "sapguimcp.middleware.logging"
-from sapguimcp.models.middleware import SapIdentity, SessionStats
+_LOGGER_NAME = "sapwebguimcp.middleware.logging"
+from sapwebguimcp.models.middleware import SapIdentity, SessionStats
 
 
 @dataclass
@@ -252,7 +252,7 @@ async def test_no_secret_reaches_any_log_record(caplog):
     from fastmcp import Client, FastMCP
     from fastmcp.server.middleware.logging import LoggingMiddleware
 
-    from sapguimcp.middleware.logging import masked_payload_serializer
+    from sapwebguimcp.middleware.logging import masked_payload_serializer
 
     server = FastMCP("t")
     server.add_middleware(ToolCallLoggingMiddleware())
@@ -294,7 +294,7 @@ async def test_validation_error_does_not_log_the_arguments(caplog):
     def sap_abapgit_pull(repo: str, pat: str) -> str:
         return f"{repo}:{len(pat)}"
 
-    caplog.set_level(logging.INFO, logger="sapguimcp.middleware.logging")
+    caplog.set_level(logging.INFO, logger="sapwebguimcp.middleware.logging")
     async with Client(server) as client:
         result = await client.call_tool("sap_abapgit_pull", {"pat": "ghp_LEAKME"}, raise_on_error=False)
 
@@ -326,7 +326,7 @@ async def test_pydantic_error_inside_a_tool_keeps_its_traceback(caplog):
     def sap_se16_query(table: str) -> str:
         return str(Row(rows=f"garbage from {table}"))  # type: ignore[arg-type]
 
-    caplog.set_level(logging.INFO, logger="sapguimcp.middleware.logging")
+    caplog.set_level(logging.INFO, logger="sapwebguimcp.middleware.logging")
     async with Client(server) as client:
         # fastmcp surfaces a pydantic error from a tool body as a protocol error.
         with contextlib.suppress(Exception):

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.slg1_parser import is_slg1_no_results
-from sapguimcp.backend.webgui.parsers.sm37_parser import is_no_jobs_found, normalize_job_status, parse_sm37_job_list
-from sapguimcp.backend.webgui.parsers.st22_parser import is_no_dumps_message, parse_st22_dump_detail
-from sapguimcp.backend.webgui.types import AriaSnapshot
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.slg1_parser import is_slg1_no_results
+from sapwebguimcp.backend.webgui.parsers.sm37_parser import is_no_jobs_found, normalize_job_status, parse_sm37_job_list
+from sapwebguimcp.backend.webgui.parsers.st22_parser import is_no_dumps_message, parse_st22_dump_detail
+from sapwebguimcp.backend.webgui.types import AriaSnapshot
 
 # ---------------------------------------------------------------------------
 # Bug: the SM37 status was not normalised

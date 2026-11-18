@@ -38,7 +38,7 @@ RUN SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION:-0.0.0.dev0+
 RUN /app/.venv/bin/playwright install chromium --with-deps
 
 # Install the project itself. --no-editable installs a real copy (as pip did),
-# which the run-sapgui-mcp-server console script needs.
+# which the run-sapwebgui-mcp-server console script needs.
 COPY --chown=appuser:appuser src/ ./src/
 RUN SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION:-0.0.0.dev0+docker} \
     uv sync --locked --no-dev --no-editable
@@ -54,4 +54,4 @@ ENV BROWSER_TYPE=chromium
 ENV CDP_URL=http://host.docker.internal:9222
 
 # MCP servers communicate via stdin/stdout, so just run the server directly
-ENTRYPOINT ["run-sapgui-mcp-server"]
+ENTRYPOINT ["run-sapwebgui-mcp-server"]

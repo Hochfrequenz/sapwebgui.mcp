@@ -2,7 +2,7 @@
 
 import pytest
 
-from sapguimcp.lang.text import RegexText, Text
+from sapwebguimcp.lang.text import RegexText, Text
 from unittests.lang.node_runner import check_patterns
 
 SPECIALS = "a/b (c) [d] {e} | ^$*+? \\ . end"

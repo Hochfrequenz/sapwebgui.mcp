@@ -4,7 +4,7 @@ import asyncio
 
 from fastmcp import FastMCP
 
-from sapguimcp.server import mcp
+from sapwebguimcp.server import mcp
 
 
 class TestMcpServer:
