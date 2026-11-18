@@ -276,7 +276,6 @@ class TestQueryStopsBeforeF8:
     @pytest.mark.usefixtures("lang_de")
     async def test_unavailable_filter_returns_a_failure_and_never_presses_f8(self) -> None:
         backend = MagicMock(spec=WebGuiBackend)
-        backend.backend_type = "webgui"
         backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True))
         backend.wait = AsyncMock()
         backend.press_key = AsyncMock()

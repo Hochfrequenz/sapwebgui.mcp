@@ -18,7 +18,6 @@ def _make_backend(
 ) -> AsyncMock:
     """Create a mock backend for fill_and_display tests."""
     backend = AsyncMock()
-    backend.backend_type = "webgui"
 
     # fill_field_with_keyboard result (via evaluate_javascript + type_text)
     backend.evaluate_javascript = AsyncMock(return_value=fill_returns)

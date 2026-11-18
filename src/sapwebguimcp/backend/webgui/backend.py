@@ -184,11 +184,6 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         self._page = page
         self._keepalive_task: asyncio.Task[None] | None = None
 
-    @property
-    def backend_type(self) -> str:
-        """Return backend identifier."""
-        return "webgui"
-
     def load_js(self, filename: str) -> str:
         """Load a bundled JavaScript helper file by name and return its source text."""
         return load_js(filename)

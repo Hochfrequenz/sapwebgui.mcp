@@ -78,8 +78,7 @@ async def fill_field_with_keyboard(
 async def _fill_field_with_keyboard_webgui(backend: WebGuiBackend, labels: Sequence[str], value: str) -> bool:
     """WebGUI: locate and focus the field via JavaScript, then type the value with real keyboard events."""
     labels_js = "[" + ",".join(f'"{lbl}"' for lbl in labels) + "]"
-    _eval = getattr(backend, "evaluate_javascript")
-    found = await _eval(f"""(() => {{
+    found = await backend.evaluate_javascript(f"""(() => {{
             const labels = {labels_js};
 
             function isUsableInput(input) {{

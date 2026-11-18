@@ -23,7 +23,7 @@ from typing import Literal, Optional
 from fastmcp import FastMCP
 from fastmcp.utilities.types import File, Image
 
-from sapwebguimcp.backend.manager import get_webgui_backend
+from sapwebguimcp.backend.manager import get_backend
 from sapwebguimcp.backend.webgui.models.browser_results import (
     BrowserKeyboardResult,
     ClickResult,
@@ -81,7 +81,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_snapshot")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_snapshot")
         except ValueError as e:
             return SnapshotResult.failure(str(e), selector=selector)
 
@@ -139,7 +139,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_screenshot")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_screenshot")
         except ValueError as e:
             return ScreenshotResult.failure(
                 str(e),
@@ -195,7 +195,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_click")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_click")
         except ValueError as e:
             return ClickResult.failure(str(e), selector=selector)
 
@@ -235,7 +235,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_fill")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_fill")
         except ValueError as e:
             return FillResult.failure(str(e), selector=selector, value=value)
 
@@ -276,7 +276,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_keyboard")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_keyboard")
         except ValueError as e:
             return BrowserKeyboardResult.failure(str(e), key=key, text=text)
 
@@ -316,7 +316,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_navigate")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_navigate")
         except ValueError as e:
             return NavigateResult.failure(str(e), url=url)
 
@@ -357,7 +357,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
         script_snippet = script[:100] if len(script) > 100 else script
 
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_evaluate")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_evaluate")
         except ValueError as e:
             return EvaluateResult.failure(str(e), script_snippet=script_snippet)
 
@@ -406,7 +406,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
         timeout_td = timedelta(milliseconds=timeout)
 
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_wait")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_wait")
         except ValueError as e:
             return WaitResult.failure(str(e), selector=selector, state=state, timeout=timeout_td)
 
@@ -450,7 +450,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_get_html")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_get_html")
         except ValueError as e:
             return HtmlResult.failure(str(e), selector=selector, outer=outer)
 
@@ -522,7 +522,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
             agent_id: Agent identifier for binding check. Optional.
         """
         try:
-            backend = await get_webgui_backend(session=session, agent_id=agent_id, tool_name="browser_select_option")
+            backend = await get_backend(session=session, agent_id=agent_id, tool_name="browser_select_option")
         except ValueError as e:
             return SelectOptionResult.failure(str(e), selector=selector)
 
