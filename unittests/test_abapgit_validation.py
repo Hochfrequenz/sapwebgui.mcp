@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sapguimcp.tools import abapgit_tools
-from sapguimcp.tools.abapgit_tools import PullParams, _validate_and_prepare_params, _validate_repo_selector
+from sapwebguimcp.tools import abapgit_tools
+from sapwebguimcp.tools.abapgit_tools import PullParams, _validate_and_prepare_params, _validate_repo_selector
 
 pytestmark = pytest.mark.usefixtures("lang_de")
 

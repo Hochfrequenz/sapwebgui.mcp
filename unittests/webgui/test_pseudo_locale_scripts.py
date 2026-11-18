@@ -21,8 +21,8 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from playwright.async_api import Page, async_playwright
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
 from unittests.lang import pseudo_fixtures as pf
 
 from .test_pseudo_locale_parsers import _difference, _plain

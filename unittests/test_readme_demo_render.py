@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageDraw
 
-from sapguimcp.demo.render_readme_demo import (
+from sapwebguimcp.demo.render_readme_demo import (
     BACKGROUND,
     CANVAS_HEIGHT,
     CANVAS_WIDTH,

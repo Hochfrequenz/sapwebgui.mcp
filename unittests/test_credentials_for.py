@@ -6,7 +6,7 @@ import pytest
 from pydantic import SecretStr
 from sap_mcp_config import Config, SAPSystem
 
-from sapguimcp.models.config import SapGuiSettings, get_sap_config
+from sapwebguimcp.models.config import SapGuiSettings, get_sap_config
 
 
 def _make_config(**systems: dict) -> Config:
@@ -34,7 +34,7 @@ class TestCredentialsFor:
 
     def test_raises_key_error_when_not_found(self) -> None:
         cfg = _make_config(DEV={"user": "dev_user", "password": "dev_pass"})
-        with patch("sapguimcp.models.config._sap_config", cfg):
+        with patch("sapwebguimcp.models.config._sap_config", cfg):
             settings = _make_settings()
             with pytest.raises(KeyError, match="UNKNOWN"):
                 settings.credentials_for("UNKNOWN")
@@ -44,7 +44,7 @@ class TestCredentialsFor:
             DEV={"user": "dev_user", "password": "dev_pass"},
             sysA={"user": "sysa_user", "password": "sysa_pass"},
         )
-        with patch("sapguimcp.models.config._sap_config", cfg):
+        with patch("sapwebguimcp.models.config._sap_config", cfg):
             settings = _make_settings()
             user, password = settings.credentials_for("sysA")
         assert user == "sysa_user"
@@ -55,7 +55,7 @@ class TestCredentialsFor:
             DEV={"user": "dev_user", "password": "dev_pass"},
             sysA={"user": "sysa_user", "password": "sysa_pass"},
         )
-        with patch("sapguimcp.models.config._sap_config", cfg):
+        with patch("sapwebguimcp.models.config._sap_config", cfg):
             settings = _make_settings()
             with pytest.raises(KeyError, match="sysB"):
                 settings.credentials_for("sysB")
@@ -66,7 +66,7 @@ class TestGetSapConfig:
 
     def test_singleton_caching(self, tmp_path: pytest.TempPathFactory) -> None:
         """get_sap_config returns the same instance on subsequent calls."""
-        import sapguimcp.models.config as mod
+        import sapwebguimcp.models.config as mod
 
         cfg = _make_config(DEV={"user": "u", "password": "p"})
         old = mod._sap_config

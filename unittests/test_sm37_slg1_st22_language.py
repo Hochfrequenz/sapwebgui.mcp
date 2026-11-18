@@ -14,16 +14,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
-from sapguimcp import lang
-from sapguimcp.lang import UnsupportedLanguageError, _register_for_tests
-from sapguimcp.lang.schema import JobStatus
-from sapguimcp.tools.slg1_tools import register_slg1_tools
-from sapguimcp.tools.sm37_tools import (
+from sapwebguimcp import lang
+from sapwebguimcp.lang import UnsupportedLanguageError, _register_for_tests
+from sapwebguimcp.lang.schema import JobStatus
+from sapwebguimcp.tools.slg1_tools import register_slg1_tools
+from sapwebguimcp.tools.sm37_tools import (
     _fetch_job_log,
     _fill_selection_screen,
     register_sm37_tools,
 )
-from sapguimcp.tools.st22_tools import (
+from sapwebguimcp.tools.st22_tools import (
     _try_quick_button,
     register_st22_tools,
 )
@@ -34,9 +34,9 @@ from unittests.lang.synthetic_pack import CODE, MARK, synthetic_pack
 # ---------------------------------------------------------------------------
 
 _TOOLS = [
-    ("sap_sm37_lookup", register_sm37_tools, "sapguimcp.tools.sm37_tools", {}),
-    ("sap_slg1_lookup", register_slg1_tools, "sapguimcp.tools.slg1_tools", {"object": "*"}),
-    ("sap_st22_lookup", register_st22_tools, "sapguimcp.tools.st22_tools", {}),
+    ("sap_sm37_lookup", register_sm37_tools, "sapwebguimcp.tools.sm37_tools", {}),
+    ("sap_slg1_lookup", register_slg1_tools, "sapwebguimcp.tools.slg1_tools", {"object": "*"}),
+    ("sap_st22_lookup", register_st22_tools, "sapwebguimcp.tools.st22_tools", {}),
 ]
 
 
@@ -81,7 +81,7 @@ async def test_sm37_selection_screen_targets_the_labels_of_the_synthetic_languag
     with (
         _register_for_tests(synthetic_pack()),
         lang.use(CODE),
-        patch("sapguimcp.tools.sm37_tools.ensure_screen_state", _ensure),
+        patch("sapwebguimcp.tools.sm37_tools.ensure_screen_state", _ensure),
     ):
         t = lang.current("test")
         await _fill_selection_screen(MagicMock(), t, "JOB*", "ME", ["finished"], None, None)

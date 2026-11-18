@@ -5,8 +5,8 @@ from collections.abc import Iterator
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang import Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang import Text
 from unittests.testdata.lang_test import TEST_DE, UI_TEST_PACKS, UiTestPack, resolve_sap_language
 
 EN = UI_TEST_PACKS["EN"]

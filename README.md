@@ -793,7 +793,7 @@ $env:BROWSER_MODE = "connect"
 $env:CDP_URL = "http://localhost:9222"
 
 # Start the server
-run-sapgui-mcp-server
+run-sapwebgui-mcp-server
 ```
 
 ### Configure your MCP client
@@ -813,7 +813,7 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
 {
     "mcpServers": {
         "sap-webgui": {
-            "command": "C:/path/to/your/venv/Scripts/run-sapgui-mcp-server.exe",
+            "command": "C:/path/to/your/venv/Scripts/run-sapwebgui-mcp-server.exe",
             "args": [],
             "env": {
                 "BROWSER_MODE": "connect",
@@ -830,7 +830,7 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
 **Recommended: register once for all projects (user scope):**
 
 ```powershell
-claude mcp add --scope user sap-webgui -e BROWSER_MODE=connect -e CDP_URL=http://localhost:9222 -e GITHUB_PAT=your_github_pat '--' C:/path/to/your/venv/Scripts/run-sapgui-mcp-server.exe
+claude mcp add --scope user sap-webgui -e BROWSER_MODE=connect -e CDP_URL=http://localhost:9222 -e GITHUB_PAT=your_github_pat '--' C:/path/to/your/venv/Scripts/run-sapwebgui-mcp-server.exe
 ```
 
 Keep the server name before `-e` and the quotes around `'--'` (in cmd.exe, write a plain `--`; see the [Desktop backend section](#claude-code) for why). A `GITHUB_PAT` typed on the command line ends up in your shell history.
@@ -843,7 +843,7 @@ If Claude Code still starts an old or broken registration instead of the global 
 {
     "mcpServers": {
         "sap-webgui": {
-            "command": "C:/path/to/your/venv/Scripts/run-sapgui-mcp-server.exe",
+            "command": "C:/path/to/your/venv/Scripts/run-sapwebgui-mcp-server.exe",
             "args": [],
             "env": {
                 "BROWSER_MODE": "connect",
@@ -1087,7 +1087,7 @@ The server always uses the WebGUI backend. SAP GUI for Windows support moved to 
 ```mermaid
 graph BT
     Claude["Claude Desktop / Claude Code"]
-    MCP["MCP Server (sapguimcp)\nPlaywright for browser automation\nSAP-specific tools"]
+    MCP["MCP Server (sapwebguimcp)\nPlaywright for browser automation\nSAP-specific tools"]
     CDP["CDP Proxy (nginx)\nOnly needed for Docker"]
     Chrome["Chrome\nSAP Web GUI loaded\nPersistent session"]
 
@@ -1101,7 +1101,7 @@ graph BT
 ```mermaid
 graph BT
     Claude["Claude Desktop / Claude Code"]
-    MCP["MCP Server (sapguimcp)\nDesktop backend with COM thread\nSAP-specific tools"]
+    MCP["MCP Server (sapwebguimcp)\nDesktop backend with COM thread\nSAP-specific tools"]
     SAP["SAP GUI for Windows\nCOM Scripting API\nPersistent session(s)"]
 
     Claude -- "MCP (stdio)" --> MCP

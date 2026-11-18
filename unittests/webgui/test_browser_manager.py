@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-import sapguimcp.backend.webgui.browser as browser_module
+import sapwebguimcp.backend.webgui.browser as browser_module
 
 
 def test_get_browser_manager_init_lock_is_per_event_loop() -> None:

@@ -5,8 +5,8 @@ import os
 import pytest
 from mcp import ClientSession
 
-from sapguimcp.backend.webgui.models.browser_results import EvaluateResult
-from sapguimcp.models import KeyboardResult, LoginResult, SessionStatus
+from sapwebguimcp.backend.webgui.models.browser_results import EvaluateResult
+from sapwebguimcp.models import KeyboardResult, LoginResult, SessionStatus
 
 from .conftest import call_tool_typed, get_html_content
 from .integration_helpers import capture_html_snapshot
@@ -69,7 +69,7 @@ async def test_sap_login(sap_mcp_client: ClientSession) -> None:
 @pytest.mark.anyio
 async def test_page_reports_the_logon_language(sap_mcp_client: ClientSession) -> None:
     """``<html lang>`` names the logon language; the WebGUI backend reads it after login (#1044)."""
-    from sapguimcp.models.config import get_sap_config  # noqa: PLC0415
+    from sapwebguimcp.models.config import get_sap_config  # noqa: PLC0415
 
     login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
     assert login.success, f"Login failed: {login.error}"

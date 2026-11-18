@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
-from sapguimcp.backend.webgui.backend import WebGuiBackend
-from sapguimcp.models.abapgit_models import AbapGitListResult, AbapGitRepoInfo, AbapGitRepoSummary
-from sapguimcp.models.sap_results import StatusBarInfo
-from sapguimcp.tools.abapgit_tools import (
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.models.abapgit_models import AbapGitListResult, AbapGitRepoInfo, AbapGitRepoSummary
+from sapwebguimcp.models.sap_results import StatusBarInfo
+from sapwebguimcp.tools.abapgit_tools import (
     _abapgit_list_repos,
     _apply_list_filters,
     _filter_repos,
@@ -178,7 +178,7 @@ def _backend() -> Any:
 
 
 async def _read(lines: list[str]) -> AbapGitListResult:
-    with patch("sapguimcp.tools.abapgit_tools._read_report_screen", return_value="\n".join(lines)):
+    with patch("sapwebguimcp.tools.abapgit_tools._read_report_screen", return_value="\n".join(lines)):
         return await _abapgit_list_repos(_backend())
 
 
@@ -266,8 +266,8 @@ async def test_the_registered_tool_validates_filters_and_applies_them() -> None:
     assert "name" in bad.error
     raw = await _read(["TOTAL~4~~~~~", *_LINES])
     with (
-        patch("sapguimcp.tools.abapgit_tools.get_backend", AsyncMock(return_value=object())),
-        patch("sapguimcp.tools.abapgit_tools._abapgit_list_repos", AsyncMock(return_value=raw)),
+        patch("sapwebguimcp.tools.abapgit_tools.get_backend", AsyncMock(return_value=object())),
+        patch("sapwebguimcp.tools.abapgit_tools._abapgit_list_repos", AsyncMock(return_value=raw)),
     ):
         result = await tool.fn(package="Z_OTHER", compact=True)
     assert result.success

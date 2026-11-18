@@ -14,14 +14,14 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.catalog.models import (
+from sapwebguimcp import lang
+from sapwebguimcp.catalog.models import (
     SAP_AREA_PREFIXES,
     TransactionCatalog,
     TransactionInfo,
     detect_area,
 )
-from sapguimcp.catalog.search import (
+from sapwebguimcp.catalog.search import (
     get_common_transactions,
     normalize_query,
     search_by_area,
@@ -490,7 +490,7 @@ class TestCatalogLoader:
 
     def test_load_catalog_from_json(self) -> None:
         """Test loading a catalog from a JSON file."""
-        from sapguimcp.catalog.loader import load_catalog
+        from sapwebguimcp.catalog.loader import load_catalog
 
         # Create a temporary catalog file
         catalog_data = {
@@ -524,7 +524,7 @@ class TestCatalogLoader:
 
     def test_load_catalog_missing_file(self) -> None:
         """Test loading from non-existent file returns empty catalog."""
-        from sapguimcp.catalog.loader import load_catalog
+        from sapwebguimcp.catalog.loader import load_catalog
 
         load_catalog.cache_clear()
 
@@ -533,7 +533,7 @@ class TestCatalogLoader:
 
     def test_reload_catalog_clears_cache(self) -> None:
         """Test that reload_catalog clears the cache."""
-        from sapguimcp.catalog.loader import load_catalog, reload_catalog
+        from sapwebguimcp.catalog.loader import load_catalog, reload_catalog
 
         # Create temp catalog
         catalog_data = {"transactions": [{"tcode": "TEST1"}]}
@@ -576,7 +576,7 @@ class TestScraperModels:
 
     def test_load_tstc_data(self) -> None:
         """Test loading raw TSTC data from JSON."""
-        from sapguimcp.catalog.scraper import load_tstc_data
+        from sapwebguimcp.catalog.scraper import load_tstc_data
 
         tstc_data = {
             "success": True,
@@ -606,7 +606,7 @@ class TestScraperModels:
         Note: Uses load_catalog_for_scraping (uncached) for scraper tests.
         The cached loader.load_catalog() is tested in TestCatalogLoader.
         """
-        from sapguimcp.catalog.scraper import load_catalog_for_scraping, save_catalog
+        from sapwebguimcp.catalog.scraper import load_catalog_for_scraping, save_catalog
 
         catalog = TransactionCatalog(
             transactions=[
@@ -710,7 +710,7 @@ async def test_enrichment_acquires_the_backend_before_reading_the_language() -> 
     """The session language is only known after the backend connected."""
     from unittest.mock import AsyncMock, patch
 
-    from sapguimcp.catalog.scraper import enrich_with_se93
+    from sapwebguimcp.catalog.scraper import enrich_with_se93
 
     order: list[str] = []
 
@@ -725,8 +725,8 @@ async def test_enrichment_acquires_the_backend_before_reading_the_language() -> 
         return real_current(feature)
 
     with (
-        patch("sapguimcp.backend.manager.get_backend", AsyncMock(side_effect=fake_backend)),
-        patch("sapguimcp.catalog.scraper.lang.current", spy),
+        patch("sapwebguimcp.backend.manager.get_backend", AsyncMock(side_effect=fake_backend)),
+        patch("sapwebguimcp.catalog.scraper.lang.current", spy),
         pytest.raises(RuntimeError),
     ):
         await enrich_with_se93(catalog_file="x.json", tstc_data=[])

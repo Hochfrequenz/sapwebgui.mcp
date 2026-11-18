@@ -1,6 +1,6 @@
 """No SAP UI literal outside the language packs (#1044, spec section 10).
 
-Scans ``src/sapguimcp/**/*.py`` (outside ``lang/``) and ``backend/webgui/js/*.js`` for string
+Scans ``src/sapwebguimcp/**/*.py`` (outside ``lang/``) and ``backend/webgui/js/*.js`` for string
 literals that look like SAP screen text, with three rules:
 
 1. **Sink rule** (AST): a literal passed to a UI sink (``click_button``, ``get_by_role(name=...)``,
@@ -50,12 +50,12 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang.schema import iter_leaves
-from sapguimcp.lang.text import Template, Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import iter_leaves
+from sapwebguimcp.lang.text import Template, Text
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src" / "sapguimcp"
+SRC = ROOT / "src" / "sapwebguimcp"
 LANG_DIR = SRC / "lang"
 JS_DIR = SRC / "backend" / "webgui" / "js"
 BASELINE = Path(__file__).with_name("lang_baseline.json")
@@ -671,7 +671,7 @@ def test_baseline_only_shrinks(scanned: tuple[list[Hit], dict[str, Counter[str]]
 
 def test_generic_fields_copied_from_en_stay_exempt() -> None:
     """A draft pack that still holds EN's generic words is exempt like EN; translated ones stay guarded."""
-    from sapguimcp.lang import _register_for_tests  # noqa: PLC0415
+    from sapwebguimcp.lang import _register_for_tests  # noqa: PLC0415
     from unittests.lang.synthetic_pack import MARK, SAME_AS_EN, synthetic_pack  # noqa: PLC0415
 
     en = dict(iter_leaves(lang.pack_for("EN")))

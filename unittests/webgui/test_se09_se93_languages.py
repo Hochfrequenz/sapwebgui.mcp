@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.se09_parser import parse_se09_transport_list
-from sapguimcp.backend.webgui.parsers.se93_parser import parse_se93_snapshot
-from sapguimcp.models import SE93Entry, SE93Error
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.se09_parser import parse_se09_transport_list
+from sapwebguimcp.backend.webgui.parsers.se93_parser import parse_se93_snapshot
+from sapwebguimcp.models import SE93Entry, SE93Error
 
 _SE93_DIR = Path(__file__).parent / "testdata" / "se93_exploration"
 

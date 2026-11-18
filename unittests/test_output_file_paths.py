@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
-from sapguimcp.models import SE16FileSummary, SE16Result, SE16Row
-from sapguimcp.models.se09_models import TransportListResult, TransportRequest
-from sapguimcp.models.sm30_models import SM30Row, SM30ViewResult
-from sapguimcp.tools.se09_tools import register_se09_tools
-from sapguimcp.tools.se16_tools import register_se16_tools
-from sapguimcp.tools.sm30_tools import register_sm30_tools
-from sapguimcp.utils import resolve_output_file_path, write_json_output_file
+from sapwebguimcp.models import SE16FileSummary, SE16Result, SE16Row
+from sapwebguimcp.models.se09_models import TransportListResult, TransportRequest
+from sapwebguimcp.models.sm30_models import SM30Row, SM30ViewResult
+from sapwebguimcp.tools.se09_tools import register_se09_tools
+from sapwebguimcp.tools.se16_tools import register_se16_tools
+from sapwebguimcp.tools.sm30_tools import register_sm30_tools
+from sapwebguimcp.utils import resolve_output_file_path, write_json_output_file
 
 
 def _tool_fn(mcp: FastMCP, tool_name: str):
@@ -184,17 +184,17 @@ def test_se16_query_preserves_result_when_output_write_fails_with_oserror(
 
     with (
         patch(
-            "sapguimcp.tools.se16_tools.get_backend",
+            "sapwebguimcp.tools.se16_tools.get_backend",
             new_callable=AsyncMock,
             return_value=MagicMock(),
         ),
         patch(
-            "sapguimcp.tools.se16_tools._execute_se16_query",
+            "sapwebguimcp.tools.se16_tools._execute_se16_query",
             new_callable=AsyncMock,
             return_value=_se16_result(),
         ),
         patch(
-            "sapguimcp.tools.se16_tools.write_json_output_file",
+            "sapwebguimcp.tools.se16_tools.write_json_output_file",
             side_effect=OSError("disk full"),
         ),
     ):
@@ -226,12 +226,12 @@ def test_se16_query_writes_output_within_working_directory(tmp_path: Path, monke
 
     with (
         patch(
-            "sapguimcp.tools.se16_tools.get_backend",
+            "sapwebguimcp.tools.se16_tools.get_backend",
             new_callable=AsyncMock,
             return_value=MagicMock(),
         ),
         patch(
-            "sapguimcp.tools.se16_tools._execute_se16_query",
+            "sapwebguimcp.tools.se16_tools._execute_se16_query",
             new_callable=AsyncMock,
             return_value=_se16_result(),
         ),
@@ -264,7 +264,7 @@ def test_sm30_lookup_rejects_output_path_escape(tmp_path: Path, monkeypatch: pyt
     tool_fn = _tool_fn(mcp, "sap_sm30_lookup")
     mock_get_backend = AsyncMock()
 
-    with patch("sapguimcp.tools.sm30_tools.get_backend", mock_get_backend):
+    with patch("sapwebguimcp.tools.sm30_tools.get_backend", mock_get_backend):
         result = asyncio.run(
             tool_fn(
                 view_name="V_T005",
@@ -290,7 +290,7 @@ def test_se09_lookup_rejects_absolute_output_path_outside_working_directory(
     tool_fn = _tool_fn(mcp, "sap_se09_lookup")
     mock_get_backend = AsyncMock()
 
-    with patch("sapguimcp.tools.se09_tools.get_backend", mock_get_backend):
+    with patch("sapwebguimcp.tools.se09_tools.get_backend", mock_get_backend):
         result = asyncio.run(
             tool_fn(
                 username=None,
@@ -317,17 +317,17 @@ def test_se16_query_preserves_result_when_output_write_fails(tmp_path: Path, mon
 
     with (
         patch(
-            "sapguimcp.tools.se16_tools.get_backend",
+            "sapwebguimcp.tools.se16_tools.get_backend",
             new_callable=AsyncMock,
             return_value=MagicMock(),
         ),
         patch(
-            "sapguimcp.tools.se16_tools._execute_se16_query",
+            "sapwebguimcp.tools.se16_tools._execute_se16_query",
             new_callable=AsyncMock,
             return_value=_se16_result(),
         ),
         patch(
-            "sapguimcp.tools.se16_tools.write_json_output_file",
+            "sapwebguimcp.tools.se16_tools.write_json_output_file",
             side_effect=ValueError("write blocked"),
         ),
     ):

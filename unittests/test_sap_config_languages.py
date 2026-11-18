@@ -6,9 +6,9 @@ from typing import get_args
 
 import pytest
 
-from sapguimcp.lang import _register_for_tests, supported_languages
-from sapguimcp.models import config as config_module
-from sapguimcp.utils import SapLanguage
+from sapwebguimcp.lang import _register_for_tests, supported_languages
+from sapwebguimcp.models import config as config_module
+from sapwebguimcp.utils import SapLanguage
 from unittests.lang.synthetic_pack import synthetic_pack
 
 

@@ -1,8 +1,8 @@
 """Guard: every pack text has a JS form that compiles in Node and matches its own variants (#1044, 2c)."""
 
-from sapguimcp import lang
-from sapguimcp.lang.schema import PackLike, iter_leaves
-from sapguimcp.lang.text import RegexText, Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import PackLike, iter_leaves
+from sapwebguimcp.lang.text import RegexText, Text
 from unittests.lang.node_runner import check_patterns
 
 

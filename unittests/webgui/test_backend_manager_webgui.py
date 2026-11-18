@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp.backend.manager import (
+from sapwebguimcp.backend.manager import (
     BackendManager,
 )
-from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
-from sapguimcp.session_language import current_language, use_language
+from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
+from sapwebguimcp.session_language import current_language, use_language
 
 
 @pytest.mark.anyio
@@ -27,7 +27,7 @@ async def test_webgui_get_or_create_sets_session_language() -> None:
     )
     manager = BackendManager()
     with (
-        patch("sapguimcp.backend.manager.get_browser_manager", AsyncMock(return_value=browser_manager)),
+        patch("sapwebguimcp.backend.manager.get_browser_manager", AsyncMock(return_value=browser_manager)),
         use_language(None),
     ):
         await manager.get_or_create(session="s2")

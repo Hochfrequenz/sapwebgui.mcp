@@ -5,7 +5,7 @@ import os
 import pytest
 from mcp import ClientSession
 
-from sapguimcp.models import (
+from sapwebguimcp.models import (
     LoginResult,
     TransactionResult,
 )

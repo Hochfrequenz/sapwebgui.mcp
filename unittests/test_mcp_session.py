@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import pytest
 from fastmcp import Client
 
-from sapguimcp.mcp_session import get_mcp_session_id, is_modern_connection
-from sapguimcp.middleware.logging import _sessions_ref
-from sapguimcp.server import mcp
+from sapwebguimcp.mcp_session import get_mcp_session_id, is_modern_connection
+from sapwebguimcp.middleware.logging import _sessions_ref
+from sapwebguimcp.server import mcp
 
 
 def _ctx(protocol_version: str, session_id: str) -> SimpleNamespace:

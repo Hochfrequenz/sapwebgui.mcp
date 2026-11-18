@@ -40,11 +40,11 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from sapguimcp import lang
-from sapguimcp.lang.backends import BACKEND_OF, Backend, backend_of
-from sapguimcp.lang.schema import iter_leaves, sections
+from sapwebguimcp import lang
+from sapwebguimcp.lang.backends import BACKEND_OF, Backend, backend_of
+from sapwebguimcp.lang.schema import iter_leaves, sections
 
-SRC = Path(__file__).resolve().parents[2] / "src" / "sapguimcp"
+SRC = Path(__file__).resolve().parents[2] / "src" / "sapwebguimcp"
 
 WEBGUI_FILES = {
     "tools/browser_tools.py",

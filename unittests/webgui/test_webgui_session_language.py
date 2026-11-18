@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp.backend.webgui.backend import WebGuiBackend
-from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
-from sapguimcp.session_language import current_language, use_language
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
+from sapwebguimcp.session_language import current_language, use_language
 
 
 def _make_backend(page_language: Any) -> tuple[WebGuiBackend, SessionRegistry]:

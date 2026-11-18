@@ -16,19 +16,19 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy
 # - fastmcp uses importlib.metadata.version("fastmcp") at import time
 # - fastmcp -> docket -> fakeredis needs commands.json data files
 # - fastmcp -> docket -> fakeredis -> lupa needs Lua runtime submodules
-# - sapguimcp ships js/, prompts/, data/, workflows/ non-Python files
+# - sapwebguimcp ships js/, prompts/, data/, workflows/ non-Python files
 # If fastmcp drops the docket dependency, the lupa/fakeredis lines can go.
 datas = []
 hiddenimports = []
 datas += collect_data_files("fakeredis")
-datas += collect_data_files("sapguimcp")
+datas += collect_data_files("sapwebguimcp")
 datas += copy_metadata("fastmcp")
 hiddenimports += collect_submodules("lupa")
 
 name = os.environ.get("SAPGUI_BUILD_NAME", "sapwebgui_mcp_windows")
 
 a = Analysis(
-    ["src\\sapguimcp\\server.py"],
+    ["src\\sapwebguimcp\\server.py"],
     pathex=[],
     binaries=[],
     datas=datas,

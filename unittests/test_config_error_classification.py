@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from sapguimcp import server
-from sapguimcp.models import config as config_module
-from sapguimcp.tools.sap_list_connections_impl import _get_configured_systems
-from sapguimcp.tools.sap_login_impl import sap_login_impl
+from sapwebguimcp import server
+from sapwebguimcp.models import config as config_module
+from sapwebguimcp.tools.sap_list_connections_impl import _get_configured_systems
+from sapwebguimcp.tools.sap_login_impl import sap_login_impl
 
 
 @pytest.fixture(name="config_file")

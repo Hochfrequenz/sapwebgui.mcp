@@ -7,10 +7,19 @@ from unittest.mock import patch
 
 import pytest
 
-from sapguimcp.lang import pack_for, supported_languages
-from sapguimcp.lang.schema import iter_leaves
-from sapguimcp.lang.sources import SOURCES, DataElement, DomainValue, Manual, Message, ScreenText, Source, Transaction
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp.lang import pack_for, supported_languages
+from sapwebguimcp.lang.schema import iter_leaves
+from sapwebguimcp.lang.sources import (
+    SOURCES,
+    DataElement,
+    DomainValue,
+    Manual,
+    Message,
+    ScreenText,
+    Source,
+    Transaction,
+)
+from sapwebguimcp.lang.text import RegexText, Template, Text
 from unittests.lang.harvest_script import harvest
 
 PREVIEW_XML = """<?xml version="1.0" encoding="utf-8"?>

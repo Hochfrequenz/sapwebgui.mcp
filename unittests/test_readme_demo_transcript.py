@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from sapguimcp.demo.render_readme_demo import Beat, Mark, ParseError, parse_transcript
+from sapwebguimcp.demo.render_readme_demo import Beat, Mark, ParseError, parse_transcript
 
 
 class TestParseTranscript:

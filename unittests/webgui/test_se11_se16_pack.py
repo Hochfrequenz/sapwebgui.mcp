@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from sapguimcp.backend.webgui.parsers.se16_parser import parse_se16_hit_count
-from sapguimcp.backend.webgui.types import AriaSnapshot
-from sapguimcp.tools.se16_tools import (
+from sapwebguimcp.backend.webgui.parsers.se16_parser import parse_se16_hit_count
+from sapwebguimcp.backend.webgui.types import AriaSnapshot
+from sapwebguimcp.tools.se16_tools import (
     _GRID_HAS_ROWS_JS,
     _check_no_entries_found,
     _check_selection_screen_columns,
@@ -21,7 +21,7 @@ from sapguimcp.tools.se16_tools import (
 from unittests.lang.node_runner import run_node
 
 if TYPE_CHECKING:
-    from sapguimcp.lang.schema import LanguagePack
+    from sapwebguimcp.lang.schema import LanguagePack
 
 # ---------------------------------------------------------------------------
 # Texts of the old code

@@ -2,8 +2,8 @@
 
 import pytest
 
-from sapguimcp.backend.webgui.backend import _status_bar_arg
-from sapguimcp.backend.webgui.js_helpers import load_js
+from sapwebguimcp.backend.webgui.backend import _status_bar_arg
+from sapwebguimcp.backend.webgui.js_helpers import load_js
 from unittests.lang.node_runner import run_node
 
 RUN_JS = """

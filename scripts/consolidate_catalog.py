@@ -21,7 +21,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from sapguimcp.catalog.models import TransactionCatalog, TransactionInfo, detect_area
+from sapwebguimcp.catalog.models import TransactionCatalog, TransactionInfo, detect_area
 
 
 def load_se16_result(file_path: Path) -> list[dict]:
@@ -67,7 +67,7 @@ def main() -> int:
         return 1
 
     # Paths
-    data_dir = project_root / "src" / "sapguimcp" / "data"
+    data_dir = project_root / "src" / "sapwebguimcp" / "data"
     output_file = data_dir / "transactions.json"
 
     # Ensure data directory exists

@@ -14,7 +14,7 @@ class TestRegisterNewWindowSession:
         """Create a WebGuiBackend with a mock page whose context has the given pages."""
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
 
         mock_page = MagicMock()
         mock_context = MagicMock()
@@ -31,7 +31,7 @@ class TestRegisterNewWindowSession:
         """Test that new page is registered when page count increases."""
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
 
@@ -43,7 +43,7 @@ class TestRegisterNewWindowSession:
 
         backend = self._make_backend_with_context(registry, [MagicMock(), new_page])
 
-        _PATCH_REGISTRY = "sapguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
+        _PATCH_REGISTRY = "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
         with patch(_PATCH_REGISTRY, new=AsyncMock(return_value=registry)):
             session_id, count, title = await backend._register_new_window_session(pages_before=1)
 
@@ -57,12 +57,12 @@ class TestRegisterNewWindowSession:
         """Test that None is returned when page count doesn't increase."""
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
         backend = self._make_backend_with_context(registry, [MagicMock()])
 
-        _PATCH_REGISTRY = "sapguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
+        _PATCH_REGISTRY = "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
         with patch(_PATCH_REGISTRY, new=AsyncMock(return_value=registry)):
             session_id, count, title = await backend._register_new_window_session(pages_before=1, wait_timeout_ms=100)
 
@@ -76,12 +76,12 @@ class TestRegisterNewWindowSession:
         import logging
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
         backend = self._make_backend_with_context(registry, [MagicMock()])
 
-        _PATCH_REGISTRY = "sapguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
+        _PATCH_REGISTRY = "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
         with patch(_PATCH_REGISTRY, new=AsyncMock(return_value=registry)):
             with caplog.at_level(logging.WARNING):
                 await backend._register_new_window_session(pages_before=1, tcode="VA01", wait_timeout_ms=100)
@@ -99,7 +99,7 @@ class TestRegisterNewWindowSession:
         """Test that the last page is registered when multiple pages are created simultaneously."""
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
 
@@ -120,7 +120,7 @@ class TestRegisterNewWindowSession:
 
         backend = self._make_backend_with_context(registry, [page1, page2, page3])
 
-        _PATCH_REGISTRY = "sapguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
+        _PATCH_REGISTRY = "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
         with patch(_PATCH_REGISTRY, new=AsyncMock(return_value=registry)):
             session_id, count, title = await backend._register_new_window_session(pages_before=1, wait_timeout_ms=100)
 
@@ -139,8 +139,8 @@ class TestWebGuiCloseSession:
         """Closing one WebGUI session must not trigger SAP's exit-all command."""
         from unittest.mock import MagicMock
 
-        from sapguimcp.backend.webgui.backend import WebGuiBackend
-        from sapguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
 
@@ -165,7 +165,7 @@ class TestWebGuiCloseSession:
         backend._page = page1  # pylint: disable=protected-access
         backend._keepalive_task = None  # pylint: disable=protected-access
 
-        patch_registry_target = "sapguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
+        patch_registry_target = "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry"
         with patch(patch_registry_target, new=AsyncMock(return_value=registry)):
             closed = await backend.close_session(session_id)
 

@@ -1,4 +1,4 @@
-"""Tests for sapguimcp.utils.
+"""Tests for sapwebguimcp.utils.
 
 ``format_sap_date`` is covered separately in ``test_date_helpers.py``.
 """
@@ -7,7 +7,7 @@ import logging
 
 import pytest
 
-from sapguimcp.utils import as_sap_language
+from sapwebguimcp.utils import as_sap_language
 
 
 class TestAsSapLanguage:
@@ -32,7 +32,7 @@ class TestAsSapLanguage:
 
     def test_unrecognised_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         """The fallback must not be silent: EN dates are MM/DD/YYYY, which a DE screen misreads."""
-        with caplog.at_level(logging.WARNING, logger="sapguimcp.utils"):
+        with caplog.at_level(logging.WARNING, logger="sapwebguimcp.utils"):
             as_sap_language("FR")
         assert len(caplog.records) == 1
         # The value travels as structured context, not in the message text.
@@ -40,6 +40,6 @@ class TestAsSapLanguage:
 
     @pytest.mark.parametrize("value", ["de", "DE", "en", "EN", "it", "IT"])
     def test_recognised_is_not_logged(self, value: str, caplog: pytest.LogCaptureFixture) -> None:
-        with caplog.at_level(logging.WARNING, logger="sapguimcp.utils"):
+        with caplog.at_level(logging.WARNING, logger="sapwebguimcp.utils"):
             as_sap_language(value)
         assert caplog.records == []

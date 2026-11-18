@@ -9,12 +9,12 @@ from collections.abc import Iterator
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.lang import UnsupportedLanguageError, _register_for_tests
-from sapguimcp.lang.de import DE
-from sapguimcp.lang.en import EN
-from sapguimcp.lang.schema import JobStatus, Key, KeysSection, LanguagePack, canonical, merge
-from sapguimcp.lang.text import RegexText, Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang import UnsupportedLanguageError, _register_for_tests
+from sapwebguimcp.lang.de import DE
+from sapwebguimcp.lang.en import EN
+from sapwebguimcp.lang.schema import JobStatus, Key, KeysSection, LanguagePack, canonical, merge
+from sapwebguimcp.lang.text import RegexText, Text
 from unittests.lang.synthetic_pack import CODE, MARK, mark, synthetic_pack
 from unittests.lang.test_pack_completeness import (
     _check_canonical_mappings,

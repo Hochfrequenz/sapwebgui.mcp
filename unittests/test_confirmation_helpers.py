@@ -7,7 +7,7 @@ import pytest
 from fastmcp.server.elicitation import AcceptedElicitation, CancelledElicitation, DeclinedElicitation
 from mcp.types import ClientCapabilities, ElicitationCapability, ElicitResult, InputRequiredResult
 
-from sapguimcp.tools.confirmation_helpers import confirm_destructive_action
+from sapwebguimcp.tools.confirmation_helpers import confirm_destructive_action
 
 
 class _FakeContext:

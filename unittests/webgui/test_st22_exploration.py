@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 from mcp import ClientSession
 
-from sapguimcp.backend.webgui.models.browser_results import SnapshotResult
-from sapguimcp.models import LoginResult, StatusBarInfo, TransactionResult
+from sapwebguimcp.backend.webgui.models.browser_results import SnapshotResult
+from sapwebguimcp.models import LoginResult, StatusBarInfo, TransactionResult
 
 from .conftest import call_tool_typed, resolve_login_user
 

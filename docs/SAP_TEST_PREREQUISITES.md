@@ -45,7 +45,7 @@ Create `ZCL_SAPGUIMCP_ORIGLANG_TEST` **logged on in EN** (SE24, Create, Local Ob
 > _SE38 → Hilfsmittel/Utilities → Einstellungen/Settings → ABAP Editor → Editor_:
 > "Quellcode-basierter Editor" drives the `GuiAbapEditor` control, "Text-basierter Editor"
 > the `GuiTextedit` control. The backend takes a different code path for each
-> (see `src/sapguimcp/backend/desktop/_abap_editor.py`), so the edit tests only cover the
+> (see `src/sapwebguimcp/backend/desktop/_abap_editor.py`), so the edit tests only cover the
 > flavour the test user has configured. Issue #859 only affected `GuiAbapEditor`. To cover
 > both, run the desktop edit tests once per setting.
 

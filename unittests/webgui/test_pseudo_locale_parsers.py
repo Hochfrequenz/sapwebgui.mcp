@@ -30,9 +30,9 @@ from typing import Any, get_args
 import pytest
 from pydantic import BaseModel
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.backend import _parse_toolbar_note
-from sapguimcp.backend.webgui.parsers import (
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.backend import _parse_toolbar_note
+from sapwebguimcp.backend.webgui.parsers import (
     se09_parser,
     se16_parser,
     se24_parser,
@@ -44,10 +44,10 @@ from sapguimcp.backend.webgui.parsers import (
     spro_parser,
     st22_parser,
 )
-from sapguimcp.backend.webgui.parsers.screen_state_parser import parse_selection_screen_state
-from sapguimcp.lang.schema import LanguagePack
-from sapguimcp.models import SE37ParameterCategory
-from sapguimcp.tools.se11_tools import _parse_se11_fields, _parse_se11_yaml
+from sapwebguimcp.backend.webgui.parsers.screen_state_parser import parse_selection_screen_state
+from sapwebguimcp.lang.schema import LanguagePack
+from sapwebguimcp.models import SE37ParameterCategory
+from sapwebguimcp.tools.se11_tools import _parse_se11_fields, _parse_se11_yaml
 from unittests.lang import pseudo_fixtures as pf
 
 TESTDATA = Path(__file__).parent / "testdata"

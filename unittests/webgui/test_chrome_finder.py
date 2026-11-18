@@ -10,13 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from sapguimcp.backend.webgui.chrome_finder import (
+from sapwebguimcp.backend.webgui.chrome_finder import (
     extract_port_from_cdp_url,
     find_chrome,
     launch_chrome,
     wait_for_cdp,
 )
-from sapguimcp.models.config import SapGuiSettings
+from sapwebguimcp.models.config import SapGuiSettings
 
 # =============================================================================
 # Tests for find_chrome()

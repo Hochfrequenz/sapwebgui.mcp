@@ -66,7 +66,7 @@ uv run --group coverage coverage run -m pytest  # Run tests with coverage report
 uv run --group linting ruff check .             # Run ruff (lint)
 uv run --group linting ruff format --check .     # Check formatting
 uv run --group linting ruff check --select I .   # Check import order
-uv run --group type_check mypy --show-error-codes src/sapguimcp --strict  # Run mypy type checking
+uv run --group type_check mypy --show-error-codes src/sapwebguimcp --strict  # Run mypy type checking
 uv run --group spell_check codespell --ignore-words=domain-specific-terms.txt src  # Run codespell
 ```
 
@@ -188,7 +188,7 @@ Linting and type checking:
 
 ```bash
 uv run --group linting ruff check .
-uv run --group type_check mypy --show-error-codes src/sapguimcp --strict
+uv run --group type_check mypy --show-error-codes src/sapwebguimcp --strict
 ```
 
 ### JavaScript and Markdown
@@ -202,7 +202,7 @@ npm run format
 ### SAP UI Texts and Languages
 
 SAP screen texts differ per logon language, so they live only in the language packs under
-`src/sapguimcp/lang/`. Never write a button label, title, status text or column header as a literal
+`src/sapwebguimcp/lang/`. Never write a button label, title, status text or column header as a literal
 in tool, parser or JS code: read it from `lang.current()` (see
 [`ARCHITECTURE.md`](ARCHITECTURE.md#sap-ui-texts-and-language-packs) and the
 [design spec](docs/superpowers/specs/2026-11-10-language-packs-design.md)).
@@ -217,7 +217,7 @@ To add a new login language: create `lang/<xx>.py` modelled on `en.py`, register
 `uv run python scripts/harvest_lang_texts.py <XX> --verify`, and run
 `uv run --group tests pytest unittests/lang unittests/test_no_ui_literals.py` (the pseudo-locale test
 included). The full guide, with the pitfalls found while migrating DE and EN, is
-[`src/sapguimcp/lang/ADDING_A_LANGUAGE.md`](src/sapguimcp/lang/ADDING_A_LANGUAGE.md).
+[`src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md`](src/sapwebguimcp/lang/ADDING_A_LANGUAGE.md).
 
 ## MCP Tool Guidelines
 
@@ -263,14 +263,14 @@ async def sap_discover_buttons(session: str | None = None) -> DiscoveredButtons:
 
 ### JavaScript Files
 
-- Place JavaScript in `src/sapguimcp/js/`
+- Place JavaScript in `src/sapwebguimcp/js/`
 - Use IIFE pattern: `() => { ... }`
 - Load with `_load_js("filename.js")` in Python
 - Document SAP-specific quirks in comments
 
 ### Pydantic Models and DTOs
 
-- Place in `src/sapguimcp/models/`
+- Place in `src/sapwebguimcp/models/`
 - Use `Field(description=...)` for all fields
 - Export from `__init__.py`
 
@@ -309,19 +309,19 @@ You don't need to put any effort in rebases, amends or similar.
 1. Create a feature branch: `feat/my-feature` or `fix/my-bug`
 2. Write tests for new functionality
 3. Ensure all tests pass: `uv run --group tests python -m pytest unittests/ -m "not integration"`
-4. Ensure linting passes: `uv run --group linting ruff check .`, `uv run --group type_check mypy --show-error-codes src/sapguimcp --strict`
+4. Ensure linting passes: `uv run --group linting ruff check .`, `uv run --group type_check mypy --show-error-codes src/sapwebguimcp --strict`
 5. Create PR with clear description
 
 ## Extending the Server
 
 ### Adding New Tools
 
-See [src/sapguimcp/tools/README.md](src/sapguimcp/tools/README.md) for detailed instructions on creating new tools.
+See [src/sapwebguimcp/tools/README.md](src/sapwebguimcp/tools/README.md) for detailed instructions on creating new tools.
 
 ### Adding New Models
 
-See [src/sapguimcp/models/README.md](src/sapguimcp/models/README.md) for information about the data models.
+See [src/sapwebguimcp/models/README.md](src/sapwebguimcp/models/README.md) for information about the data models.
 
 ### Creating Skills
 
-See [src/sapguimcp/skills/README.md](src/sapguimcp/skills/README.md) for how to create reusable workflows.
+See [src/sapwebguimcp/skills/README.md](src/sapwebguimcp/skills/README.md) for how to create reusable workflows.

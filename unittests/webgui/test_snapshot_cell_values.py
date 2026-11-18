@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from playwright.async_api import async_playwright
 
-from sapguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
 
 _HTML = """
 <div role="grid"><table><tbody>

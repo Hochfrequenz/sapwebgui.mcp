@@ -2303,7 +2303,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sapguimcp"
+name = "sapwebguimcp"
 source = { editable = "." }
 default-groups = []
 dependencies = [

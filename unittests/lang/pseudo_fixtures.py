@@ -64,10 +64,10 @@ from html.parser import HTMLParser
 from typing import Any
 from unittest.mock import patch
 
-from sapguimcp import lang
-from sapguimcp.lang import _register_for_tests
-from sapguimcp.lang.schema import LanguagePack, Leaf, UniversalView, canonical, iter_leaves, sections
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp import lang
+from sapwebguimcp.lang import _register_for_tests
+from sapwebguimcp.lang.schema import LanguagePack, Leaf, UniversalView, canonical, iter_leaves, sections
+from sapwebguimcp.lang.text import RegexText, Template, Text
 
 CODE = "PS"
 

@@ -22,7 +22,7 @@ They are NOT shipped with the package and NOT used at runtime.
 
 ## Language Pack Verification
 
-`harvest_lang_texts.py` compares a language pack (`src/sapguimcp/lang/`) with SAP's own texts
+`harvest_lang_texts.py` compares a language pack (`src/sapwebguimcp/lang/`) with SAP's own texts
 (#1044, spec section 9). It reads only development-metadata text tables (DD04T, D021T, RSMPTEXTS,
 T100, DD07T, TSTCT, T002) through the ADT data-preview endpoint, with the credentials of
 `systems.json`.
@@ -43,7 +43,7 @@ pack and never overwrites a file).
 
 ## Transaction Catalog Building
 
-The transaction catalog (`src/sapguimcp/data/transactions.json`) is built using these scripts:
+The transaction catalog (`src/sapwebguimcp/data/transactions.json`) is built using these scripts:
 
 ### Step 1: Scrape TSTC Table
 
@@ -114,7 +114,7 @@ This script:
 
 ```
 sapgui.mcp/
-├── src/sapguimcp/           # RUNTIME CODE - shipped with package
+├── src/sapwebguimcp/           # RUNTIME CODE - shipped with package
 │   ├── catalog/                # Runtime catalog (loader, search)
 │   │   └── scraper.py          # Dev helper, but co-located for imports
 │   ├── data/
@@ -141,4 +141,4 @@ These scripts:
 - Should **NOT be importable** as part of the package
 - Are **NOT included** in the built wheel/Docker image
 
-The `scraper.py` module in `src/sapguimcp/catalog/` is an exception - it's co-located because it imports from the catalog models, but it's clearly marked as "DEVELOPMENT USE ONLY" in its docstring.
+The `scraper.py` module in `src/sapwebguimcp/catalog/` is an exception - it's co-located because it imports from the catalog models, but it's clearly marked as "DEVELOPMENT USE ONLY" in its docstring.

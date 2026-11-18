@@ -7,7 +7,7 @@ import pytest
 from mcp import ClientSession
 from mcp.types import ImageContent
 
-from sapguimcp.models import (
+from sapwebguimcp.models import (
     LoginResult,
     SessionStatus,
     TransactionResult,

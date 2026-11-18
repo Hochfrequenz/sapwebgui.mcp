@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.models.sap_results import StatusBarInfo
-from sapguimcp.tools import abapgit_tools
-from sapguimcp.tools.quick_report_tools import classify_result_screen
+from sapwebguimcp import lang
+from sapwebguimcp.models.sap_results import StatusBarInfo
+from sapwebguimcp.tools import abapgit_tools
+from sapwebguimcp.tools.quick_report_tools import classify_result_screen
 
 
 @pytest.mark.parametrize("code", ["DE", "EN"])

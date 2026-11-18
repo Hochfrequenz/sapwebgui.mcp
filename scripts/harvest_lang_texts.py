@@ -7,7 +7,7 @@ Usage::
     uv run python scripts/harvest_lang_texts.py DE --print-sql
     uv run python scripts/harvest_lang_texts.py IT --draft [--system <key>] [--sap-texts texts.json] [--out it.py]
 
-``--verify`` reads every non-``Manual`` source of ``sapguimcp.lang.sources.SOURCES`` for the
+``--verify`` reads every non-``Manual`` source of ``sapwebguimcp.lang.sources.SOURCES`` for the
 language and reports each pack field whose text no longer matches SAP ("drift"). It reads only
 development-metadata text tables (DD04T, D021T, RSMPTEXTS, T100, DD07T, TSTCT, T002) through the
 ADT data-preview endpoint ``/sap/bc/adt/datapreview/freestyle``, as the SAP API policy allows for
@@ -43,9 +43,9 @@ from typing import TYPE_CHECKING
 import httpx
 from sap_mcp_config import load_default
 
-from sapguimcp.lang import pack_for, supported_languages
-from sapguimcp.lang.schema import Leaf, iter_leaves, sections
-from sapguimcp.lang.sources import (
+from sapwebguimcp.lang import pack_for, supported_languages
+from sapwebguimcp.lang.schema import Leaf, iter_leaves, sections
+from sapwebguimcp.lang.sources import (
     SOURCES,
     DataElement,
     DomainValue,
@@ -56,7 +56,7 @@ from sapguimcp.lang.sources import (
     Source,
     Transaction,
 )
-from sapguimcp.lang.text import RegexText, Template, Text
+from sapwebguimcp.lang.text import RegexText, Template, Text
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -258,7 +258,7 @@ def draft(language: str, fetch: Callable[[str, Source], Sequence[str]]) -> str:
     if not _LANGUAGE_KEY.match(language):
         raise ValueError(f"not an SAP language key: {language!r}")
     en = pack_for("EN")
-    imports: dict[str, set[str]] = {"sapguimcp.lang.schema": {"LanguagePack"}, "sapguimcp.lang.text": set()}
+    imports: dict[str, set[str]] = {"sapwebguimcp.lang.schema": {"LanguagePack"}, "sapwebguimcp.lang.text": set()}
     body: list[str] = []
 
     def emit(indent: int, text: str, comment: str | None = None) -> None:
@@ -267,7 +267,7 @@ def draft(language: str, fetch: Callable[[str, Source], Sequence[str]]) -> str:
     def leaf_line(indent: int, prefix: str, path: str, leaf: Leaf) -> None:
         source = SOURCES[path]
         code, comment = _draft_leaf(leaf, source, () if isinstance(source, Manual) else fetch(path, source))
-        imports["sapguimcp.lang.text"].add(type(leaf).__name__)
+        imports["sapwebguimcp.lang.text"].add(type(leaf).__name__)
         emit(indent, f"{prefix}{code},", comment)
 
     # The module constant must be a Python identifier; SAP keys such as "1Q" start with a digit.
@@ -280,7 +280,7 @@ def draft(language: str, fetch: Callable[[str, Source], Sequence[str]]) -> str:
     emit(4, "same_as_en=frozenset(),", "TODO field paths that deliberately equal EN")
     for section_name, section in sections(en):
         section_class = type(section).__name__
-        imports["sapguimcp.lang.schema"].add(section_class)
+        imports["sapwebguimcp.lang.schema"].add(section_class)
         emit(4, f"{section_name}={section_class}(")
         for field in dataclasses.fields(section):
             value = getattr(section, field.name)
@@ -288,11 +288,11 @@ def draft(language: str, fetch: Callable[[str, Source], Sequence[str]]) -> str:
             if not isinstance(value, Mapping):
                 leaf_line(8, f"{field.name}=", path, value)
                 continue
-            imports["sapguimcp.lang.schema"].add("canonical")
+            imports["sapwebguimcp.lang.schema"].add("canonical")
             emit(8, f"{field.name}=canonical(")
             emit(12, "{")
             for key, leaf in value.items():
-                imports["sapguimcp.lang.schema"].add(type(key).__name__)
+                imports["sapwebguimcp.lang.schema"].add(type(key).__name__)
                 leaf_line(16, f"{_entry_name(key)}: ", f"{path}[{key}]", leaf)
             emit(12, "}")
             emit(8, "),")

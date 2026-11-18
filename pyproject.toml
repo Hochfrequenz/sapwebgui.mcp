@@ -1,5 +1,5 @@
 [project]
-name = "sapguimcp"
+name = "sapwebguimcp"
 description = "MCP server for SAP Web GUI browser automation"
 license = "MIT"
 requires-python = ">=3.11"
@@ -26,7 +26,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "rapidfuzz>=3.0.0",  # Fuzzy string matching for catalog search
-    "sap-mcp-config>=2.0.0,<3",  # Shared SAP system credentials config. 2.0.0 for the required `supported_languages` argument: sapguimcp passes its supported languages (lang.supported_languages()), so an unsupported language in systems.json fails at load time (Hochfrequenz/sap-mcp-config#37 for ${env:VAR} placeholders, available since 1.1.0).
+    "sap-mcp-config>=2.0.0,<3",  # Shared SAP system credentials config. 2.0.0 for the required `supported_languages` argument: sapwebguimcp passes its supported languages (lang.supported_languages()), so an unsupported language in systems.json fails at load time (Hochfrequenz/sap-mcp-config#37 for ${env:VAR} placeholders, available since 1.1.0).
 ]
 dynamic = ["readme", "version"]
 
@@ -74,7 +74,7 @@ dev = [
 default-groups = []
 
 [project.scripts]
-run-sapgui-mcp-server = "sapguimcp.server:main"
+run-sapwebgui-mcp-server = "sapwebguimcp.server:main"
 
 [tool.ruff]
 line-length = 120
@@ -114,7 +114,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["sapguimcp"]
+known-first-party = ["sapwebguimcp"]
 known-third-party = ["sap_mcp_config"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -131,71 +131,71 @@ known-third-party = ["sap_mcp_config"]
 "scripts/consolidate_catalog.py" = ["E402", "PTH123"] # module-import-not-at-top-of-file, builtin-open
 "scripts/harvest_lang_texts.py" = ["S608"] # hardcoded-sql-expression: every value is checked against a technical-ID regex first
 "scripts/smoke_test_exe.py" = ["PTH113", "S101", "S603", "SIM115"] # os-path-isfile, assert, subprocess-without-shell-equals-true, open-file-with-context-handler
-"src/sapguimcp/__init__.py" = ["PLC0415", "RUF022"] # import-outside-top-level, unsorted-dunder-all
-"src/sapguimcp/backend/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/backend/manager.py" = ["S101", "SIM102"] # assert, collapsible-if
-"src/sapguimcp/backend/webgui/backend.py" = ["ARG002", "PIE810", "PLC0207", "PLR0911", "RUF019", "S110", "SIM105", "SIM108"] # unused-method-argument, multiple-starts-ends-with, missing-maxsplit-arg, too-many-return-statements, unnecessary-key-check, try-except-pass, suppressible-exception, if-else-block-instead-of-if-exp
-"src/sapguimcp/backend/webgui/browser.py" = ["PLW0603", "RUF022", "UP045"] # global-statement, unsorted-dunder-all, non-pep604-annotation-optional
-"src/sapguimcp/backend/webgui/chrome_finder.py" = ["RUF003", "S603", "S607", "UP045"] # ambiguous-unicode-character-comment, subprocess-without-shell-equals-true, start-process-with-partial-path, non-pep604-annotation-optional
-"src/sapguimcp/backend/webgui/models/session_registry.py" = ["RUF022", "UP035", "UP037"] # unsorted-dunder-all, deprecated-import, quoted-annotation
-"src/sapguimcp/backend/webgui/parsers/se09_parser.py" = ["ARG001", "PIE810"] # unused-function-argument, multiple-starts-ends-with
-"src/sapguimcp/backend/webgui/parsers/se16_parser.py" = ["SIM108"] # if-else-block-instead-of-if-exp
-"src/sapguimcp/backend/webgui/parsers/se24_parser.py" = ["RET504", "RUF002", "RUF022"] # unnecessary-assign, ambiguous-unicode-character-docstring, unsorted-dunder-all
-"src/sapguimcp/backend/webgui/parsers/se37_parser.py" = ["RET504", "RUF022"] # unnecessary-assign, unsorted-dunder-all
-"src/sapguimcp/backend/webgui/parsers/se93_parser.py" = ["RET504"] # unnecessary-assign
-"src/sapguimcp/backend/webgui/parsers/sm30_parser.py" = ["PIE810", "RUF022"] # multiple-starts-ends-with, unsorted-dunder-all
-"src/sapguimcp/backend/webgui/parsers/sm37_parser.py" = ["PIE810", "RUF022"] # multiple-starts-ends-with, unsorted-dunder-all
-"src/sapguimcp/backend/webgui/parsers/spro_parser.py" = ["PIE810"] # multiple-starts-ends-with
-"src/sapguimcp/backend/webgui/parsers/st22_parser.py" = ["PIE810", "PLR0911", "PLW2901", "RUF022", "SIM102", "SIM212"] # multiple-starts-ends-with, too-many-return-statements, redefined-loop-name, unsorted-dunder-all, collapsible-if, if-expr-with-twisted-arms
-"src/sapguimcp/backend/webgui/utils.py" = ["SIM110"] # reimplemented-builtin
-"src/sapguimcp/catalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/catalog/loader.py" = ["PTH123"] # builtin-open
-"src/sapguimcp/catalog/scraper.py" = ["PLC0415", "PTH123", "UP035"] # import-outside-top-level, builtin-open, deprecated-import
-"src/sapguimcp/classcatalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/classcatalog/loader.py" = ["PTH123"] # builtin-open
-"src/sapguimcp/fmcatalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/fmcatalog/loader.py" = ["PTH123"] # builtin-open
-"src/sapguimcp/logging_config.py" = ["RUF012", "RUF022", "SIM105", "UP012", "UP017"] # mutable-class-default, unsorted-dunder-all, suppressible-exception, unnecessary-encode-utf8, datetime-timezone-utc
-"src/sapguimcp/loghandlers/feedback_issue_handler.py" = ["SIM108", "UP017"] # if-else-block-instead-of-if-exp, datetime-timezone-utc
-"src/sapguimcp/models/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/models/config.py" = ["PLW0603", "UP045"] # global-statement, non-pep604-annotation-optional
-"src/sapguimcp/models/middleware.py" = ["UP017"] # datetime-timezone-utc
-"src/sapguimcp/models/se24_models.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/models/se37_models.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/models/sm30_models.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/models/sm37_models.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/models/spro_models.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/prompts/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/server.py" = ["PLC0415"] # import-outside-top-level
-"src/sapguimcp/tables/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/tables/loader.py" = ["PTH123"] # builtin-open
-"src/sapguimcp/tables/scraper.py" = ["PLC0415", "PTH123"] # import-outside-top-level, builtin-open
-"src/sapguimcp/tools/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/tools/abapgit_tools.py" = ["PLC0415", "PLW2901", "S101", "S110", "S112", "SIM105", "TC002", "UP037"] # import-outside-top-level, redefined-loop-name, assert, try-except-pass, try-except-continue, suppressible-exception, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/browser_tools.py" = ["UP045"] # non-pep604-annotation-optional
-"src/sapguimcp/tools/confirmation_helpers.py" = ["PLR0911", "TC002"] # too-many-return-statements, typing-only-third-party-import
-"src/sapguimcp/tools/feedback_tools.py" = ["RUF006", "RUF022", "UP017"] # asyncio-dangling-task, unsorted-dunder-all, datetime-timezone-utc
-"src/sapguimcp/tools/field_helpers.py" = ["B009", "TC003"] # get-attr-with-constant, typing-only-standard-library-import
-"src/sapguimcp/tools/intent_tools.py" = ["RUF022", "UP017"] # unsorted-dunder-all, datetime-timezone-utc
-"src/sapguimcp/tools/quick_report_tools.py" = ["PLR0911", "S112", "TC002"] # too-many-return-statements, try-except-continue, typing-only-third-party-import
-"src/sapguimcp/tools/sap_list_connections_impl.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/tools/sap_login_impl.py" = ["UP045"] # non-pep604-annotation-optional
-"src/sapguimcp/tools/sap_tools.py" = ["PLC0415", "PLR0911", "RUF022", "S101", "SIM103", "SIM118", "SIM201", "TC006", "UP045"] # import-outside-top-level, too-many-return-statements, unsorted-dunder-all, assert, needless-bool, in-dict-keys, negate-equal-op, runtime-cast-value, non-pep604-annotation-optional
-"src/sapguimcp/tools/se09_tools.py" = ["N814", "PLC0415", "S101", "S112", "TC002", "UP037"] # camelcase-imported-as-constant, import-outside-top-level, assert, try-except-continue, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/se11_tools.py" = ["PLC0415", "PLR0911", "SIM102", "TC002"] # import-outside-top-level, too-many-return-statements, collapsible-if, typing-only-third-party-import
-"src/sapguimcp/tools/se16_tools.py" = ["ARG001", "N814", "PLC0415", "PLR0911", "S101", "S110", "S112", "SIM105", "SIM108", "TC002"] # unused-function-argument, camelcase-imported-as-constant, import-outside-top-level, too-many-return-statements, assert, try-except-pass, try-except-continue, suppressible-exception, if-else-block-instead-of-if-exp, typing-only-third-party-import
-"src/sapguimcp/tools/se24_edit_tools.py" = ["PLC0415", "S110", "S112", "TC002", "TC006"] # import-outside-top-level, try-except-pass, try-except-continue, typing-only-third-party-import, runtime-cast-value
-"src/sapguimcp/tools/se24_tools.py" = ["PLC0415", "S110", "S112", "TC002"] # import-outside-top-level, try-except-pass, try-except-continue, typing-only-third-party-import
-"src/sapguimcp/tools/se37_edit_tools.py" = ["S112", "TC002"] # try-except-continue, typing-only-third-party-import
-"src/sapguimcp/tools/se37_tools.py" = ["PLC0415", "S112", "TC002"] # import-outside-top-level, try-except-continue, typing-only-third-party-import
-"src/sapguimcp/tools/se38_edit_tools.py" = ["N814", "PLC0415", "S101", "TC002"] # camelcase-imported-as-constant, import-outside-top-level, assert, typing-only-third-party-import
-"src/sapguimcp/tools/se93_tools.py" = ["PLC0415", "TC001", "TC002"] # import-outside-top-level, typing-only-first-party-import, typing-only-third-party-import
-"src/sapguimcp/tools/session_tools.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/tools/slg1_tools.py" = ["PLC0415", "PLR0911", "RUF100", "TC001", "TC002", "UP037"] # import-outside-top-level, too-many-return-statements, unused-noqa, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/sm30_tools.py" = ["TC001", "TC002", "UP037"] # typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/sm37_tools.py" = ["N806", "PLW2901", "RUF005", "S110", "S112", "TC001", "TC002", "UP037"] # non-lowercase-variable-in-function, redefined-loop-name, collection-literal-concatenation, try-except-pass, try-except-continue, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/spro_tools.py" = ["PLC0415", "S110", "SIM102", "SIM105", "TC002", "UP037"] # import-outside-top-level, try-except-pass, collapsible-if, suppressible-exception, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/st22_tools.py" = ["PLC0415", "PLR0911", "S110", "TC001", "TC002", "UP037"] # import-outside-top-level, too-many-return-statements, try-except-pass, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/__init__.py" = ["PLC0415", "RUF022"] # import-outside-top-level, unsorted-dunder-all
+"src/sapwebguimcp/backend/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/backend/manager.py" = ["S101", "SIM102"] # assert, collapsible-if
+"src/sapwebguimcp/backend/webgui/backend.py" = ["ARG002", "PIE810", "PLC0207", "PLR0911", "RUF019", "S110", "SIM105", "SIM108"] # unused-method-argument, multiple-starts-ends-with, missing-maxsplit-arg, too-many-return-statements, unnecessary-key-check, try-except-pass, suppressible-exception, if-else-block-instead-of-if-exp
+"src/sapwebguimcp/backend/webgui/browser.py" = ["PLW0603", "RUF022", "UP045"] # global-statement, unsorted-dunder-all, non-pep604-annotation-optional
+"src/sapwebguimcp/backend/webgui/chrome_finder.py" = ["RUF003", "S603", "S607", "UP045"] # ambiguous-unicode-character-comment, subprocess-without-shell-equals-true, start-process-with-partial-path, non-pep604-annotation-optional
+"src/sapwebguimcp/backend/webgui/models/session_registry.py" = ["RUF022", "UP035", "UP037"] # unsorted-dunder-all, deprecated-import, quoted-annotation
+"src/sapwebguimcp/backend/webgui/parsers/se09_parser.py" = ["ARG001", "PIE810"] # unused-function-argument, multiple-starts-ends-with
+"src/sapwebguimcp/backend/webgui/parsers/se16_parser.py" = ["SIM108"] # if-else-block-instead-of-if-exp
+"src/sapwebguimcp/backend/webgui/parsers/se24_parser.py" = ["RET504", "RUF002", "RUF022"] # unnecessary-assign, ambiguous-unicode-character-docstring, unsorted-dunder-all
+"src/sapwebguimcp/backend/webgui/parsers/se37_parser.py" = ["RET504", "RUF022"] # unnecessary-assign, unsorted-dunder-all
+"src/sapwebguimcp/backend/webgui/parsers/se93_parser.py" = ["RET504"] # unnecessary-assign
+"src/sapwebguimcp/backend/webgui/parsers/sm30_parser.py" = ["PIE810", "RUF022"] # multiple-starts-ends-with, unsorted-dunder-all
+"src/sapwebguimcp/backend/webgui/parsers/sm37_parser.py" = ["PIE810", "RUF022"] # multiple-starts-ends-with, unsorted-dunder-all
+"src/sapwebguimcp/backend/webgui/parsers/spro_parser.py" = ["PIE810"] # multiple-starts-ends-with
+"src/sapwebguimcp/backend/webgui/parsers/st22_parser.py" = ["PIE810", "PLR0911", "PLW2901", "RUF022", "SIM102", "SIM212"] # multiple-starts-ends-with, too-many-return-statements, redefined-loop-name, unsorted-dunder-all, collapsible-if, if-expr-with-twisted-arms
+"src/sapwebguimcp/backend/webgui/utils.py" = ["SIM110"] # reimplemented-builtin
+"src/sapwebguimcp/catalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/catalog/loader.py" = ["PTH123"] # builtin-open
+"src/sapwebguimcp/catalog/scraper.py" = ["PLC0415", "PTH123", "UP035"] # import-outside-top-level, builtin-open, deprecated-import
+"src/sapwebguimcp/classcatalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/classcatalog/loader.py" = ["PTH123"] # builtin-open
+"src/sapwebguimcp/fmcatalog/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/fmcatalog/loader.py" = ["PTH123"] # builtin-open
+"src/sapwebguimcp/logging_config.py" = ["RUF012", "RUF022", "SIM105", "UP012", "UP017"] # mutable-class-default, unsorted-dunder-all, suppressible-exception, unnecessary-encode-utf8, datetime-timezone-utc
+"src/sapwebguimcp/loghandlers/feedback_issue_handler.py" = ["SIM108", "UP017"] # if-else-block-instead-of-if-exp, datetime-timezone-utc
+"src/sapwebguimcp/models/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/models/config.py" = ["PLW0603", "UP045"] # global-statement, non-pep604-annotation-optional
+"src/sapwebguimcp/models/middleware.py" = ["UP017"] # datetime-timezone-utc
+"src/sapwebguimcp/models/se24_models.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/models/se37_models.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/models/sm30_models.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/models/sm37_models.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/models/spro_models.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/prompts/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/server.py" = ["PLC0415"] # import-outside-top-level
+"src/sapwebguimcp/tables/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/tables/loader.py" = ["PTH123"] # builtin-open
+"src/sapwebguimcp/tables/scraper.py" = ["PLC0415", "PTH123"] # import-outside-top-level, builtin-open
+"src/sapwebguimcp/tools/__init__.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/tools/abapgit_tools.py" = ["PLC0415", "PLW2901", "S101", "S110", "S112", "SIM105", "TC002", "UP037"] # import-outside-top-level, redefined-loop-name, assert, try-except-pass, try-except-continue, suppressible-exception, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/browser_tools.py" = ["UP045"] # non-pep604-annotation-optional
+"src/sapwebguimcp/tools/confirmation_helpers.py" = ["PLR0911", "TC002"] # too-many-return-statements, typing-only-third-party-import
+"src/sapwebguimcp/tools/feedback_tools.py" = ["RUF006", "RUF022", "UP017"] # asyncio-dangling-task, unsorted-dunder-all, datetime-timezone-utc
+"src/sapwebguimcp/tools/field_helpers.py" = ["B009", "TC003"] # get-attr-with-constant, typing-only-standard-library-import
+"src/sapwebguimcp/tools/intent_tools.py" = ["RUF022", "UP017"] # unsorted-dunder-all, datetime-timezone-utc
+"src/sapwebguimcp/tools/quick_report_tools.py" = ["PLR0911", "S112", "TC002"] # too-many-return-statements, try-except-continue, typing-only-third-party-import
+"src/sapwebguimcp/tools/sap_list_connections_impl.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/tools/sap_login_impl.py" = ["UP045"] # non-pep604-annotation-optional
+"src/sapwebguimcp/tools/sap_tools.py" = ["PLC0415", "PLR0911", "RUF022", "S101", "SIM103", "SIM118", "SIM201", "TC006", "UP045"] # import-outside-top-level, too-many-return-statements, unsorted-dunder-all, assert, needless-bool, in-dict-keys, negate-equal-op, runtime-cast-value, non-pep604-annotation-optional
+"src/sapwebguimcp/tools/se09_tools.py" = ["N814", "PLC0415", "S101", "S112", "TC002", "UP037"] # camelcase-imported-as-constant, import-outside-top-level, assert, try-except-continue, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/se11_tools.py" = ["PLC0415", "PLR0911", "SIM102", "TC002"] # import-outside-top-level, too-many-return-statements, collapsible-if, typing-only-third-party-import
+"src/sapwebguimcp/tools/se16_tools.py" = ["ARG001", "N814", "PLC0415", "PLR0911", "S101", "S110", "S112", "SIM105", "SIM108", "TC002"] # unused-function-argument, camelcase-imported-as-constant, import-outside-top-level, too-many-return-statements, assert, try-except-pass, try-except-continue, suppressible-exception, if-else-block-instead-of-if-exp, typing-only-third-party-import
+"src/sapwebguimcp/tools/se24_edit_tools.py" = ["PLC0415", "S110", "S112", "TC002", "TC006"] # import-outside-top-level, try-except-pass, try-except-continue, typing-only-third-party-import, runtime-cast-value
+"src/sapwebguimcp/tools/se24_tools.py" = ["PLC0415", "S110", "S112", "TC002"] # import-outside-top-level, try-except-pass, try-except-continue, typing-only-third-party-import
+"src/sapwebguimcp/tools/se37_edit_tools.py" = ["S112", "TC002"] # try-except-continue, typing-only-third-party-import
+"src/sapwebguimcp/tools/se37_tools.py" = ["PLC0415", "S112", "TC002"] # import-outside-top-level, try-except-continue, typing-only-third-party-import
+"src/sapwebguimcp/tools/se38_edit_tools.py" = ["N814", "PLC0415", "S101", "TC002"] # camelcase-imported-as-constant, import-outside-top-level, assert, typing-only-third-party-import
+"src/sapwebguimcp/tools/se93_tools.py" = ["PLC0415", "TC001", "TC002"] # import-outside-top-level, typing-only-first-party-import, typing-only-third-party-import
+"src/sapwebguimcp/tools/session_tools.py" = ["RUF022"] # unsorted-dunder-all
+"src/sapwebguimcp/tools/slg1_tools.py" = ["PLC0415", "PLR0911", "RUF100", "TC001", "TC002", "UP037"] # import-outside-top-level, too-many-return-statements, unused-noqa, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/sm30_tools.py" = ["TC001", "TC002", "UP037"] # typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/sm37_tools.py" = ["N806", "PLW2901", "RUF005", "S110", "S112", "TC001", "TC002", "UP037"] # non-lowercase-variable-in-function, redefined-loop-name, collection-literal-concatenation, try-except-pass, try-except-continue, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/spro_tools.py" = ["PLC0415", "S110", "SIM102", "SIM105", "TC002", "UP037"] # import-outside-top-level, try-except-pass, collapsible-if, suppressible-exception, typing-only-third-party-import, quoted-annotation
+"src/sapwebguimcp/tools/st22_tools.py" = ["PLC0415", "PLR0911", "S110", "TC001", "TC002", "UP037"] # import-outside-top-level, too-many-return-statements, try-except-pass, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
 "unittests/conftest.py" = ["PLC0415"] # import-outside-top-level
 "unittests/test_backend_manager.py" = ["ARG001", "PT022"] # unused-function-argument, pytest-useless-yield-fixture
 "unittests/test_backend_protocol.py" = ["PLC0415"] # import-outside-top-level
@@ -292,7 +292,7 @@ fragments = [{ path = "README.md" }]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/_sapguimcp_version.py"
+version-file = "src/_sapwebguimcp_version.py"
 template = '''
 version = "{version}"
 '''

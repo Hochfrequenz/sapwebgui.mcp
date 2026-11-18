@@ -14,9 +14,9 @@ from typing import Any
 import pytest
 from playwright.async_api import async_playwright
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.backend import WebGuiBackend, _parse_toolbar_note
-from sapguimcp.tools.sap_tools import SELECTORS, parse_shortcut_from_title
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend, _parse_toolbar_note
+from sapwebguimcp.tools.sap_tools import SELECTORS, parse_shortcut_from_title
 
 SNAPSHOTS = Path(__file__).resolve().parents[1] / "testdata" / "html_snapshots"
 

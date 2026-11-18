@@ -2,9 +2,9 @@
 
 import pytest
 
-from sapguimcp import lang
-from sapguimcp.backend.webgui.parsers.sm30_parser import _is_selection_cell, parse_sm30_snapshot
-from sapguimcp.backend.webgui.parsers.spro_parser import parse_spro_search_results
+from sapwebguimcp import lang
+from sapwebguimcp.backend.webgui.parsers.sm30_parser import _is_selection_cell, parse_sm30_snapshot
+from sapwebguimcp.backend.webgui.parsers.spro_parser import parse_spro_search_results
 
 _SM30_DE = """\
 - main "Sicht anzeigen":

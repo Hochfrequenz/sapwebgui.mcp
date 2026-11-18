@@ -41,8 +41,8 @@ jobs:
             --copy-metadata fastmcp \
             --collect-submodules lupa \
             --collect-data fakeredis \
-            --collect-data sapguimcp \
-            src/sapguimcp/server.py
+            --collect-data sapwebguimcp \
+            src/sapwebguimcp/server.py
           codesign --force --deep --sign - dist/sapwebgui_mcp_macos_arm64
 
       - name: Freeze build dependencies
