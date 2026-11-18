@@ -17,3 +17,21 @@ jobs:
         run: uv build
       - name: Check package
         run: uv publish --dry-run dist/*
+  check_docker_build:
+    # Builds the image without pushing it, so a broken Dockerfile is caught before a release.
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sapwebgui-mcp:ci
+          cache-from: type=gha
+      - name: Check entry point
+        run: docker run --rm --entrypoint sh sapwebgui-mcp:ci -c 'command -v run-sapwebgui-mcp-server'

@@ -142,7 +142,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Windows (public) Executable
+      - name: Download Windows Executable
         uses: actions/download-artifact@v8
         with:
           name: sapwebgui_mcp_windows
@@ -165,7 +165,7 @@ jobs:
           if [ -f ./dist/windows/sapwebgui_mcp_windows.exe ]; then
             mv ./dist/windows/sapwebgui_mcp_windows.exe ./dist/release/sapwebgui_mcp_windows_${{ github.ref_name }}.exe
           else
-            echo "::warning::Windows (public) artifact missing; skipping"
+            echo "::warning::Windows artifact missing; skipping"
           fi
           if [ -f ./dist/macos/sapwebgui_mcp_macos_arm64 ]; then
             mv ./dist/macos/sapwebgui_mcp_macos_arm64 ./dist/release/sapwebgui_mcp_macos_arm64_${{ github.ref_name }}
