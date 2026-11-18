@@ -9,7 +9,6 @@ This package contains tool modules that are registered with the FastMCP server:
 """
 
 from sapguimcp.tools.abapgit_tools import register_abapgit_tools
-from sapguimcp.tools.breakpoint_tools import register_breakpoint_tools
 from sapguimcp.tools.browser_tools import register_browser_tools
 from sapguimcp.tools.catalog_tools import register_catalog_tools
 from sapguimcp.tools.class_tools import register_class_tools
@@ -44,7 +43,6 @@ from sapguimcp.tools.table_tools import register_table_tools
 
 __all__ = [
     "register_abapgit_tools",
-    "register_breakpoint_tools",
     "register_browser_tools",
     "register_catalog_tools",
     "register_class_tools",

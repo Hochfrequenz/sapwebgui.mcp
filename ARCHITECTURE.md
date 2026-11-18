@@ -156,8 +156,7 @@ Guards:
   for literals that look like SAP screen text. Fix a hit by moving the text into the packs (and a
   `SOURCES` entry in `lang/sources.py`), or, if it is code or the server's own message, mark the
   exact line with `# lang-ok: <reason>` (`// lang-ok: <reason>` in JS). The baseline
-  `unittests/lang_baseline.json` is shrink-only and holds only `tools/breakpoint_tools.py`, the one
-  documented exception (#1025).
+  `unittests/lang_baseline.json` is shrink-only and empty.
 - `unittests/lang/` checks pack completeness, flag consistency, regex/JS portability, and
   `test_pseudo_locale.py` round-trips a pseudo pack (every text replaced by a marker) through its
   helpers (the parser tests against the pseudo pack are a follow-up).
@@ -191,7 +190,6 @@ case sensitivity, short fragments), is
 5. Fill the test pack (`unittests/testdata/lang_test.py`), record fixtures with
    `SAP_LANGUAGE=<XX>`, run `uv run --group tests pytest unittests/lang unittests/test_no_ui_literals.py`,
    then the live tests logged on in the new language.
-6. Known limitation: `tools/breakpoint_tools.py` stays DE/EN.
 
 ## How to Add a New Transaction Tool
 
@@ -322,7 +320,6 @@ SAP credentials (user, password, mandant) are loaded from `~/.config/sap-mcp/sys
 | Group          | Variables                                                                                            | Purpose                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | **Browser**    | `BROWSER_MODE`, `BROWSER_TYPE`, `CDP_URL`, `CHROME_PATH`, `CHROME_USER_DATA_DIR`, `BROWSER_HEADLESS` | Chrome/Playwright configuration                           |
-| **COM timing** | `COM_MIN_INTERVAL_MS`                                                                                | Minimum ms between COM calls (desktop, prevents overload) |
 | **GitHub**     | `GITHUB_PAT`, `GITHUB_USER`, `GITHUB_REPO`, `ABAPGIT_PAT`                                            | Feedback issue creation, abapGit operations               |
 
 See `.env.example` for a complete template with descriptions.

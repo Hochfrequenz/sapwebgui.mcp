@@ -591,12 +591,8 @@ def _in_array_receiver(tokens: list[_Tok], index: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
-# Not registered on the server (desktop only) and left unmigrated; deleted together with the other desktop modules.
-UNREGISTERED_DESKTOP_MODULES = (SRC / "tools" / "breakpoint_tools.py",)
-
-
 def scanned_files() -> list[Path]:
-    python = [p for p in SRC.rglob("*.py") if not p.is_relative_to(LANG_DIR) and p not in UNREGISTERED_DESKTOP_MODULES]
+    python = [p for p in SRC.rglob("*.py") if not p.is_relative_to(LANG_DIR)]
     return sorted([*python, *JS_DIR.glob("*.js")])
 
 

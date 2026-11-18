@@ -36,11 +36,6 @@ def _has_sap_config() -> bool:
         return False
 
 
-def has_sap_desktop_creds() -> bool:
-    """Check if SAP credentials are configured (via systems.json)."""
-    return _has_sap_config()
-
-
 def has_sap_webgui_creds() -> bool:
     """Check if SAP credentials are configured (via systems.json) and SAP_URL is set or host is configured."""
     if not _has_sap_config():
@@ -127,22 +122,15 @@ def clean_environment() -> Generator[None, None, None]:
 # =============================================================================
 
 _LIVE_SAP_FIXTURES_ANYWHERE = frozenset({"sap_mcp_client"})
-_LIVE_SAP_FIXTURES_DESKTOP = frozenset({"backend"})  # defined in unittests/desktop/conftest.py
-_DESKTOP_DIR = Path(__file__).parent / "desktop"
 
 
 def is_live_sap_item(fixturenames: Iterable[str], path: Path | str) -> bool:
     """Return True if a test requests a fixture that drives a live SAP system.
 
-    ``sap_mcp_client`` (WebGUI) counts anywhere; ``backend`` (desktop COM) only under ``unittests/desktop``,
-    where it is defined.
+    ``sap_mcp_client`` (WebGUI) counts anywhere.
     """
-    names = set(fixturenames)
-    if names & _LIVE_SAP_FIXTURES_ANYWHERE:
-        return True
-    if names & _LIVE_SAP_FIXTURES_DESKTOP:
-        return Path(path).resolve().is_relative_to(_DESKTOP_DIR.resolve())
-    return False
+    del path  # the rule does not depend on where the test lives
+    return bool(set(fixturenames) & _LIVE_SAP_FIXTURES_ANYWHERE)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

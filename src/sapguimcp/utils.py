@@ -4,7 +4,6 @@ import errno
 import json
 import logging
 import os
-from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
@@ -114,27 +113,6 @@ def is_path_within_root(path: Path, root: Path) -> bool:
     resolved_path = Path(os.path.normcase(str(path.resolve())))
     resolved_root = Path(os.path.normcase(str(root.resolve())))
     return resolved_path.is_relative_to(resolved_root)
-
-
-def resolve_candidates_within_roots(candidate: Path, roots: Iterable[Path]) -> list[Path]:
-    """Resolve ``candidate`` against ``roots`` and keep the locations inside a root.
-
-    Absolute candidates are resolved as-is and kept if they lie inside any
-    root. Relative candidates are resolved against each root in order (never
-    against the process cwd) and every location that stays inside that root
-    is returned, in root order, so callers can pick the first existing file
-    ("first matching root wins").
-    """
-    root_list = list(roots)
-    if candidate.is_absolute():
-        resolved = candidate.resolve()
-        return [resolved] if any(is_path_within_root(resolved, root) for root in root_list) else []
-    results: list[Path] = []
-    for root in root_list:
-        located = (root.resolve() / candidate).resolve()
-        if is_path_within_root(located, root):
-            results.append(located)
-    return results
 
 
 def resolve_output_file_path(output_file: str, base_dir: Path | None = None) -> Path:

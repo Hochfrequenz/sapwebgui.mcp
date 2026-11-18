@@ -26,7 +26,6 @@ from sapguimcp.models import (
     SE37FileSummary,
     SE37Result,
 )
-from sapguimcp.models.se37_models import SE37Parameter, SE37ParameterCategory, SE37TypingMethod
 from sapguimcp.tools.field_helpers import fill_and_display
 
 if TYPE_CHECKING:
@@ -46,32 +45,6 @@ MAX_INLINE_OBJECTS = 5
 # =============================================================================
 # SE37 Navigation Helpers
 # =============================================================================
-
-
-def _parse_se37_params(
-    rows: list[dict[str, str]], category: SE37ParameterCategory, t: LanguagePack
-) -> list[SE37Parameter]:
-    """Parse parameter rows from an SE37 tab into SE37Parameter models."""
-    params: list[SE37Parameter] = []
-    for row in rows:
-        name = t.se37.parameter_name_column.first_key(row) or ""
-        if not name:
-            continue
-        typing_raw = (t.se37.typing_column.first_key(row) or "").upper()
-        typing: SE37TypingMethod = "TYPE" if "TYPE" in typing_raw else "LIKE"
-        params.append(
-            SE37Parameter(
-                name=name,
-                category=category,
-                typing=typing,
-                reference_type=t.se37.type_ref_column.first_key(row) or "",
-                default_value=t.se37.default_column.first_key(row) or None,
-                optional="X" in (t.se37.optional_column.first_key(row) or "").upper(),
-                pass_by_value="X" in (t.se37.pass_value_column.first_key(row) or "").upper(),
-                description=t.se37.short_text_column.first_key(row) or "",
-            )
-        )
-    return params
 
 
 async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text) -> str | None:

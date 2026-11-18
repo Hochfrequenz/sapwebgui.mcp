@@ -2312,10 +2312,8 @@ dependencies = [
     { name = "playwright" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "rapidfuzz" },
     { name = "sap-mcp-config" },
-    { name = "sapsucker" },
 ]
 
 [package.dev-dependencies]
@@ -2380,10 +2378,8 @@ requires-dist = [
     { name = "playwright", specifier = ">=1.40.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },
     { name = "rapidfuzz", specifier = ">=3.0.0" },
     { name = "sap-mcp-config", specifier = ">=2.0.0,<3" },
-    { name = "sapsucker", specifier = ">=1.5.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -2433,19 +2429,6 @@ type-check = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "respx", specifier = "==0.23.1" },
     { name = "types-pyyaml", specifier = "==6.0.12.20260518" },
-]
-
-[[package]]
-name = "sapsucker"
-version = "1.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "pywin32", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/e5/1925118924b168e0a2cc653823672d6e04fa6f4e307c84ee88d9c8f5def1/sapsucker-1.7.0.tar.gz", hash = "sha256:eded31e5ef02358ca7af1224b3e730716819f7aafb3dd9b49fd4558d72a603e6", size = 223829, upload-time = "2026-10-26T22:27:28.329Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/33/d32ca0b016024fd089b0ec070a717c3900b4c89f3e258f6501d36820114d/sapsucker-1.7.0-py3-none-any.whl", hash = "sha256:cd5f566187b015187dea1e51c20af48fe9761103538ca2e43540bb1745c0fe30", size = 97958, upload-time = "2026-10-26T22:27:26.494Z" },
 ]
 
 [[package]]

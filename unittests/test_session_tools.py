@@ -381,7 +381,6 @@ class TestSessionOwnership:
 
         sessions = [SessionInfo(session_id="s1"), SessionInfo(session_id="s2", origin="attached")]
         backend = _make_backend(list_sessions=sessions)
-        backend.com_engine_state = None
         with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
             result = await sap_session_list_impl()
 

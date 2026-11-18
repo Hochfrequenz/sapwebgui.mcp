@@ -23,75 +23,9 @@ from sapguimcp.backend.webgui.parsers.se24_parser import (
 )
 from sapguimcp.backend.webgui.parsers.se37_parser import parse_se37_exceptions_snapshot, parse_se37_snapshot
 from sapguimcp.models import SE24Entry, SE24Error, SE37Entry, SE37Error
-from sapguimcp.tools.se24_tools import _parse_attributes, _parse_methods
-from sapguimcp.tools.se37_tools import _parse_se37_params
 
 if TYPE_CHECKING:
     from sapguimcp.lang import LanguagePack
-
-# One row per component: (language, visibility text, kind text, expected visibility, static, constant)
-_DE_ROWS = [
-    ("Öffentlich", "Instanzmethode", "public", False),
-    ("Geschützt", "Statische Methode", "protected", True),
-    ("Privat", "Statische Methode", "private", True),
-    ("Private", "Instanzmethode", "private", False),  # the domain text of SEOEXPOSE is English in both languages
-    # live desktop table control on a DE logon: the DDIC domain texts are English
-    ("Protected", "Static Method", "protected", True),
-    ("Public", "Instance Method", "public", False),
-]
-_EN_ROWS = [
-    ("Public", "Instance method", "public", False),
-    ("Protected", "Static method", "protected", True),
-    ("Private", "Static method", "private", True),
-]
-
-
-@pytest.mark.parametrize(("visibility", "kind", "expected", "static"), _DE_ROWS)
-def test_desktop_methods_of_a_german_session_keep_visibility_and_static(
-    lang_de: LanguagePack, visibility: str, kind: str, expected: str, static: bool
-) -> None:
-    rows = [{"Methode": "M", "Art": kind, "Sichtbarkeit": visibility, "Beschreibung": "d"}]
-    [method] = _parse_methods(rows, lang_de)
-    assert (method.visibility, method.is_static, method.description) == (expected, static, "d")
-
-
-@pytest.mark.parametrize(("visibility", "kind", "expected", "static"), _EN_ROWS)
-def test_desktop_methods_of_an_english_session_keep_visibility_and_static(
-    lang_en: LanguagePack, visibility: str, kind: str, expected: str, static: bool
-) -> None:
-    rows = [{"Method": "M", "Level": kind, "Visibility": visibility, "Description": "d"}]
-    [method] = _parse_methods(rows, lang_en)
-    assert (method.visibility, method.is_static, method.description) == (expected, static, "d")
-
-
-def test_desktop_attributes_of_a_german_session_read_private_protected_static_and_constant(
-    lang_de: LanguagePack,
-) -> None:
-    rows = [
-        {"Attribut": "A", "Art": "Instanzattribut", "Sichtbarkeit": "Privat", "Bezugstyp": "I", "Initialer Wert": "5"},
-        {"Attribut": "B", "Art": "Statisches Attribut", "Sichtbarkeit": "Geschützt"},
-        {"Attribut": "C", "Art": "Konstante", "Sichtbarkeit": "Öffentlich", "Initialer Wert": ""},
-    ]
-    a, b, c = _parse_attributes(rows, lang_de)
-    assert (a.visibility, a.is_static, a.is_constant, a.type_ref, a.default_value) == (
-        "private",
-        False,
-        False,
-        "I",
-        "5",
-    )
-    assert (b.visibility, b.is_static, b.is_constant) == ("protected", True, False)
-    assert (c.visibility, c.is_static, c.is_constant, c.default_value) == ("public", False, True, None)
-
-
-def test_desktop_attributes_of_an_english_session_read_the_same(lang_en: LanguagePack) -> None:
-    rows = [
-        {"Attribute": "A", "Level": "Instance attribute", "Visibility": "Private", "Assoc.Type": "I"},
-        {"Attribute": "C", "Level": "Constant", "Visibility": "Public"},
-    ]
-    a, c = _parse_attributes(rows, lang_en)
-    assert (a.visibility, a.is_constant, a.type_ref) == ("private", False, "I")
-    assert (c.visibility, c.is_constant) == ("public", True)
 
 
 def test_map_visibility_exact_versus_contains(lang_de: LanguagePack) -> None:
@@ -180,35 +114,6 @@ def test_a_missing_class_is_reported_in_both_languages(lang_de: LanguagePack, me
     assert "not found" in result.error
 
 
-_PARAM_DE = {
-    "Parametername": "IV_X",
-    "Typisierung": "TYPE",
-    "Bezugstyp": "STRING",
-    "Standardwert": "'A'",
-    "Optional": "X",
-    "Wertübergabe": "X",
-    "Kurztext": "Text",
-}
-_PARAM_EN = {
-    "Parameter Name": "IV_X",
-    "Typing": "TYPE",
-    "Associated Type": "STRING",
-    "Default Value": "'A'",
-    "Optional": "X",
-    "Pass Value": "X",
-    "Short Text": "Text",
-}
-
-
-@pytest.mark.parametrize(("row", "code"), [(_PARAM_DE, "DE"), (_PARAM_EN, "EN")])
-def test_se37_signature_rows_read_the_same_in_both_languages(row: dict[str, str], code: str) -> None:
-    with lang.use(code):
-        t = lang.current("test")
-    [param] = _parse_se37_params([row], "import", t)
-    assert (param.name, param.typing, param.reference_type, param.default_value) == ("IV_X", "TYPE", "STRING", "'A'")
-    assert (param.optional, param.pass_by_value, param.description) == (True, True, "Text")
-
-
 def test_se37_heading_name_and_not_found_in_both_languages(lang_de: LanguagePack) -> None:
     ok = parse_se37_snapshot('- heading "Function Builder: Z_FM anzeigen" [level=1]', "z_fm", lang_de)
     assert isinstance(ok, SE37Entry)
@@ -272,7 +177,7 @@ async def test_a_session_without_a_language_pack_raises_instead_of_failing_quiet
     mod = importlib.import_module(f"sapguimcp.tools.{module}")
     fn = _tool_function(mod, register, tool)
     backend = MagicMock()
-    backend.backend_type = "desktop"
+    backend.backend_type = "webgui"
     with (
         patch.object(mod, "get_backend", new=AsyncMock(return_value=backend)),
         lang.use("XX"),

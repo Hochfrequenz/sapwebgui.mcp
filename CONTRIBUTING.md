@@ -210,7 +210,7 @@ in tool, parser or JS code: read it from `lang.current()` (see
 `unittests/test_no_ui_literals.py` enforces this. If it flags a literal, move the text into the
 packs (plus a `SOURCES` entry in `lang/sources.py`), or, when the literal is code or the server's
 own message, add `# lang-ok: <reason>` on the flagged line (`// lang-ok: <reason>` in JS). Never add
-to `unittests/lang_baseline.json`; it holds only `tools/breakpoint_tools.py` (#1025).
+to `unittests/lang_baseline.json`; it is empty.
 
 To add a new login language: create `lang/<xx>.py` modelled on `en.py`, register it in
 `lang/__init__.py`, fill the test pack in `unittests/testdata/lang_test.py`, verify it with
