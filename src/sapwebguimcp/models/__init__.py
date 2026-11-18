@@ -1,14 +1,9 @@
 """
-Shared data models — the contract between desktop and webgui backends.
+Shared data models: the tool results and inputs the MCP tools exchange with the backend.
 
-Both projects depend on these models after the split. Backend-specific
-models live in their respective packages:
+Backend-specific models live in ``backend/webgui/models/`` (browser_results, session_registry).
 
-- ``backend/webgui/models/`` — browser_results, session_registry
-- ``backend/desktop/models/`` — com_results
-
-See also: ``backend/webgui/types.py`` (AriaSnapshot),
-``backend/desktop/types.py`` (ComTreeSnapshot).
+See also: ``backend/webgui/types.py`` (AriaSnapshot).
 """
 
 from sapwebguimcp.models.abapgit_models import (

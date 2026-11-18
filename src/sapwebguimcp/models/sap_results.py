@@ -68,8 +68,7 @@ class LoginResult(ToolResult):
             "Registry session ID assigned to the new login (e.g. 's1', 's2'). "
             "Pass this as the 'session' / 'session_id' parameter on subsequent "
             "tool calls to address this specific login when multiple parallel "
-            "sessions are active. Desktop backend only — webgui currently runs "
-            "a single session."
+            "sessions are active."
         ),
     )
 
@@ -111,16 +110,12 @@ class SessionInfo(BaseModel):
         default="opened",
         description=(
             "'opened' = this server created the session and may close it; "
-            "'attached' = a window the user already had open, which is never closed by the server "
-            "(use sap_session_detach to drop it from the registry)."
+            "'attached' = a window the user already had open (not used by the WebGUI backend)."
         ),
     )
     halted_at_breakpoint: str | None = Field(
         default=None,
-        description=(
-            "Set while the session is stopped at an ABAP breakpoint (the ABAP debugger is open in SAP GUI): "
-            "what happened and what a human has to do. The other fields are empty until then."
-        ),
+        description=("Not used by the WebGUI backend (always None)."),
     )
 
 
@@ -198,8 +193,7 @@ class SessionResetResult(ToolResult):
     skipped_attached: list[str] = Field(
         default_factory=list,
         description=(
-            "Attached (user-owned) session IDs that were deliberately left open. "
-            "Drop them from the registry with sap_session_detach if no longer needed."
+            "Attached (user-owned) session IDs that were deliberately left open. Not used by the WebGUI backend."
         ),
     )
 
@@ -259,17 +253,16 @@ class StatusBarInfo(ToolResult):
     message_id: str | None = Field(
         default=None,
         description=(
-            "T100 message class (e.g. 'DS'), padding stripped; None when the bar is empty or the SAP GUI "
-            "does not expose it. Together with message_number it identifies a message independently of "
-            "the logon language, so check these instead of the text. Desktop backend only; the WebGUI "
-            "backend leaves it None."
+            "T100 message class (e.g. 'DS'), padding stripped; None when the bar is empty or the Web GUI "
+            "does not expose it. Together with message_number it would identify a message independently of "
+            "the logon language. Currently always None."
         ),
     )
     message_number: str | None = Field(
         default=None,
         description=(
-            "T100 message number, zero-padded (e.g. '017'); None when the bar is empty or the SAP GUI "
-            "does not expose it. Language-independent. Desktop backend only; the WebGUI backend leaves it None."
+            "T100 message number, zero-padded (e.g. '017'); None when the bar is empty or the Web GUI "
+            "does not expose it. Language-independent. Currently always None."
         ),
     )
     message_parameters: list[str] = Field(
@@ -277,7 +270,7 @@ class StatusBarInfo(ToolResult):
         description=(
             "Message variables &1-&4 (index 0 is &1), trailing empty values removed; [] when the bar is "
             "empty. These are runtime values and may themselves be translated text, so they are not a "
-            "language-independent identity. Desktop backend only; the WebGUI backend leaves it empty."
+            "language-independent identity. Currently always empty on the WebGUI backend."
         ),
     )
 

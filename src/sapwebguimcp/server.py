@@ -172,24 +172,26 @@ async def app_lifespan(_server: FastMCP) -> AsyncIterator[None]:
 # Instructions for the LLM about this MCP server
 _WEBGUI_INSTRUCTIONS = """
 SAP Web GUI automation server. Controls SAP through a Chrome browser with remote debugging enabled.
+This server only supports SAP Web GUI in a browser.
 
 BROWSER SETUP:
-Chrome is auto-launched with debugging flags when not already running.
+On Windows, Chrome is auto-launched with debugging flags when not already running.
 If Chrome cannot be found automatically, set CHROME_PATH in the .env file.
-The user may also pre-launch Chrome manually with --remote-debugging-port=9222.
+On macOS and Linux (and in Docker) the user must start Chrome first with --remote-debugging-port=9222.
+The user may also pre-launch Chrome manually on Windows.
 
 IMPORTANT: Do NOT attempt to install Chrome or any browser.
 
 PREREQUISITES:
-- Chrome installed (auto-detected, or CHROME_PATH set in .env)
+- Chrome installed (auto-detected on Windows, or CHROME_PATH set in .env)
 - VPN connected (if SAP system is on internal network)
-- CDP proxy running (for Docker setups)
+- CDP proxy running (only when this server runs in Docker)
 
 IF CONNECTION FAILS:
 Do NOT try to install browsers. Instead, ask the user to verify:
-1. "Is Chrome installed?" (set CHROME_PATH in .env if not auto-detected)
+1. "Is Chrome installed?" (set CHROME_PATH in .env if not auto-detected; auto-detection works on Windows only)
 2. "Is your VPN connected?" (for internal SAP systems)
-3. "Is the CDP proxy running?" (docker compose up -d)
+3. "Is the CDP proxy running?" (Docker setups only: docker compose up -d)
 
 COMMON ERROR CAUSES:
 - "Chrome not found" / "Chrome konnte nicht ... gefunden werden": Set CHROME_PATH in .env
@@ -218,16 +220,16 @@ If sap-adt (SAP ADT MCP) tools are available, prefer them for:
 - Transport management (get_transport_requests, create_transport, release_transport on S4)
 - Activation, syntax checks, ATC checks, unit tests
 - Code completion, pretty printing, refactoring
-- Debugging (breakpoints, stepping, variable inspection)
+- Debugging (breakpoints, stepping, variable inspection; this server has no debugger tools)
 - DDIC lookups (get_object_info, get_ddic_info)
 
 Use THIS server (sap-webgui) for:
 - Customizing transactions (SPRO, SM30, SM34)
 - Transport release on ECC (SE09 — ADT release may silently fail on ECC)
-- Complex GUI interactions (popups, drag-and-drop, tree navigation)
+- Complex GUI interactions (popups, tabs, grids)
 - Transactions without ADT endpoints (SE21 on ECC, SM37, SLG1, ST22, SQVI)
 - Visual verification of screen state
-- abapGit operations via SAP GUI (SE80 > abapGit)
+- abapGit operations (sap_abapgit_pull, sap_abapgit_list_repos)
 
 TRANSACTION SELECTION:
 - Prefer dedicated transactions (SE38, SE24, SE37, SE21) over SE80
