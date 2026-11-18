@@ -922,7 +922,7 @@ Each release publishes binaries for Windows and macOS:
 - `sapwebgui_mcp_windows.exe` (Windows)
 - `sapwebgui_mcp_macos_arm64` (macOS, Apple Silicon)
 
-Both binaries honour user overrides via `.env` or environment variables.
+The binaries honour user overrides via `.env` or environment variables.
 
 ## Troubleshooting
 
