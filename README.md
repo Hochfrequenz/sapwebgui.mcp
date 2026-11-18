@@ -1,9 +1,9 @@
 # SAP GUI MCP Server
 
-[![Unittests](https://github.com/Hochfrequenz/sapgui.mcp/workflows/Unittests/badge.svg)](https://github.com/Hochfrequenz/sapgui.mcp/actions)
-[![Coverage](https://github.com/Hochfrequenz/sapgui.mcp/workflows/Coverage/badge.svg)](https://github.com/Hochfrequenz/sapgui.mcp/actions)
-[![Linting](https://github.com/Hochfrequenz/sapgui.mcp/workflows/Linting/badge.svg)](https://github.com/Hochfrequenz/sapgui.mcp/actions)
-[![Formatting](https://github.com/Hochfrequenz/sapgui.mcp/workflows/Formatting/badge.svg)](https://github.com/Hochfrequenz/sapgui.mcp/actions)
+[![Unittests](https://github.com/Hochfrequenz/sapwebgui.mcp/workflows/Unittests/badge.svg)](https://github.com/Hochfrequenz/sapwebgui.mcp/actions)
+[![Coverage](https://github.com/Hochfrequenz/sapwebgui.mcp/workflows/Coverage/badge.svg)](https://github.com/Hochfrequenz/sapwebgui.mcp/actions)
+[![Linting](https://github.com/Hochfrequenz/sapwebgui.mcp/workflows/Linting/badge.svg)](https://github.com/Hochfrequenz/sapwebgui.mcp/actions)
+[![Formatting](https://github.com/Hochfrequenz/sapwebgui.mcp/workflows/Formatting/badge.svg)](https://github.com/Hochfrequenz/sapwebgui.mcp/actions)
 
 An MCP (Model Context Protocol) server for SAP automation.
 It allows you to control SAP through Claude Desktop, Claude Code, or [opencode](https://opencode.ai) - via **SAP GUI desktop** or **SAP Web GUI** (Chromium-based browser).
@@ -78,12 +78,12 @@ Choose one of these three approaches:
 <br>
 
 Download the binary for your platform from
-[GitHub Releases](https://github.com/Hochfrequenz/sapgui.mcp/releases/latest):
+[GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest):
 
 | Platform         | Binary                                    |
 | ---------------- | ----------------------------------------- |
-| Windows (x64)    | `sapgui_mcp_windows_<version>.exe`        |
-| macOS (Apple Silicon) | `sapgui_mcp_macos_arm64_<version>` |
+| Windows (x64)    | `sapwebgui_mcp_windows_<version>.exe`        |
+| macOS (Apple Silicon) | `sapwebgui_mcp_macos_arm64_<version>` |
 
 #### Smart App and other Security Tools
 
@@ -103,7 +103,7 @@ Download the binary for your platform from
 >
 > The macOS binary supports the **WebGUI backend only** (browser automation). The desktop backend requires SAP GUI for Windows (COM Scripting) and is not available on macOS.
 >
-> **macOS Gatekeeper:** If macOS refuses to run the binary, clear the quarantine attribute: `xattr -c sapgui_mcp_macos_arm64_<version>`
+> **macOS Gatekeeper:** If macOS refuses to run the binary, clear the quarantine attribute: `xattr -c sapwebgui_mcp_macos_arm64_<version>`
 
 Choose a backend:
 
@@ -211,7 +211,7 @@ See [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config) for the com
 #### Step 2: Configure your MCP client
 
 > [!TIP]
-> Note the full path to the downloaded `.exe`. For example, if you saved `sapgui_mcp_windows_1.5.0.exe` to your Downloads folder, the path is `C:/Users/YourName/Downloads/sapgui_mcp_windows_1.5.0.exe`. Always use forward slashes (`/`) in JSON, not backslashes (`\`).
+> Note the full path to the downloaded `.exe`. For example, if you saved `sapwebgui_mcp_windows_1.5.0.exe` to your Downloads folder, the path is `C:/Users/YourName/Downloads/sapwebgui_mcp_windows_1.5.0.exe`. Always use forward slashes (`/`) in JSON, not backslashes (`\`).
 
 ##### Claude Desktop
 
@@ -221,7 +221,7 @@ Add to `claude_desktop_config.json`. To open the file: press **Win+R**, type `%A
 {
     "mcpServers": {
         "sap-desktop": {
-            "command": "C:/path/to/sapgui_mcp_windows_<version>.exe",
+            "command": "C:/path/to/sapwebgui_mcp_windows_<version>.exe",
             "env": {
                 "BACKEND_TYPE": "desktop"
             }
@@ -235,7 +235,7 @@ Add to `claude_desktop_config.json`. To open the file: press **Win+R**, type `%A
 **Recommended: register once for all projects (user scope).** Run this in PowerShell:
 
 ```powershell
-claude mcp add --scope user sap-desktop -e BACKEND_TYPE=desktop '--' C:/path/to/sapgui_mcp_windows_<version>.exe
+claude mcp add --scope user sap-desktop -e BACKEND_TYPE=desktop '--' C:/path/to/sapwebgui_mcp_windows_<version>.exe
 ```
 
 Together with `systems.json`, this is all Claude Code needs - no `.mcp.json` in any project folder. Two details matter:
@@ -251,7 +251,7 @@ If Claude Code still starts an old or broken registration instead of the global 
 {
     "mcpServers": {
         "sap-desktop": {
-            "command": "C:/path/to/sapgui_mcp_windows_<version>.exe",
+            "command": "C:/path/to/sapwebgui_mcp_windows_<version>.exe",
             "env": {
                 "BACKEND_TYPE": "desktop"
             }
@@ -270,7 +270,7 @@ Add to `opencode.json` in your project root:
     "mcp": {
         "sap-desktop": {
             "type": "local",
-            "command": ["C:/path/to/sapgui_mcp_windows_<version>.exe"],
+            "command": ["C:/path/to/sapwebgui_mcp_windows_<version>.exe"],
             "enabled": true,
             "environment": {
                 "BACKEND_TYPE": "desktop"
@@ -332,7 +332,7 @@ claude mcp list
 ```
 Expected output:
 ```
-sap-desktop: C:/path/to/sapgui_mcp_windows_<version>.exe ✓ Connected
+sap-desktop: C:/path/to/sapwebgui_mcp_windows_<version>.exe ✓ Connected
 ```
 
 **opencode:**
@@ -408,7 +408,7 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
 {
     "mcpServers": {
         "sap-webgui": {
-            "command": "C:/path/to/sapgui_mcp_windows_<version>.exe",
+            "command": "C:/path/to/sapwebgui_mcp_windows_<version>.exe",
             "env": {}
         }
     }
@@ -420,10 +420,10 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
 **Recommended: register once for all projects (user scope).** Run this in PowerShell, bash or zsh:
 
 ```powershell
-claude mcp add --scope user sap-webgui '--' C:/path/to/sapgui_mcp_windows_<version>.exe
+claude mcp add --scope user sap-webgui '--' C:/path/to/sapwebgui_mcp_windows_<version>.exe
 ```
 
-Together with `systems.json`, no `.mcp.json` is needed in any project folder. On macOS, use the path to `sapgui_mcp_macos_arm64_<version>` instead; the command works unchanged in bash and zsh. Keep the quotes around `'--'` in PowerShell (in cmd.exe, write a plain `--`), and if you add environment variables with `-e`, put them between the server name (`sap-webgui`) and `'--'` - see the [Desktop backend section](#claude-code) for why both matter.
+Together with `systems.json`, no `.mcp.json` is needed in any project folder. On macOS, use the path to `sapwebgui_mcp_macos_arm64_<version>` instead; the command works unchanged in bash and zsh. Keep the quotes around `'--'` in PowerShell (in cmd.exe, write a plain `--`), and if you add environment variables with `-e`, put them between the server name (`sap-webgui`) and `'--'` - see the [Desktop backend section](#claude-code) for why both matter.
 
 If Claude Code still starts an old or broken registration instead of the global one, see [Claude Code ignores the global registration](#claude-code-ignores-the-global-registration).
 
@@ -433,7 +433,7 @@ If Claude Code still starts an old or broken registration instead of the global 
 {
     "mcpServers": {
         "sap-webgui": {
-            "command": "C:/path/to/sapgui_mcp_windows_<version>.exe",
+            "command": "C:/path/to/sapwebgui_mcp_windows_<version>.exe",
             "env": {}
         }
     }
@@ -450,7 +450,7 @@ Add to `opencode.json` in your project root:
     "mcp": {
         "sap-webgui": {
             "type": "local",
-            "command": ["C:/path/to/sapgui_mcp_windows_<version>.exe"],
+            "command": ["C:/path/to/sapwebgui_mcp_windows_<version>.exe"],
             "enabled": true,
             "environment": {}
         }
@@ -476,7 +476,7 @@ claude mcp list
 ```
 Expected output:
 ```
-sap-webgui: C:/path/to/sapgui_mcp_windows_<version>.exe ✓ Connected
+sap-webgui: C:/path/to/sapwebgui_mcp_windows_<version>.exe ✓ Connected
 ```
 
 **opencode:**
@@ -662,7 +662,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
                 "C:/Users/YourName/.config/sap-mcp/systems.json:/home/appuser/.config/sap-mcp/systems.json:ro",
                 "-e",
                 "GITHUB_PAT=your_github_pat",
-                "ghcr.io/hochfrequenz/sapgui.mcp:latest"
+                "ghcr.io/hochfrequenz/sapwebgui.mcp:latest"
             ]
         }
     }
@@ -681,7 +681,7 @@ Replace:
 **Recommended: register once for all projects (user scope):**
 
 ```powershell
-claude mcp add --scope user sap-webgui '--' docker run -i --rm --network sap-mcp-network -e BROWSER_MODE=connect -e CDP_URL=http://cdp-proxy:9222 -e SAP_URL=https://your-sap-server/sap/bc/gui/sap/its/webgui -v C:/Users/YourName/.config/sap-mcp/systems.json:/home/appuser/.config/sap-mcp/systems.json:ro -e GITHUB_PAT=your_github_pat ghcr.io/hochfrequenz/sapgui.mcp:latest
+claude mcp add --scope user sap-webgui '--' docker run -i --rm --network sap-mcp-network -e BROWSER_MODE=connect -e CDP_URL=http://cdp-proxy:9222 -e SAP_URL=https://your-sap-server/sap/bc/gui/sap/its/webgui -v C:/Users/YourName/.config/sap-mcp/systems.json:/home/appuser/.config/sap-mcp/systems.json:ro -e GITHUB_PAT=your_github_pat ghcr.io/hochfrequenz/sapwebgui.mcp:latest
 ```
 
 Everything after `'--'` is the Docker command and is passed through unchanged, so the `-e` flags there are Docker's, not Claude Code's. Keep the quotes around `'--'` (in cmd.exe, write a plain `--`; see the [Desktop backend section](#claude-code) for why). Replace `C:/Users/YourName` with your home folder; write the path out in full instead of using `~`, because how `~` is expanded on the command line depends on the shell. Note that a `GITHUB_PAT` typed on the command line ends up in your shell history.
@@ -711,7 +711,7 @@ If Claude Code still starts an old or broken registration instead of the global 
                 "C:/Users/YourName/.config/sap-mcp/systems.json:/home/appuser/.config/sap-mcp/systems.json:ro",
                 "-e",
                 "GITHUB_PAT=your_github_pat",
-                "ghcr.io/hochfrequenz/sapgui.mcp:latest"
+                "ghcr.io/hochfrequenz/sapwebgui.mcp:latest"
             ]
         }
     }
@@ -735,7 +735,7 @@ If Docker Desktop isn't running or you're not logged in (`docker login ghcr.io`)
 Try pulling manually if you run into errors:
 
 ```powershell
-docker pull ghcr.io/hochfrequenz/sapgui.mcp:latest
+docker pull ghcr.io/hochfrequenz/sapwebgui.mcp:latest
 ```
 
 If the containers started but Chrome (in browser automation mode with CDP enabled) is missing, Claude will likely understand how to login but fail on the first tool call.
@@ -756,8 +756,8 @@ For contributors who want to run from source.
 ### Clone and install
 
 ```bash
-git clone https://github.com/Hochfrequenz/sapgui.mcp.git
-cd sapgui.mcp
+git clone https://github.com/Hochfrequenz/sapwebgui.mcp.git
+cd sapwebgui.mcp
 # Install uv: https://docs.astral.sh/uv/getting-started/installation/
 uv sync --group dev
 uv run playwright install chromium
@@ -925,9 +925,9 @@ Each release publishes binaries for Windows and macOS:
 
 | Binary | Papertrail default | Intended audience |
 |---|---|---|
-| `sapgui_mcp_windows.exe` | **off** - no defaults bundled | Public / external users |
-| `sapgui_mcp_windows_with_remote_logging.exe` | Hochfrequenz endpoint baked in at build time | Hochfrequenz-internal use |
-| `sapgui_mcp_macos_arm64` | **off** - no defaults bundled | Public / macOS (Apple Silicon) users |
+| `sapwebgui_mcp_windows.exe` | **off** - no defaults bundled | Public / external users |
+| `sapwebgui_mcp_windows_with_remote_logging.exe` | Hochfrequenz endpoint baked in at build time | Hochfrequenz-internal use |
+| `sapwebgui_mcp_macos_arm64` | **off** - no defaults bundled | Public / macOS (Apple Silicon) users |
 
 Both binaries honour user overrides via `.env` or environment variables.
 
@@ -1077,7 +1077,7 @@ You should see: `Login Succeeded`
 **Step 3: Pull the image**
 
 ```powershell
-docker pull ghcr.io/hochfrequenz/sapgui.mcp:latest
+docker pull ghcr.io/hochfrequenz/sapwebgui.mcp:latest
 ```
 
 > [!NOTE]
