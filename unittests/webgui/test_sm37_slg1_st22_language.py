@@ -7,9 +7,6 @@ pack (or is unknown) fails the tool call with ``UnsupportedLanguageError``.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from sapguimcp import lang
@@ -17,13 +14,9 @@ from sapguimcp.backend.webgui.parsers.slg1_parser import is_slg1_no_results
 from sapguimcp.backend.webgui.parsers.sm37_parser import is_no_jobs_found, normalize_job_status, parse_sm37_job_list
 from sapguimcp.backend.webgui.parsers.st22_parser import is_no_dumps_message, parse_st22_dump_detail
 from sapguimcp.backend.webgui.types import AriaSnapshot
-from sapguimcp.models import TableData, TableRow
-from sapguimcp.tools.sm37_tools import (
-    _execute_sm37_lookup_desktop,
-)
 
 # ---------------------------------------------------------------------------
-# Bug: the desktop SM37 status was not normalised
+# Bug: the SM37 status was not normalised
 # ---------------------------------------------------------------------------
 
 
@@ -44,20 +37,7 @@ def test_the_job_status_is_the_canonical_one(language: str, text: str, expected:
     assert normalize_job_status(f" {text} ", lang.view_for(language)) == expected
 
 
-@pytest.mark.anyio
-async def test_the_desktop_status_is_normalised_like_the_webgui_status() -> None:
-    backend = MagicMock()
-    backend.backend_type = "desktop"
-    backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
-    for name in ("wait_for_ready", "focus_and_type", "press_key"):
-        setattr(backend, name, AsyncMock())
-    backend.focus_and_type = AsyncMock(return_value=True)
-    backend.get_status_bar = AsyncMock(return_value=SimpleNamespace(type="S", message=""))
-    row = TableRow(row=1, data={"Jobname": "MYJOB", "Status": "Freigegeben", "Ersteller": "USER1", "Mandant": "100"})
-    backend.read_table = AsyncMock(return_value=TableData(success=True, headers=["Jobname", "Status"], rows=[row]))
-    result = await _execute_sm37_lookup_desktop(backend, lang.view_for("DE"), "*", None, None, None, None)
-    assert [job.status for job in result.jobs] == ["Released"]
-
+def test_the_webgui_status_is_normalised() -> None:
     webgui = parse_sm37_job_list(
         AriaSnapshot('- heading "Jobübersicht"\n- text: MYJOB USER1 freigegeben 0 0 100'), lang.view_for("DE")
     )

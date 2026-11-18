@@ -362,32 +362,6 @@ class TestSessionOwnership:
         backend.close_session.assert_awaited_once_with("s2")
 
     @pytest.mark.anyio
-    async def test_detach(self) -> None:
-        from sapguimcp.tools.session_tools import sap_session_detach_impl
-
-        backend = _make_backend(has_session=True)
-        backend.detach_session.return_value = "agent-1"
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            result = await sap_session_detach_impl("s2")
-
-        assert result.success is True
-        assert result.released_agent == "agent-1"
-        backend.close_session.assert_not_called()
-        backend.list_sessions.assert_not_called()  # detach must stay COM-free (no reconcile)
-        backend.list_sessions_fast.assert_awaited()
-
-    @pytest.mark.anyio
-    async def test_detach_unknown_session(self) -> None:
-        from sapguimcp.tools.session_tools import sap_session_detach_impl
-
-        backend = _make_backend(has_session=False)
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            result = await sap_session_detach_impl("s9")
-
-        assert result.success is False
-        backend.detach_session.assert_not_called()
-
-    @pytest.mark.anyio
     async def test_detach_not_supported_on_webgui(self) -> None:
         from types import SimpleNamespace
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
@@ -20,35 +20,18 @@ from mcp.types import ToolAnnotations
 from sapguimcp import lang
 from sapguimcp.backend.manager import get_backend
 from sapguimcp.models.se24_edit_models import SE24EditResult
-from sapguimcp.tools.desktop_wait_predicates import (
-    editor_loaded,
-    editor_loaded_after,
-    popup_closed_and_screen_changed,
-    screen_changed,
-    tab_table_control_loaded,
-    window_title_changed,
-)
 from sapguimcp.tools.edit_helpers import describe_failed_replace
 from sapguimcp.tools.field_helpers import fill_field_with_keyboard, toggle_to_change_mode
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
 
 
 logger = logging.getLogger(__name__)
 
-# Upper bound for waiting on a state change on the desktop (#928): the former fixed waits took 1-2 s, so a step whose
-# state does not change as expected (e.g. a toggle that was a no-op) must not cost more than they did.
-_SE24_DISPLAY_WAIT_MS = 3000
-_SE24_TOGGLE_WAIT_MS = 1000
-_SE24_SOURCE_WAIT_MS = 10000
 
-
-async def _fill_class_field(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, attempt: int, t: LanguagePack
-) -> bool:
+async def _fill_class_field(backend: WebGuiBackend, class_name: str, attempt: int, t: LanguagePack) -> bool:
     """Fill the SE24 class name field. attempt==0 uses JS, retries use keyboard."""
     if attempt == 0:
         for label in t.se24.object_type:
@@ -61,9 +44,7 @@ async def _fill_class_field(
     return await fill_field_with_keyboard(backend, list(t.se24.object_type), class_name)
 
 
-async def _open_class_in_change_mode(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, t: LanguagePack
-) -> str | None:
+async def _open_class_in_change_mode(backend: WebGuiBackend, class_name: str, t: LanguagePack) -> str | None:
     """Navigate to SE24, display class via F7, and toggle to change mode.
 
     Returns error message or None on success.
@@ -103,7 +84,7 @@ async def _open_class_in_change_mode(
 
 
 async def _select_method_and_open_source(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, method_name: str, t: LanguagePack
+    backend: WebGuiBackend, class_name: str, method_name: str, t: LanguagePack
 ) -> str | None:
     """Select method in methods grid and open its source editor.
 
@@ -153,191 +134,8 @@ async def _select_method_and_open_source(
     return None
 
 
-async def _open_class_in_change_mode_desktop(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, t: LanguagePack
-) -> str | None:
-    """Desktop-specific: navigate to SE24, display class, toggle to change mode."""
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-
-    if not isinstance(backend, DesktopBackend):
-        return "Requires DesktopBackend"
-
-    await backend.enter_transaction("SE24")
-    await backend.wait_for_ready()
-
-    filled = await backend.focus_and_type("SEOCLASS-CLSNAME", class_name.upper())
-    if not filled:
-        filled = await fill_field_with_keyboard(backend, list(t.se24.object_type), class_name.upper())
-    if not filled:
-        return "Could not fill class name field on desktop"
-
-    await asyncio.sleep(0.3)
-    before_title = (await backend.get_screen_info()).title or ""
-    before_status = (await backend.get_status_bar()).message.strip()
-    await backend.press_key("F7")  # Display
-    await backend.wait_for_ready()
-    await backend.wait_for_condition(screen_changed(before_title, before_status), timeout_ms=_SE24_DISPLAY_WAIT_MS)
-
-    popup_error = await _confirm_language_dialog_desktop(backend, before_title, before_status)
-    if popup_error is not None:
-        return f"Unexpected popup while displaying class '{class_name}': {popup_error}"  # lang-ok: our own message
-
-    # Verify we left the initial screen
-    screen = await backend.get_screen_info()
-    if t.se24.initial_screen.contains(screen.title or ""):
-        sbar = await backend.get_status_bar()
-        return sbar.message or f"Could not display class '{class_name}'"  # lang-ok: our own message
-
-    # Toggle to change mode: Ctrl+F1 (the toolbar button has no text on desktop,
-    # so toggle_to_change_mode's label-based click_button won't find it).
-    session = backend.require_session()
-    display_title = await backend.com.run(lambda: str(cast(Any, session.find_by_id("wnd[0]")).text).strip())
-    before_status = (await backend.get_status_bar()).message.strip()
-    await backend.press_key("Ctrl+F1")
-    await backend.wait_for_ready()
-    if not await backend.wait_for_condition(window_title_changed(display_title), timeout_ms=_SE24_TOGGLE_WAIT_MS):
-        logger.debug("SE24 edit: the window title did not change after Ctrl+F1 within %d ms", _SE24_TOGGLE_WAIT_MS)
-    # SAP asks about the original language when switching to change mode, not when displaying.
-    popup_error = await _confirm_language_dialog_desktop(backend, display_title, before_status)
-    if popup_error is not None:
-        return f"Unexpected popup while switching class '{class_name}' to change mode: {popup_error}"  # lang-ok: our own message  # noqa: E501
-    return None
-
-
-async def _confirm_language_dialog_desktop(
-    backend: DesktopBackend, before_title: str, before_status: str
-) -> str | None:
-    """Confirm the "Different original and logon languages" dialog if it is open; the text of any other popup.
-
-    The dialog only exists for some classes and users: without it there is nothing to wait for. Only that dialog
-    is confirmed (see :meth:`DesktopBackend.dismiss_language_dialog`); any other popup is left alone and reported,
-    since Enter could accept its default action. ``before_title`` / ``before_status`` are read right before the
-    action that led to the popup.
-    """
-    if await backend.check_popup() is None:
-        return None
-    try:
-        await backend.dismiss_language_dialog()
-        await backend.wait_for_ready()
-        # screen_changed is already true because of the popup itself: wait until it is gone as well.
-        await backend.wait_for_condition(
-            popup_closed_and_screen_changed(before_title, before_status), timeout_ms=_SE24_DISPLAY_WAIT_MS
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
-    popup = await backend.check_popup()
-    if popup is not None:
-        return popup.message or popup.popup_type
-    return None
-
-
-async def _select_method_and_open_source_desktop(  # pylint: disable=too-many-return-statements
-    backend: WebGuiBackend | DesktopBackend, class_name: str, method_name: str, t: LanguagePack
-) -> str | None:
-    """Desktop-specific: find method in table control and open its source editor."""
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-    from sapguimcp.backend.desktop._element_finder import _flatten  # pylint: disable=import-outside-toplevel
-
-    if not isinstance(backend, DesktopBackend):
-        return "Requires DesktopBackend"
-
-    # Ensure we're on the Methods tab. SAP instantiates a tab page lazily, so wait until the tab's own table
-    # control is in the tree (it is already there when the tab was the active one).
-    for tab_label in t.se24.methods_tab:
-        try:
-            await backend.click_tab(tab_label)
-            await backend.wait_for_ready()
-            await backend.wait_for_condition(tab_table_control_loaded(tab_label), timeout_ms=_SE24_TOGGLE_WAIT_MS)
-            break
-        except Exception:  # pylint: disable=broad-exception-caught
-            continue
-
-    session = backend.require_session()
-    com = backend.com
-
-    def _select_method_row() -> str | None:
-        """Find the method row in the table control and select it."""
-        wnd = session.find_by_id("wnd[0]")
-        tree = cast(Any, wnd).dump_tree()
-        flat = _flatten(tree)
-
-        for elem in flat:
-            if elem.type_as_number != 80:  # GuiTableControl
-                continue
-            tc = session.find_by_id(elem.id)
-            raw: Any = getattr(tc, "com", getattr(tc, "_com", tc))
-            col_count = raw.Columns.Count
-            visible = min(raw.RowCount, raw.VisibleRowCount)
-
-            # Find the method name column
-            method_col = -1
-            for c in range(col_count):
-                title = raw.Columns(c).Title or raw.Columns(c).Name
-                if t.se24.method_column.equals(title):
-                    method_col = c
-                    break
-            if method_col < 0:
-                continue
-
-            # Find and select the method row
-            for r in range(visible):
-                try:
-                    cell_text = raw.GetCell(r, method_col).Text
-                    if cell_text.upper().strip() == method_name.upper():
-                        raw.GetCell(r, method_col).SetFocus()
-                        return None
-                except Exception:  # pylint: disable=broad-exception-caught
-                    continue
-            return f"Method '{method_name}' not found in class '{class_name}' methods table"  # lang-ok: our own message
-        return "No table control found on SE24 screen"
-
-    select_error = await com.run(_select_method_row)
-    if select_error:
-        return select_error
-
-    # Selecting the row only moves the focus on the client: no round trip to wait for.
-    await backend.wait_for_ready()
-
-    # An editor that is already open (e.g. the class itself is shown in the source-based view) does not tell that
-    # the method's source has loaded: then the window title has to change as well.
-    def _read_title_if_editor_is_open() -> str | None:
-        if not editor_loaded(session):
-            return None
-        return str(cast(Any, session.find_by_id("wnd[0]")).text).strip()
-
-    title_with_editor = await com.run(_read_title_if_editor_is_open)
-
-    # Click the source code button to open the method source editor
-    for btn_name in t.se24.source_button:
-        try:
-            await backend.click_button(btn_name)
-        except Exception:  # pylint: disable=broad-exception-caught
-            continue
-        await backend.wait_for_ready()
-        if not await backend.wait_for_condition(
-            editor_loaded_after(title_with_editor), timeout_ms=_SE24_SOURCE_WAIT_MS
-        ):
-            # Going on would read (and replace) a missing editor, or the one that predates the click.
-            logger.warning("SE24 edit: no editor appeared within %d ms after '%s'", _SE24_SOURCE_WAIT_MS, btn_name)
-            seconds = _SE24_SOURCE_WAIT_MS // 1000
-            return f"The source editor of method '{method_name}' did not open within {seconds} s"  # lang-ok: ours
-        return None
-
-    return "Could not find the source code button"  # lang-ok: our own message
-
-
-async def _navigate_to_method_editor_desktop(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, method_name: str, t: LanguagePack
-) -> str | None:
-    """Desktop: navigate to SE24, open class in change mode, select method, open source."""
-    error = await _open_class_in_change_mode_desktop(backend, class_name, t)
-    if error:
-        return error
-    return await _select_method_and_open_source_desktop(backend, class_name, method_name, t)
-
-
 async def _navigate_to_method_editor(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, method_name: str, t: LanguagePack
+    backend: WebGuiBackend, class_name: str, method_name: str, t: LanguagePack
 ) -> str | None:
     """Navigate to SE24, open class in change mode, select method, open source editor.
 
@@ -350,13 +148,10 @@ async def _navigate_to_method_editor(
 
 
 async def _edit_check_activate_method(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, method_name: str, new_source: str, t: LanguagePack
+    backend: WebGuiBackend, class_name: str, method_name: str, new_source: str, t: LanguagePack
 ) -> SE24EditResult:
     """Core edit logic: navigate, read backup, replace, check, activate, revert on failure."""
-    if backend.backend_type == "desktop":
-        nav_error = await _navigate_to_method_editor_desktop(backend, class_name, method_name, t)
-    else:
-        nav_error = await _navigate_to_method_editor(backend, class_name, method_name, t)
+    nav_error = await _navigate_to_method_editor(backend, class_name, method_name, t)
     if nav_error:
         return SE24EditResult.failure(
             error=nav_error, class_name=class_name, method_name=method_name, backup_source="", activated=False

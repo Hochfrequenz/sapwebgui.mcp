@@ -28,32 +28,13 @@ logger = logging.getLogger(__name__)
 async def sap_session_list_impl() -> SessionListResult:
     """List all active SAP sessions.
 
-    Desktop: when the connection's single COM engine has a call running for a
-    while, the result carries a ``com_engine`` block — that call is why other
-    tool calls on the same connection hang (issue #905).
-
     Returns:
         SessionListResult with all sessions and their state
     """
     try:
         backend = await get_backend()
-        # Read the engine state FIRST: while a long call blocks the COM
-        # engine, the full listing (reconcile probes + property reads) would
-        # queue behind it and only run after the busy state has cleared
-        # (Copilot review of #934). When the engine is busy, list from the
-        # registry without COM so the answer comes back immediately.
-        com_engine = None
-        engine_state = getattr(backend, "com_engine_state", None)
-        if callable(engine_state):
-            state = await engine_state()
-            if isinstance(state, dict):
-                com_engine = state
-        if com_engine is not None:
-            fast_list = getattr(backend, "list_sessions_fast", None)
-            sessions = await fast_list() if callable(fast_list) else await backend.list_sessions()
-        else:
-            sessions = await backend.list_sessions()
-        return SessionListResult(sessions=sessions, com_engine=com_engine)
+        sessions = await backend.list_sessions()
+        return SessionListResult(sessions=sessions)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("Listing sessions")
@@ -110,14 +91,10 @@ async def sap_session_close_impl(session_id: str) -> SessionCloseResult:
 
 
 async def sap_session_detach_impl(session_id: str) -> SessionDetachResult:
-    """Stop tracking a session WITHOUT closing it.
+    """Stop tracking a session WITHOUT closing it (not supported on the WebGUI backend).
 
-    Removes the session from the registry, unbinds its agent and stops watching its connection.
-    No SAP GUI call is made: the window stays open. This is the only way to drop an attached
-    (user-owned) session; it also works on sessions this server opened.
-
-    Desktop only. The WebGUI backend has no detach: its sessions are browser tabs the server
-    owns, so use ``sap_session_close``.
+    The WebGUI backend has no detach: its sessions are browser tabs the server owns, so use
+    ``sap_session_close``.
 
     Args:
         session_id: Session to detach (e.g. "s2")
@@ -125,35 +102,11 @@ async def sap_session_detach_impl(session_id: str) -> SessionDetachResult:
     Returns:
         SessionDetachResult
     """
-    try:
-        backend = await get_backend()
-        detach = getattr(backend, "detach_session", None)
-        if not callable(detach):
-            return SessionDetachResult.failure(
-                "sap_session_detach is not supported on the WebGUI backend (sessions are browser tabs owned by "
-                "this server); use sap_session_close."
-            )
-
-        # Detach is COM-free: list from the registry only (no reconcile probes).
-        list_fast = getattr(backend, "list_sessions_fast", backend.list_sessions)
-        if not await backend.has_session(session_id):
-            sessions = await list_fast()
-            available = ", ".join(s.session_id for s in sessions) or "(none)"
-            return SessionDetachResult.failure(
-                f"Session '{session_id}' not found. Active: {available}."  # lang-ok: our own message
-            )
-
-        released = await detach(session_id)
-        remaining = await list_fast()
-        return SessionDetachResult(
-            session_id=session_id,
-            released_agent=released,
-            remaining_sessions=len(remaining),
-        )
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.exception("Detaching session", extra={"session_id": session_id})
-        return SessionDetachResult.failure(f"Error detaching session: {e}")
+    logger.info("sap_session_detach is not supported on the WebGUI backend", extra={"session_id": session_id})
+    return SessionDetachResult.failure(
+        "sap_session_detach is not supported on the WebGUI backend (sessions are browser tabs owned by "
+        "this server); use sap_session_close."
+    )
 
 
 async def sap_session_bind_impl(
@@ -262,8 +215,6 @@ async def sap_session_reset_to_primary_impl() -> SessionResetResult:
     """
     try:
         backend = await get_backend()
-        # Both WebGuiBackend and DesktopBackend implement reset_to_primary;
-        # the BackendManager union type enforces this. No defensive guard.
         report = await backend.reset_to_primary()
         return SessionResetResult(
             closed_sessions=report.get("closed", []),

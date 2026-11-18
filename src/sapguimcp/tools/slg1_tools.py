@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
@@ -25,10 +24,8 @@ from sapguimcp.backend.webgui.parsers.slg1_parser import (
     parse_slg1_log_list,
 )
 from sapguimcp.backend.webgui.types import AriaSnapshot
-from sapguimcp.models import TableData
 from sapguimcp.models.slg1_models import (
     SLG1FileSummary,
-    SLG1LogEntry,
     SLG1LogListResult,
 )
 from sapguimcp.utils import format_sap_date_as
@@ -36,7 +33,6 @@ from sapguimcp.utils import format_sap_date_as
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang import LanguagePack
     from sapguimcp.lang.text import Text
@@ -46,22 +42,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["register_slg1_tools"]
 
-_MAX_LOGS = 50
-# Item columns of the log tree in SAP's standard layout (the node text itself is date, time and user): the number of
-# messages, the external ID, the texts of the object and the subobject, and (last) the log number.
-_TREE_COLUMN_MESSAGES = "100"
-_TREE_COLUMN_EXTERNAL_ID = "101"
-_TREE_COLUMN_OBJECT = "102"
-_TREE_COLUMN_SUBOBJECT = "103"
-_TREE_COLUMN_LOG_NUMBER = "107"
-# A log node's text: a date, a time (with AM/PM in some date formats) and the user, if there is one. The 'More ...' node
-# the tree ends in when the selection holds more logs than it loaded does not look like this.
-_TREE_NODE_TEXT = re.compile(
-    r"^(?P<date>\S+)\s+(?P<time>\d{1,2}:\d{2}:\d{2}(?:\s*[AP]M)?)(?:\s+(?P<user>\S+))?$", re.IGNORECASE
-)
 
-
-async def _fill_by_label(backend: "WebGuiBackend | DesktopBackend", labels: Iterable[str], value: str) -> bool:
+async def _fill_by_label(backend: "WebGuiBackend", labels: Iterable[str], value: str) -> bool:
     """Fill the field with the first of ``labels`` the screen shows. False if none is found or the value is refused."""
     for label in labels:
         result = await backend.fill_form({label: value})
@@ -71,203 +53,8 @@ async def _fill_by_label(backend: "WebGuiBackend | DesktopBackend", labels: Iter
     return False
 
 
-def _safe_int(value: str | None) -> int:
-    """Convert a value to int, returning 0 on failure."""
-    try:
-        return int(value or "0")
-    except (ValueError, TypeError):
-        return 0
-
-
-def _tree_item(tree: Any, columns: set[str], key: str, column: str) -> str:
-    """The text of one item of a log node, empty if the tree has no such column."""
-    return str(tree.get_item_text(key, column)).strip() if column in columns else ""
-
-
-def _read_log_tree(session: Any, max_logs: int) -> tuple[list[SLG1LogEntry], bool]:
-    """Read the logs of the log tree on screen (COM thread): the newest ``max_logs``, newest first, and if more exist.
-
-    The desktop lists the logs in a flat tree next to a grid that holds the messages of the selected log: one node per
-    log whose text is ``<date> <time> <user>``, with the other columns as items. The tree shows the descriptions of
-    the object and the subobject, not their technical names. If the tree ends in a
-    'More ...' node, SAP loaded only the first logs of the selection: these are the newest of those, so the result is
-    reported as truncated. ``([], False)`` if there is no tree.
-    """
-    from sapsucker.components.tree import GuiTree  # pylint: disable=import-outside-toplevel
-
-    from sapguimcp.backend.desktop._element_finder import _flatten  # pylint: disable=import-outside-toplevel
-
-    wnd: Any = session.find_by_id("wnd[0]")
-    for elem in _flatten(wnd.dump_tree()):
-        if elem.type_as_number != 122:
-            continue
-        tree: Any = session.find_by_id(elem.id)
-        if not isinstance(tree, GuiTree):
-            continue
-        columns = set(tree.get_column_names())
-        keys = tree.get_all_node_keys()
-        # Only the end of the tree is looked at: reading the text of every node would cost a COM call per node.
-        stamps: dict[str, re.Match[str]] = {}
-        more_on_server = False
-        for key in keys[-(max_logs + 1) :]:
-            match = _TREE_NODE_TEXT.match(str(tree.get_node_text_by_key(key)).strip())
-            if match:
-                stamps[key] = match
-            else:
-                more_on_server = True  # the 'More ...' node
-        logs: list[SLG1LogEntry] = []
-        for key, match in list(stamps.items())[-max_logs:][::-1]:
-            logs.append(
-                SLG1LogEntry(
-                    log_number=_tree_item(tree, columns, key, _TREE_COLUMN_LOG_NUMBER),
-                    object=_tree_item(tree, columns, key, _TREE_COLUMN_OBJECT),
-                    subobject=_tree_item(tree, columns, key, _TREE_COLUMN_SUBOBJECT),
-                    external_id=_tree_item(tree, columns, key, _TREE_COLUMN_EXTERNAL_ID),
-                    date=match.group("date"),
-                    time=match.group("time"),
-                    user=match.group("user") or "",
-                    message_count=_safe_int(_tree_item(tree, columns, key, _TREE_COLUMN_MESSAGES)),
-                )
-            )
-        return logs, more_on_server or len(keys) > max_logs
-    return [], False
-
-
-async def _slg1_lookup_desktop(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-branches,too-many-locals,too-many-return-statements
-    backend: "WebGuiBackend | DesktopBackend",
-    t: LanguagePack,
-    object_name: str,
-    subobject: str | None = None,
-    external_id: str | None = None,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> SLG1LogListResult:
-    """Desktop-specific SLG1 lookup using read_table instead of ARIA parsing."""
-    now = datetime.now(UTC)
-    logger.info("SLG1 desktop backend path", extra={"object": object_name})
-
-    tx_result = await backend.enter_transaction("SLG1")
-    if not tx_result.success:
-        return SLG1LogListResult.failure(
-            f"Failed to navigate to SLG1: {tx_result.error}",
-            logs=[],
-            log_count=0,
-            logs_truncated=False,
-            retrieved_at=now,
-        )
-    await backend.wait_for_ready()
-
-    # A filter that cannot be applied fails the lookup: it would otherwise return the default selection (the logs of
-    # today) as if it were the answer. The date fields are not found by their labels on the desktop, so they are filled
-    # by their technical names (the 'to' field's name starts with a star).
-    unapplied: list[str] = []
-    if not await _fill_by_label(backend, t.slg1.log_object, object_name):
-        unapplied.append("object")
-    if subobject and not await _fill_by_label(backend, t.slg1.log_subobject, subobject):
-        unapplied.append("subobject")
-    if external_id and not await _fill_by_label(backend, t.slg1.external_id, external_id):
-        unapplied.append("external_id")
-    for value, field_name, filter_name in (
-        (from_date, "BALHDR-ALDATE", "from_date"),
-        (to_date, "*BALHDR-ALDATE", "to_date"),
-    ):
-        if value and not await backend.focus_and_type(
-            field_name, format_sap_date_as(value, t.date_format), delay_ms=50
-        ):
-            unapplied.append(filter_name)
-    if unapplied:
-        return SLG1LogListResult.failure(
-            f"Could not apply the filter(s) on the SLG1 selection screen: {', '.join(unapplied)}",
-            logs=[],
-            log_count=0,
-            logs_truncated=False,
-            retrieved_at=now,
-        )
-
-    # Execute search (F8)
-    await backend.press_key("F8")
-    await backend.wait_for_ready()
-
-    # Check status bar
-    sbar = await backend.get_status_bar()
-    filters = _build_filters(object_name, subobject, external_id, from_date, to_date)
-
-    if sbar.type == "E":
-        return SLG1LogListResult.failure(
-            f"SLG1 error: {sbar.message}",
-            logs=[],
-            log_count=0,
-            logs_truncated=False,
-            retrieved_at=now,
-        )
-
-    if sbar.message and t.slg1.no_logs_found.contains(sbar.message):
-        return SLG1LogListResult(
-            logs=[],
-            log_count=0,
-            logs_truncated=False,
-            filters_applied=filters,
-            retrieved_at=now,
-        )
-
-    # The logs are listed in a tree (next to a grid that holds the messages of the selected log), so read that first
-    desktop = cast("DesktopBackend", backend)
-    session = desktop.require_session()
-    tree_logs, tree_truncated = await desktop.com.run(
-        lambda: _read_log_tree(session, _MAX_LOGS), retry_server_fault=True
-    )
-    if tree_logs:
-        return SLG1LogListResult(
-            logs=tree_logs,
-            log_count=len(tree_logs),
-            logs_truncated=tree_truncated,
-            filters_applied=filters,
-            retrieved_at=now,
-        )
-
-    # Read table data
-    table_data: TableData = await backend.read_table(start_row=1, max_rows=_MAX_LOGS)
-
-    # No rows without a "no logs" status message is not an empty result, and neither are rows that are no logs: the
-    # logs are listed in a tree next to a grid that stays empty until a log is selected (and then holds its messages),
-    # so there is no log list to read here.
-    if not table_data.rows or not any(t.slg1.log_number.equals(h) for h in table_data.headers):
-        return SLG1LogListResult.failure(
-            "Could not read SLG1 log list: the desktop shows the logs in a tree, which cannot be read as a table",
-            logs=[],
-            log_count=0,
-            logs_truncated=False,
-            retrieved_at=now,
-        )
-
-    # Convert to SLG1LogEntry models
-    logs: list[SLG1LogEntry] = []
-    for tr in table_data.rows:
-        d = tr.data
-        logs.append(
-            SLG1LogEntry(
-                log_number=t.slg1.log_number.first_key(d) or "",
-                object=t.slg1.log_object.first_key(d) or "",
-                subobject=t.slg1.log_subobject.first_key(d) or "",
-                external_id=t.slg1.external_id.first_key(d) or "",
-                date=t.slg1.col_date.first_key(d) or "",
-                time=t.slg1.col_time.first_key(d) or "",
-                user=t.common.user.first_key(d) or "",
-                message_count=_safe_int(t.slg1.col_messages.first_key(d)),
-            )
-        )
-
-    return SLG1LogListResult(
-        logs=logs,
-        log_count=len(logs),
-        logs_truncated=len(logs) >= 50,
-        filters_applied=filters,
-        retrieved_at=now,
-    )
-
-
 async def _slg1_lookup(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-branches,too-many-locals
-    backend: "WebGuiBackend | DesktopBackend",
+    backend: "WebGuiBackend",
     t: LanguagePack,
     object_name: str,
     subobject: str | None = None,
@@ -277,10 +64,6 @@ async def _slg1_lookup(  # pylint: disable=too-many-arguments,too-many-positiona
 ) -> SLG1LogListResult:
     """Execute SLG1 lookup and return parsed results."""
     now = datetime.now(UTC)
-
-    # Desktop backend: use read_table instead of ARIA snapshot parsing
-    if backend.backend_type == "desktop":
-        return await _slg1_lookup_desktop(backend, t, object_name, subobject, external_id, from_date, to_date)
 
     # Navigate to SLG1
     tx_result = await backend.enter_transaction("SLG1")

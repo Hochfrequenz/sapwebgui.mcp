@@ -42,7 +42,6 @@ from sapguimcp.tools.sap_tools import _TRANSACTION_NOT_FOUND_MESSAGE
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
     from sapguimcp.models.base import PopupInfo
@@ -175,13 +174,10 @@ def _enrich_transport_error(error_text: str) -> str:
     return error_text
 
 
-async def _check_for_error_popup(backend: "WebGuiBackend | DesktopBackend") -> str | None:
+async def _check_for_error_popup(backend: "WebGuiBackend") -> str | None:
     """Check for SAP error popup dialog and extract message text."""
     try:
-        if backend.backend_type == "desktop":
-            text = await _check_for_error_popup_desktop(backend)
-        else:
-            text = await _check_for_error_popup_webgui(cast("WebGuiBackend", backend))
+        text = await _check_for_error_popup_webgui(backend)
         if not text:
             return None
         popup = lang.universal().popup
@@ -224,33 +220,16 @@ async def _check_for_error_popup_webgui(backend: "WebGuiBackend") -> str | None:
     return result
 
 
-async def _check_for_error_popup_desktop(backend: "WebGuiBackend | DesktopBackend") -> str | None:
-    """Check for error popup via check_popup (desktop backend)."""
-    popup = await backend.check_popup()
-    if popup is None:
-        return None
-    return popup.message
-
-
-async def _read_screen_text_desktop(backend: "WebGuiBackend | DesktopBackend") -> str:
-    """The text to scan for errors on the desktop backend: the COM snapshot of the screen."""
-    snapshot = await backend.get_snapshot()
-    return str(snapshot)
-
-
 async def _read_screen_text_webgui(backend: "WebGuiBackend") -> str:
     """The text to scan for errors on the WebGUI backend: the inner text of the page body."""
     body_text: str = await backend.evaluate_javascript("() => document.body.innerText || ''")
     return body_text
 
 
-async def _check_screen_for_errors(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> str | None:
+async def _check_screen_for_errors(backend: "WebGuiBackend", t: LanguagePack) -> str | None:
     """Check the entire screen for error indicators as a fallback."""
     try:
-        if backend.backend_type == "desktop":
-            body_text = await _read_screen_text_desktop(backend)
-        else:
-            body_text = await _read_screen_text_webgui(cast("WebGuiBackend", backend))
+        body_text = await _read_screen_text_webgui(backend)
         body_lower = body_text.lower()
 
         for pattern in (*t.abapgit.screen_errors, *INVARIANT.abapgit_screen_errors):
@@ -472,7 +451,7 @@ def _validate_and_prepare_params(  # pylint: disable=too-many-return-statements,
 
 
 async def _enter_tcode_via_okcode(
-    backend: "WebGuiBackend | DesktopBackend", tcode_with_params: str, repo: str
+    backend: "WebGuiBackend", tcode_with_params: str, repo: str
 ) -> AbapGitActionResult | None:
     """Enter a parameterised transaction via the OK-Code field. Returns error or None."""
     result = await backend.enter_transaction(tcode_with_params)
@@ -488,9 +467,7 @@ async def _enter_tcode_via_okcode(
 # Pull Result Analysis
 
 
-async def _analyze_pull_result(
-    backend: "WebGuiBackend | DesktopBackend", repo: str, t: LanguagePack
-) -> AbapGitActionResult:
+async def _analyze_pull_result(backend: "WebGuiBackend", repo: str, t: LanguagePack) -> AbapGitActionResult:
     """Analyze status bar and screen to determine pull result."""
     status = await backend.get_status_bar()
     msg = status.message or ""
@@ -549,7 +526,7 @@ async def _analyze_pull_result(
 # Main Pull Implementation
 
 
-async def _handle_popup_error(backend: "WebGuiBackend | DesktopBackend", repo: str) -> AbapGitActionResult | None:
+async def _handle_popup_error(backend: "WebGuiBackend", repo: str) -> AbapGitActionResult | None:
     """Check for error popup and return failure if found, None otherwise."""
     popup_error = await _check_for_error_popup(backend)
     if popup_error:
@@ -562,7 +539,7 @@ async def _handle_popup_error(backend: "WebGuiBackend | DesktopBackend", repo: s
 
 
 async def _execute_pull_transaction(
-    backend: "WebGuiBackend | DesktopBackend", params: PullParams, repo: str, t: LanguagePack
+    backend: "WebGuiBackend", params: PullParams, repo: str, t: LanguagePack
 ) -> AbapGitActionResult | None:
     """Execute pull transaction and return failure result if error, None if OK to continue."""
     okcode_error = await _enter_tcode_via_okcode(backend, params.tcode_with_params, repo)
@@ -592,9 +569,7 @@ def _is_inactive_objects_popup(popup: PopupInfo) -> bool:
     return lang.universal().popup.abapgit_inactive_objects.contains(f"{popup.title or ''} {popup.message or ''}")
 
 
-async def _run_pull_and_check_errors(
-    backend: "WebGuiBackend | DesktopBackend", repo: str
-) -> AbapGitActionResult | None:
+async def _run_pull_and_check_errors(backend: "WebGuiBackend", repo: str) -> AbapGitActionResult | None:
     """Execute F8 and wait for SAP to finish processing. Returns error if found."""
     await backend.press_key("F8")
 
@@ -709,117 +684,6 @@ def parse_repo_list_total(raw_output: str) -> int | None:
     return None
 
 
-_LIST_LABEL_ID = re.compile(r"lbl\[(\d+),(\d+)\]$")
-_LIST_FIRST_DATA_ROW = 2  # screen rows 0 and 1 are the fixed list header (title, page number)
-_LIST_HORIZONTAL_OVERLAP = 25  # characters two horizontal slices of a line share; they are compared when stitching
-
-
-def _list_screen_rows(usr: Any) -> dict[int, str]:
-    """The data labels of the classic list currently on screen, by screen row (one ``dump_tree()`` call)."""
-    rows: dict[int, str] = {}
-    for elem in usr.dump_tree():
-        match = _LIST_LABEL_ID.search(elem.id)
-        if match and int(match.group(1)) == 0 and int(match.group(2)) >= _LIST_FIRST_DATA_ROW:
-            rows[int(match.group(2))] = str(elem.text)
-    return rows
-
-
-def _scrollbar_range(usr: Any, attribute: str) -> tuple[int, int]:
-    """``(maximum, page_size)`` of one of the user area's scrollbars, ``(0, 0)`` if the area has none.
-
-    A scrollbar that exists but cannot be read raises: reading on without it would silently return a cut list.
-    """
-    scrollbar = getattr(usr, attribute, None)
-    if scrollbar is None:
-        logger.debug("abapGit list: no %s", attribute)
-        return 0, 0
-    return max(int(scrollbar.maximum), 0), max(int(scrollbar.page_size), 0)
-
-
-def _scroll_positions(maximum: int, step: int) -> list[int]:
-    """Scroll positions ``step`` apart from ``step``... up to ``maximum``, always including ``maximum`` itself."""
-    positions = [*range(step, maximum + 1, step)]
-    if maximum > 0 and (not positions or positions[-1] != maximum):
-        positions.append(maximum)
-    return positions
-
-
-def _read_list_lines(session: Any, problems: list[str] | None = None) -> list[str]:
-    """Read every line of the classic list on screen, however long the list and however long its lines (COM thread).
-
-    SAP GUI shows a window-sized part of a classic list: the visible lines vertically and, for each line, only as many
-    characters as fit horizontally (a label holds the visible slice, so longer lines end mid-field). Both are scrolled
-    through here: page by page with the vertical scrollbar (a line's absolute index is the scroll position plus its
-    screen row) and, for lines that fill the window, with the horizontal scrollbar in slices that overlap and are
-    stitched together. Pages overlap a little as well; lines are keyed by index, so that costs nothing. Both
-    scrollbars are reset afterwards. A list without usable scrollbars is read as one page. Anything that may have left a
-    line cut or damaged is logged and described in ``problems`` (if given), so the caller can refuse to call the list
-    complete.
-    """
-    usr = session.find_by_id("wnd[0]/usr")
-    v_last, v_page = _scrollbar_range(usr, "vertical_scrollbar")
-    h_last, h_page = _scrollbar_range(usr, "horizontal_scrollbar")
-    v_step = max(v_page - _LIST_FIRST_DATA_ROW, 1)
-    width = h_page if h_page > _LIST_HORIZONTAL_OVERLAP else 0  # 0: no horizontal stitching possible
-    h_positions = _scroll_positions(h_last, width - _LIST_HORIZONTAL_OVERLAP) if width else []
-
-    def _problem(message: str, *args: Any) -> None:
-        logger.warning("abapGit list: " + message, *args)
-        if problems is not None:
-            problems.append(message % args)
-
-    if h_last > 0 and not width:
-        _problem("the horizontal scrollbar is unusable, lines wider than the window may be cut")
-
-    lines: dict[int, str] = {}
-    try:
-        for wanted in [0, *_scroll_positions(v_last, v_step)]:
-            if wanted:
-                usr.vertical_scrollbar.position = wanted
-            position = int(usr.vertical_scrollbar.position) if v_last else 0  # SAP clamps: use where it really is
-            if h_positions:
-                usr.horizontal_scrollbar.position = 0
-            page = _list_screen_rows(usr)
-            stitched = dict(page)
-            open_rows = {row for row, text in page.items() if width and len(text) >= width}
-            for h_position in h_positions:
-                if not open_rows:
-                    break
-                usr.horizontal_scrollbar.position = h_position
-                slice_rows = _list_screen_rows(usr)
-                for row in sorted(open_rows):
-                    if row not in slice_rows:
-                        _problem("no slice at position %d for line %d", h_position, position + row)
-                        open_rows.discard(row)
-                        continue
-                    piece = slice_rows[row]
-                    overlap = len(stitched[row]) - h_position
-                    if overlap < 0:  # a gap: the earlier slice did not reach this far, stop extending the row
-                        _problem("gap while stitching line %d", position + row)
-                        open_rows.discard(row)
-                        continue
-                    if piece[:overlap] != stitched[row][h_position:]:
-                        _problem("slices of line %d do not overlap consistently", position + row)
-                    stitched[row] += piece[overlap:]
-                    if len(piece) < width:
-                        open_rows.discard(row)
-            for row, text in stitched.items():
-                lines[position + row] = text
-    finally:
-        for attribute in ("horizontal_scrollbar", "vertical_scrollbar"):
-            try:
-                getattr(usr, attribute).position = 0
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.debug("Could not reset a scrollbar of the abapGit list", exc_info=True)
-    return [lines[index] for index in sorted(lines)]
-
-
-def _abapgit_list_displayed(session: Any) -> bool:
-    """True once the list screen holds the report's output: the TOTAL header or a data line."""
-    usr = session.find_by_id("wnd[0]/usr")
-    return any(text.startswith("TOTAL~") or "~" in text for text in _list_screen_rows(usr).values())
-
-
 _FILTER_MAX_LENGTH = 200
 _KEY_FILTER = re.compile(r"[0-9]{1,12}")
 
@@ -929,26 +793,8 @@ def _apply_list_filters(
     return AbapGitListResult(success=True, repos=shaped, total_count=total, matched_count=len(matched), message=message)
 
 
-async def _read_report_screen(backend: "WebGuiBackend | DesktopBackend", read_problems: list[str]) -> str:
+async def _read_report_screen(backend: "WebGuiBackend") -> str:
     """Read the report's WRITE output from the screen (after F8)."""
-    if backend.backend_type == "desktop":
-        return await _read_report_screen_desktop(cast("DesktopBackend", backend), read_problems)
-    return await _read_report_screen_webgui(cast("WebGuiBackend", backend))
-
-
-async def _read_report_screen_desktop(desktop: "DesktopBackend", read_problems: list[str]) -> str:
-    """Read the report's WRITE output on the desktop backend."""
-    # On the desktop backend, WRITE output appears as labels (GuiLabel) in a classic list that is only as
-    # big as the window: read all of it, not just what is visible.
-    await desktop.wait_for_ready()
-    if not await desktop.wait_for_condition(_abapgit_list_displayed, timeout_ms=5000):
-        logger.warning("The abapGit list did not show within 5 s, reading the screen as it is")
-    session = desktop.require_session()
-    return "\n".join(await desktop.com.run(lambda: _read_list_lines(session, read_problems)))
-
-
-async def _read_report_screen_webgui(backend: "WebGuiBackend") -> str:
-    """Read the report's WRITE output on the WebGUI backend."""
     await backend.wait(3000)
     text = await backend.evaluate_javascript("""
         () => {
@@ -959,7 +805,7 @@ async def _read_report_screen_webgui(backend: "WebGuiBackend") -> str:
     return str(text or "")
 
 
-async def _abapgit_list_repos(backend: "WebGuiBackend | DesktopBackend") -> AbapGitListResult:
+async def _abapgit_list_repos(backend: "WebGuiBackend") -> AbapGitListResult:
     """List all registered abapGit repositories via Z_ABAPGIT_PULL_MCP P_ACTION=LIST."""
     logger.info("Listing abapGit repositories")
     # Resolved outside the try: an unsupported session language must reach the caller, not become a failure result.
@@ -987,8 +833,7 @@ async def _abapgit_list_repos(backend: "WebGuiBackend | DesktopBackend") -> Abap
         await backend.press_key("F8")
 
         # Read the WRITE output from the screen
-        read_problems: list[str] = []
-        raw_output = await _read_report_screen(backend, read_problems)
+        raw_output = await _read_report_screen(backend)
 
         repos, skipped = _parse_repo_lines(raw_output or "")
         total = parse_repo_list_total(raw_output or "")
@@ -1001,11 +846,6 @@ async def _abapgit_list_repos(backend: "WebGuiBackend | DesktopBackend") -> Abap
             # A short list must not pass as the list: "not in the list" would read as "not registered".
             incomplete.append(
                 f"The report lists {total} repositories but only {len(repos) + skipped} could be read from the screen"
-            )
-        if read_problems:
-            incomplete.append(
-                "the list could not be read reliably, some entries may be cut or damaged: "
-                + "; ".join(read_problems[:3])
             )
         if incomplete:
             return AbapGitListResult(
@@ -1032,25 +872,20 @@ async def _abapgit_list_repos(backend: "WebGuiBackend | DesktopBackend") -> Abap
 _BRANCH_ECHO = re.compile(r"BRANCH~(refs/heads/\S+)")
 
 
-async def _read_branch_echo(backend: "WebGuiBackend | DesktopBackend") -> str | None:
+async def _read_branch_echo(backend: "WebGuiBackend") -> str | None:
     """Read the ``BRANCH~<full ref>`` line the report writes after a pull with a branch; None if not exactly one."""
-    problems: list[str] = []
     try:
-        raw_output = await _read_report_screen(backend, problems)
+        raw_output = await _read_report_screen(backend)
     except Exception:  # pylint: disable=broad-exception-caught
         # An outdated report writes no list: the screen is not a list and reading it may raise.
         logger.warning("Could not read the branch echo of the report", exc_info=True)
-        return None
-    if problems:
-        # A cut or inconsistently stitched line must not be read as a (mismatching) echo: fail closed.
-        logger.warning("The branch echo could not be read reliably: %s", "; ".join(problems[:3]))
         return None
     matches = [m for line in (raw_output or "").splitlines() if (m := _BRANCH_ECHO.fullmatch(line.strip()))]
     return matches[0].group(1) if len(matches) == 1 else None
 
 
 async def _confirm_branch(
-    backend: "WebGuiBackend | DesktopBackend", result: AbapGitActionResult, params: PullParams
+    backend: "WebGuiBackend", result: AbapGitActionResult, params: PullParams
 ) -> AbapGitActionResult:
     """Turn a successful pull with a branch into a success only if the report echoed that branch."""
     echo = await _read_branch_echo(backend)
@@ -1089,7 +924,7 @@ def _annotate_branch_failure(result: AbapGitActionResult, params: PullParams) ->
 
 
 async def _check_branch_outcome(
-    backend: "WebGuiBackend | DesktopBackend", result: AbapGitActionResult, params: PullParams
+    backend: "WebGuiBackend", result: AbapGitActionResult, params: PullParams
 ) -> AbapGitActionResult:
     """Apply the branch-specific checks to a pull result; a pull without a branch is returned as it is."""
     if params.branch is None:
@@ -1148,7 +983,7 @@ def _check_key_outcome(result: AbapGitActionResult, params: PullParams) -> AbapG
 
 
 async def _abapgit_pull_via_api(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    backend: "WebGuiBackend | DesktopBackend",
+    backend: "WebGuiBackend",
     repo: str | None,
     trkorr: str | None,
     username: str | None,
@@ -1477,25 +1312,6 @@ async def read_se38_source(backend: "WebGuiBackend", program_name: str, t: Langu
         return {"success": False, "error": str(e)}
 
 
-async def verify_abap_report_content(backend: "WebGuiBackend", program_name: str, expected_text: str) -> dict[str, Any]:
-    """Verify that an ABAP report contains expected text."""
-    result = await read_se38_source(backend, program_name, lang.current("sap_read_se38_source"))
-
-    if not result.get("success"):
-        return result
-
-    source_code = result.get("source_code", "")
-    found = expected_text in source_code
-
-    return {
-        "success": True,
-        "found": found,
-        "expected_text": expected_text,
-        "source_code": source_code,
-        "program_name": program_name,
-    }
-
-
 # =============================================================================
 # Tool Registration
 # =============================================================================
@@ -1682,13 +1498,4 @@ def register_abapgit_tools(mcp: FastMCP) -> None:
             backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_read_se38_source")
         except ValueError as e:
             return {"success": False, "error": f"Session error: {e}"}
-        if backend.backend_type == "desktop":
-            return {
-                "success": False,
-                "error": "sap_read_se38_source is not supported on the desktop backend. "
-                "Use sap_se38_edit to open the report in SE38 instead.",
-            }
-        from sapguimcp.backend.webgui.backend import WebGuiBackend  # pylint: disable=import-outside-toplevel
-
-        assert isinstance(backend, WebGuiBackend)
         return await read_se38_source(backend, program_name, lang.current("sap_read_se38_source"))

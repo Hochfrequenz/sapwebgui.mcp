@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp.backend.desktop import DesktopBackend
+from sapguimcp.backend.webgui.backend import WebGuiBackend
 from sapguimcp.models.abapgit_models import AbapGitActionResult
 from sapguimcp.models.sap_results import StatusBarInfo
 from sapguimcp.tools import abapgit_tools
@@ -28,8 +28,8 @@ def _no_settings_credentials():
 
 
 def _backend(status: StatusBarInfo) -> Any:
-    backend = MagicMock(spec=DesktopBackend)
-    backend.backend_type = "desktop"
+    backend = MagicMock(spec=WebGuiBackend)
+    backend.backend_type = "webgui"
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
     backend.get_status_bar = AsyncMock(return_value=status)
     backend.press_key = AsyncMock()
@@ -51,9 +51,9 @@ async def _pull(
     backend: Any, lines: list[str] | Exception | None, branch: str | None = "feature/x"
 ) -> AbapGitActionResult:
     if isinstance(lines, Exception):
-        patcher = patch.object(abapgit_tools, "_read_list_lines", side_effect=lines)
+        patcher = patch.object(abapgit_tools, "_read_report_screen", side_effect=lines)
     else:
-        patcher = patch.object(abapgit_tools, "_read_list_lines", return_value=lines or [])
+        patcher = patch.object(abapgit_tools, "_read_report_screen", return_value="\n".join(lines or []))
     with patcher:
         return await _abapgit_pull_via_api(backend, "R", "TRK1", None, None, branch)
 
@@ -161,20 +161,6 @@ def test_result_schema_and_roundtrip_carry_the_branch() -> None:
     result = AbapGitActionResult.success_result("pull", "R", "ok")
     result.branch = REF
     assert AbapGitActionResult.model_validate(result.model_dump(mode="json")).branch == REF
-
-
-@pytest.mark.anyio
-async def test_read_problems_make_the_echo_unconfirmed() -> None:
-    def read_with_problem(_session: Any, problems: list[str] | None = None) -> list[str]:
-        assert problems is not None
-        problems.append("slices of line 1 do not overlap consistently")
-        return [f"BRANCH~{REF}"]
-
-    with patch.object(abapgit_tools, "_read_list_lines", side_effect=read_with_problem):
-        result = await _abapgit_pull_via_api(_backend(_ok()), "R", "TRK1", None, None, "feature/x")
-    assert not result.success
-    assert "did not confirm" in (result.error or "")
-    assert "no readable `BRANCH~` line" in (result.error or "")
 
 
 @pytest.mark.anyio

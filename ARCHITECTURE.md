@@ -114,7 +114,6 @@ src/sapguimcp/
     se38_edit_tools.py         # SE38 report editing
     ...                        # More transaction tools (se09, se11, se93, sm30, sm37, slg1, spro, st22)
     field_helpers.py           # Shared field-filling logic
-    table_helpers.py           # Shared table-reading logic
     session_tools.py           # Multi-session management (list/close/detach/bind/release/reset)
     feedback_tools.py          # LLM feedback logging → GitHub issues
 ```

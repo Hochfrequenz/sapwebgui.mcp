@@ -185,17 +185,6 @@ class TestSapClickButton:
         backend.click_button.assert_not_awaited()
 
     @pytest.mark.anyio
-    async def test_desktop_backend_skips_popup_check(self) -> None:
-        """Desktop backend should not call check_popup (it manages windows differently)."""
-        backend = _make_backend(backend_type="desktop")
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            async with Client(mcp) as client:
-                raw = await client.call_tool("sap_click_button", {"label": "Save"})
-        data = _parse_result(raw)
-        assert data["success"] is True
-        backend.check_popup.assert_not_awaited()
-
-    @pytest.mark.anyio
     async def test_button_not_found_value_error(self) -> None:
         backend = _make_backend()
         backend.click_button = AsyncMock(side_effect=ValueError("Button 'Foo' not found"))
@@ -262,16 +251,6 @@ class TestSapSelectTab:
         backend.click_tab.assert_not_awaited()
 
     @pytest.mark.anyio
-    async def test_desktop_backend_skips_popup_check(self) -> None:
-        backend = _make_backend(backend_type="desktop")
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            async with Client(mcp) as client:
-                raw = await client.call_tool("sap_select_tab", {"label": "Details"})
-        data = _parse_result(raw)
-        assert data["success"] is True
-        backend.check_popup.assert_not_awaited()
-
-    @pytest.mark.anyio
     async def test_tab_not_found(self) -> None:
         backend = _make_backend()
         backend.click_tab = AsyncMock(side_effect=ValueError("Tab 'X' not found"))
@@ -336,16 +315,6 @@ class TestSapSelectDropdown:
         data = _parse_result(raw)
         assert data["success"] is False
         backend.select_dropdown.assert_not_awaited()
-
-    @pytest.mark.anyio
-    async def test_desktop_backend_skips_popup_check(self) -> None:
-        backend = _make_backend(backend_type="desktop")
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            async with Client(mcp) as client:
-                raw = await client.call_tool("sap_select_dropdown", {"label": "Country", "value": "DE"})
-        data = _parse_result(raw)
-        assert data["success"] is True
-        backend.check_popup.assert_not_awaited()
 
     @pytest.mark.anyio
     async def test_dropdown_value_not_found_returns_available_options(self) -> None:

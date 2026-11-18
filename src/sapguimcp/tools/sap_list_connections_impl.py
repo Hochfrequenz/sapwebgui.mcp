@@ -1,15 +1,17 @@
 """Standalone implementation for sap_list_connections."""
 
+import logging
 from typing import Any
 
 from pydantic import Field
 
-from sapguimcp.backend.desktop._landscape import _find_landscape_path, _parse_landscape_xml
 from sapguimcp.backend.manager import get_backend
 from sapguimcp.models.base import ToolResult
 from sapguimcp.models.config import try_get_sap_config
 
-__all__ = ["sap_list_connections_impl", "_parse_landscape_xml"]
+__all__ = ["sap_list_connections_impl"]
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectionListResult(ToolResult):
@@ -53,7 +55,7 @@ def _get_configured_systems() -> tuple[list[dict[str, str]], str | None]:
 
 
 async def sap_list_connections_impl() -> ConnectionListResult:
-    """List available SAP Logon connections from the landscape file or backend."""
+    """List the connections the backend knows, plus the systems configured in systems.json."""
     configured_systems, config_error = _get_configured_systems()
     try:
         backend = await get_backend(tool_name="sap_list_connections")
@@ -65,19 +67,10 @@ async def sap_list_connections_impl() -> ConnectionListResult:
             config_error=config_error,
         )
     except Exception:  # pylint: disable=broad-exception-caught
-        # Fall back to reading the landscape file directly
-        path = _find_landscape_path()
-        if path is None:
-            return ConnectionListResult(
-                success=True,
-                connections=[],
-                configured_systems=configured_systems,
-                config_error=config_error,
-            )
-        connections = _parse_landscape_xml(path.read_text(encoding="utf-8"))
+        logger.debug("The backend could not list connections", exc_info=True)
         return ConnectionListResult(
             success=True,
-            connections=connections,
+            connections=[],
             configured_systems=configured_systems,
             config_error=config_error,
         )
