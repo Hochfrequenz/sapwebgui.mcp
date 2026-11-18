@@ -32,6 +32,7 @@ jobs:
           push: false
           load: true
           tags: sapwebgui-mcp:ci
-          cache-from: type=gha
-      - name: Check entry point
-        run: docker run --rm --entrypoint sh sapwebgui-mcp:ci -c 'command -v run-sapwebgui-mcp-server'
+      - name: Check entry point and import
+        run: |
+          docker run --rm --entrypoint sh sapwebgui-mcp:ci -c 'command -v run-sapwebgui-mcp-server'
+          docker run --rm --entrypoint python sapwebgui-mcp:ci -c "import sapwebguimcp.server"
