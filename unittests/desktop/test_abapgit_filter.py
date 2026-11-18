@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
-from sapguimcp.backend.desktop import DesktopBackend
+from sapguimcp.backend.webgui.backend import WebGuiBackend
 from sapguimcp.models.abapgit_models import AbapGitListResult, AbapGitRepoInfo, AbapGitRepoSummary
 from sapguimcp.models.sap_results import StatusBarInfo
 from sapguimcp.tools.abapgit_tools import (
@@ -163,8 +163,8 @@ def test_valid_filters_are_accepted() -> None:
 
 
 def _backend() -> Any:
-    backend = MagicMock(spec=DesktopBackend)
-    backend.backend_type = "desktop"
+    backend = MagicMock(spec=WebGuiBackend)
+    backend.backend_type = "webgui"
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
     backend.get_status_bar = AsyncMock(return_value=StatusBarInfo(type="S", message=""))
     backend.press_key = AsyncMock()
@@ -178,7 +178,7 @@ def _backend() -> Any:
 
 
 async def _read(lines: list[str]) -> AbapGitListResult:
-    with patch("sapguimcp.tools.abapgit_tools._read_list_lines", return_value=lines):
+    with patch("sapguimcp.tools.abapgit_tools._read_report_screen", return_value="\n".join(lines)):
         return await _abapgit_list_repos(_backend())
 
 

@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
@@ -34,32 +32,19 @@ from sapguimcp.backend.webgui.parsers.st22_parser import (
     parse_st22_initial_screen,
 )
 from sapguimcp.backend.webgui.types import AriaSnapshot
-from sapguimcp.lang.schema import DumpSection
-from sapguimcp.models import TableData
 from sapguimcp.models.st22_models import (
-    ST22Dump,
-    ST22DumpDetail,
     ST22DumpDetailResult,
     ST22DumpListResult,
 )
-from sapguimcp.tools.classic_list_helpers import read_classic_list_lines
-from sapguimcp.tools.desktop_wait_predicates import screen_changed
 from sapguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang import LanguagePack
-    from sapguimcp.lang.text import Text
 
 
 logger = logging.getLogger(__name__)
 
-# Upper bound for waiting on the detail screen after a dump was opened (#928); the former fixed wait took 1 s.
-_ST22_DETAIL_WAIT_MS = 1000
-# The dump detail is a long list; the call stack is well within its first lines, the rest (source, system fields,
-# loaded programs) is not read.
-_ST22_DETAIL_MAX_LINES = 800
 
 __all__ = ["register_st22_tools"]
 
@@ -69,7 +54,7 @@ __all__ = ["register_st22_tools"]
 # =============================================================================
 
 
-async def _navigate_to_st22(backend: "WebGuiBackend | DesktopBackend") -> str | None:
+async def _navigate_to_st22(backend: "WebGuiBackend") -> str | None:
     """Navigate to ST22. Returns error message or None on success."""
     tx_result = await backend.enter_transaction("ST22")
     if not tx_result.success:
@@ -79,7 +64,7 @@ async def _navigate_to_st22(backend: "WebGuiBackend | DesktopBackend") -> str | 
     return None
 
 
-async def _clear_user_field(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> None:
+async def _clear_user_field(backend: "WebGuiBackend", t: LanguagePack) -> None:
     """Clear the user field to search for all users.
 
     ST22 pre-fills the user field with the current user.
@@ -100,7 +85,7 @@ async def _clear_user_field(backend: "WebGuiBackend | DesktopBackend", t: Langua
     logger.debug("User field not found for clearing")
 
 
-async def _fill_date_field(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack, target_date: str) -> str | None:
+async def _fill_date_field(backend: "WebGuiBackend", t: LanguagePack, target_date: str) -> str | None:
     """Fill the date field with a formatted date. Returns error or None."""
     try:
         formatted = format_sap_date_as(target_date, t.date_format)
@@ -125,9 +110,7 @@ async def _fill_date_field(backend: "WebGuiBackend | DesktopBackend", t: Languag
     return "Could not find date field"
 
 
-async def _try_quick_button(
-    backend: "WebGuiBackend | DesktopBackend", t: LanguagePack, target_date: str | None
-) -> bool:
+async def _try_quick_button(backend: "WebGuiBackend", t: LanguagePack, target_date: str | None) -> bool:
     """Try to use the Today or Yesterday quick buttons.
 
     These buttons navigate directly to the dump list for all users,
@@ -156,9 +139,7 @@ async def _try_quick_button(
     return False
 
 
-async def _execute_search(
-    backend: "WebGuiBackend | DesktopBackend", t: LanguagePack, target_date: str | None
-) -> str | None:
+async def _execute_search(backend: "WebGuiBackend", t: LanguagePack, target_date: str | None) -> str | None:
     """Execute the ST22 search. Returns error or None.
 
     Strategy:
@@ -186,9 +167,7 @@ async def _execute_search(
     return None
 
 
-async def _select_dump_by_index(
-    backend: "WebGuiBackend | DesktopBackend", dump_index: int, dump_count: int
-) -> str | None:
+async def _select_dump_by_index(backend: "WebGuiBackend", dump_index: int, dump_count: int) -> str | None:
     """Select a dump from the list by double-clicking the row via click_table_cell.
 
     Returns error message or None on success.
@@ -207,7 +186,7 @@ async def _select_dump_by_index(
         return f"Could not find row at index {dump_index}: {e}"
 
 
-async def _capture_full_detail(backend: "WebGuiBackend | DesktopBackend") -> str:
+async def _capture_full_detail(backend: "WebGuiBackend") -> str:
     """Capture the full dump detail by scrolling and collecting snapshots.
 
     ST22 detail is a long scrollable text. Scroll down and concatenate
@@ -233,276 +212,13 @@ async def _capture_full_detail(backend: "WebGuiBackend | DesktopBackend") -> str
     return "\n".join(snapshots)
 
 
-async def _capture_desktop_detail(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> list[str]:
-    """Read the lines of the dump detail screen.
-
-    SAP ERP 6.0 and S/4HANA show the detail as a classic list of labels with a vertical scrollbar (PageDown does not
-    scroll it), so it is read with the classic list reader: line by line, page by page. Without labels in a list
-    layout, the labels of the screen are the fallback.
-    """
-    desktop = cast("DesktopBackend", backend)
-    session = desktop.require_session()
-    lines: list[str] = await desktop.com.run(
-        lambda: read_classic_list_lines(session, _ST22_DETAIL_MAX_LINES), retry_server_fault=True
-    )
-    if lines:
-        call_stack_headings = _headings(t).call_stack
-        if len(lines) >= _ST22_DETAIL_MAX_LINES and not any(
-            _heading_key(line) in call_stack_headings for line in lines
-        ):
-            logger.warning(
-                "ST22 detail: read %d lines without reaching the call stack, it is not in the result", len(lines)
-            )
-        return lines
-    screen_text = await desktop.get_screen_text(keep_duplicate_labels=True)
-    return list(screen_text.labels)
-
-
-def _heading_key(line: str) -> str:
-    """A line as it is compared with the section headings: trimmed, without a trailing question mark, lower case."""
-    return line.strip().rstrip("?").strip().lower()
-
-
-@dataclass(frozen=True)
-class _Headings:
-    """The headings of the dump detail screen of one language view, as ``_heading_key`` writes them."""
-
-    what_happened: frozenset[str]
-    how_to_correct: frozenset[str]
-    """'What can you do?' and 'How to correct the error' are both advice: how_to_correct holds every such section."""
-    call_stack: frozenset[str]
-    every: frozenset[str]
-    """Every heading that ends a section, the ones above included."""
-
-
-def _headings(t: LanguagePack) -> _Headings:
-    """The headings of the session's view: the sections, the call stack and the other headings that end a section."""
-
-    def keys(text: Text) -> frozenset[str]:
-        return frozenset(_heading_key(variant) for variant in text)
-
-    what_happened = keys(t.st22.section[DumpSection.WHAT_HAPPENED])
-    how_to_correct = keys(t.st22.section[DumpSection.HOW_TO_CORRECT])
-    call_stack = keys(t.st22.call_stack_heading)
-    other = keys(t.st22.section[DumpSection.ERROR_ANALYSIS]) | keys(t.st22.other_headings)
-    return _Headings(what_happened, how_to_correct, call_stack, what_happened | how_to_correct | call_stack | other)
-
-
-# One call stack entry: number, kind, program, include and (if the list is wide enough to show it) the line number;
-# the name of the called method or form follows on the next line.
-_CALL_STACK_ENTRY = re.compile(r"^(\d+)\s+([A-Z][A-Z_]*)\s+(\S+)\s+(\S+)(?:\s+(\d+))?$")
-_MAX_CALL_STACK_ENTRIES = 20
-
-
-def _section_text(lines: list[str], headings: frozenset[str], every: frozenset[str]) -> str:
-    """The lines below every heading in ``headings`` (in screen order), each up to the next heading in ``every``."""
-    body: list[str] = []
-    collecting = False
-    for line in lines:
-        key = _heading_key(line)
-        if key in every:
-            collecting = key in headings
-        elif collecting and line.strip():
-            body.append(line.strip())
-    return "\n".join(body)
-
-
-def _call_stack_entries(lines: list[str], headings: _Headings) -> list[tuple[re.Match[str], str]]:
-    """The entries (match of the first line, name of the second) of the call stack section, topmost first."""
-    entries: list[tuple[re.Match[str], str]] = []
-    for index, line in enumerate(lines):
-        if _heading_key(line) not in headings.call_stack:
-            continue
-        position = index + 1
-        while position < len(lines) and _heading_key(lines[position]) not in headings.every:
-            match = _CALL_STACK_ENTRY.match(lines[position].strip())
-            if match:
-                name = ""
-                following = lines[position + 1].strip() if position + 1 < len(lines) else ""
-                if (
-                    following
-                    and not _CALL_STACK_ENTRY.match(following)
-                    and _heading_key(following) not in headings.every
-                ):
-                    name = following
-                    position += 1
-                entries.append((match, name))
-                if len(entries) >= _MAX_CALL_STACK_ENTRIES:
-                    return entries
-            position += 1
-        break
-    return entries
-
-
-def _parse_desktop_detail_lines(lines: list[str], source_dump: "ST22Dump", t: LanguagePack) -> "ST22DumpDetail":
-    """Parse the lines of the dump detail screen into an ST22DumpDetail model.
-
-    The screen is made of sections under headings ('What happened?', 'What can you do?', 'Error analysis', ... in
-    German or English). The call stack lists the topmost call first, which is where the program terminated: program,
-    include and line come from it. Without a call stack the metadata of the list entry is kept.
-    """
-    headings = _headings(t)
-    stack = _call_stack_entries(lines, headings)
-    program = source_dump.program
-    include = source_dump.include
-    line: int | None = None
-    if stack:
-        top, _top_name = stack[0]
-        # The topmost call is where the program terminated: program, include and line belong together
-        program = top.group(3)
-        include = top.group(4)
-        line = int(top.group(5)) if top.group(5) else None
-    call_stack = [" ".join(part for part in (*match.groups(default=""), name) if part) for match, name in stack]
-    return ST22DumpDetail(
-        error_type=source_dump.error_type,
-        short_text=source_dump.short_text,
-        what_happened=_section_text(lines, headings.what_happened, headings.every),
-        how_to_correct=_section_text(lines, headings.how_to_correct, headings.every),
-        program=program,
-        include=include,
-        line=line,
-        call_stack=call_stack,
-        raw_text="\n".join(lines)[:10240],  # truncated to ~10 KB
-    )
-
-
 # =============================================================================
 # Main Lookup Logic
 # =============================================================================
 
 
-async def _st22_lookup_desktop(  # pylint: disable=too-many-locals,too-many-branches,too-many-return-statements
-    backend: "WebGuiBackend | DesktopBackend",
-    t: LanguagePack,
-    target_date: str | None,
-    dump_index: int | None,
-) -> ST22DumpListResult | ST22DumpDetailResult:
-    """Desktop-specific ST22 lookup using read_table instead of ARIA parsing."""
-    now = datetime.now(UTC)
-    date_str = target_date or date.today().isoformat()
-    logger.info("ST22 desktop backend path", extra={"date": date_str})
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-
-    if not isinstance(backend, DesktopBackend):
-        return ST22DumpListResult.failure(
-            error="Requires DesktopBackend", dumps=[], dump_count=0, date_searched=date_str, retrieved_at=now
-        )
-
-    # Navigate to ST22
-    error = await _navigate_to_st22(backend)
-    if error:
-        return ST22DumpListResult.failure(
-            error=error,
-            dumps=[],
-            dump_count=0,
-            date_searched=date_str,
-            retrieved_at=now,
-        )
-
-    # Execute search
-    error = await _execute_search(backend, t, target_date)
-    if error:
-        return ST22DumpListResult.failure(
-            error=error,
-            dumps=[],
-            dump_count=0,
-            date_searched=date_str,
-            retrieved_at=now,
-        )
-
-    # Check status bar for "no dumps"
-    sbar = await backend.get_status_bar()
-    if sbar.message and t.st22.no_dumps.contains(sbar.message):
-        if dump_index is not None:
-            return ST22DumpDetailResult.failure(
-                error=f"No dumps found for {date_str} -- cannot select dump_index {dump_index}",
-                detail=None,
-                retrieved_at=now,
-            )
-        return ST22DumpListResult(
-            dumps=[],
-            dump_count=0,
-            date_searched=date_str,
-            retrieved_at=now,
-        )
-
-    # Read table data
-    table_data: TableData = await backend.read_table(start_row=1, max_rows=200)
-
-    if not table_data.headers:
-        return ST22DumpListResult(
-            dumps=[],
-            dump_count=0,
-            date_searched=date_str,
-            retrieved_at=now,
-        )
-
-    # Convert to ST22Dump models
-    dumps: list[ST22Dump] = []
-    for idx, tr in enumerate(table_data.rows):
-        d = tr.data
-        dumps.append(
-            ST22Dump(
-                index=idx,
-                time=t.st22.col_time.first_key(d) or "",
-                program=t.st22.col_program.first_key(d) or "",
-                include=d.get("Include", None),  # lang-ok: column title is the same in every language
-                error_type=t.st22.col_error_type.first_key(d) or "",
-                short_text=t.st22.col_short_text.first_key(d) or "",
-                user=t.common.user.first_key(d) or "",
-            )
-        )
-
-    # Sort by time descending, keeping a mapping from sorted index to original
-    # table row position (needed for double-clicking the correct row).
-    indexed_dumps = [(d.index, d) for d in dumps]  # (original_table_row, dump)
-    indexed_dumps.sort(key=lambda pair: pair[1].time, reverse=True)
-    sorted_to_ui: dict[int, int] = {}
-    dumps = []
-    for new_idx, (orig_idx, dump) in enumerate(indexed_dumps):
-        sorted_to_ui[new_idx] = orig_idx
-        dump.index = new_idx
-        dumps.append(dump)
-
-    if dump_index is None:
-        return ST22DumpListResult(
-            dumps=dumps,
-            dump_count=len(dumps),
-            date_searched=date_str,
-            retrieved_at=now,
-        )
-
-    # Bounds check
-    if dump_index < 0 or dump_index >= len(dumps):
-        return ST22DumpDetailResult.failure(
-            error=f"dump_index {dump_index} out of range (0..{len(dumps) - 1})",
-            detail=None,
-            retrieved_at=now,
-        )
-
-    target_dump = dumps[dump_index]
-
-    # Use the original table row position for clicking, not the sorted index
-    ui_row_idx = sorted_to_ui[dump_index]
-    before_title = (await backend.get_screen_info()).title or ""
-    before_status = (await backend.get_status_bar()).message.strip()
-    error = await _select_dump_by_index(backend, ui_row_idx, len(dumps))
-    if error:
-        return ST22DumpDetailResult.failure(error=error, detail=None, retrieved_at=now)
-
-    # Wait for the detail screen (new title, new status text or a popup) instead of a fixed time (#928), then read
-    # it by scrolling through the pages. Bounded by the former fixed wait: if nothing changes, read what is there.
-    await backend.wait_for_condition(screen_changed(before_title, before_status), timeout_ms=_ST22_DETAIL_WAIT_MS)
-    detail_lines = await _capture_desktop_detail(backend, t)
-
-    # Parse the detail text into structured fields
-    detail = _parse_desktop_detail_lines(detail_lines, target_dump, t)
-
-    return ST22DumpDetailResult(detail=detail, retrieved_at=now)
-
-
 async def _st22_lookup(  # pylint: disable=too-many-return-statements,too-many-locals,too-many-branches
-    backend: "WebGuiBackend | DesktopBackend",
+    backend: "WebGuiBackend",
     t: LanguagePack,
     target_date: str | None,
     dump_index: int | None,
@@ -510,10 +226,6 @@ async def _st22_lookup(  # pylint: disable=too-many-return-statements,too-many-l
     """Core ST22 lookup logic."""
     now = datetime.now(UTC)
     date_str = target_date or date.today().isoformat()
-
-    # Desktop backend: use read_table instead of ARIA snapshot parsing
-    if backend.backend_type == "desktop":
-        return await _st22_lookup_desktop(backend, t, target_date, dump_index)
 
     # Navigate to ST22
     error = await _navigate_to_st22(backend)

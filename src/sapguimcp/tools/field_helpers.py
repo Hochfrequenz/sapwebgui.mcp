@@ -15,10 +15,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang import LanguagePack
     from sapguimcp.lang.text import Text
@@ -31,7 +30,7 @@ _F7_POLL_INTERVAL_MS = 500
 _F7_MAX_POLLS = 10  # 10 * 500ms = 5 seconds max wait
 
 
-async def toggle_to_change_mode(backend: WebGuiBackend | DesktopBackend, t: LanguagePack) -> str | None:
+async def toggle_to_change_mode(backend: WebGuiBackend, t: LanguagePack) -> str | None:
     """Click Display<->Change toggle button. Retries once after 1s wait.
 
     The toggle button may not be rendered immediately after F7 navigation,
@@ -59,7 +58,7 @@ async def toggle_to_change_mode(backend: WebGuiBackend | DesktopBackend, t: Lang
 
 
 async def fill_field_with_keyboard(
-    backend: WebGuiBackend | DesktopBackend,
+    backend: WebGuiBackend,
     labels: Sequence[str],
     value: str,
 ) -> bool:
@@ -73,20 +72,7 @@ async def fill_field_with_keyboard(
     Returns:
         True if the field was found and filled, False otherwise.
     """
-    if backend.backend_type == "desktop":
-        return await _fill_field_with_keyboard_desktop(cast("DesktopBackend", backend), labels, value)
-    return await _fill_field_with_keyboard_webgui(cast("WebGuiBackend", backend), labels, value)
-
-
-async def _fill_field_with_keyboard_desktop(backend: DesktopBackend, labels: Sequence[str], value: str) -> bool:
-    """Desktop backend uses COM — no JavaScript available.
-
-    Falls back to focus_and_type which uses COM field resolution.
-    """
-    for lbl in labels:
-        if await backend.focus_and_type(lbl, value):
-            return True
-    return False
+    return await _fill_field_with_keyboard_webgui(backend, labels, value)
 
 
 async def _fill_field_with_keyboard_webgui(backend: WebGuiBackend, labels: Sequence[str], value: str) -> bool:
@@ -145,7 +131,7 @@ async def _fill_field_with_keyboard_webgui(backend: WebGuiBackend, labels: Seque
 
 
 async def fill_and_display(
-    backend: WebGuiBackend | DesktopBackend,
+    backend: WebGuiBackend,
     labels: Sequence[str],
     name: str,
     t: LanguagePack,

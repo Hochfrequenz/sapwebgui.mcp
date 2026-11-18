@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
@@ -22,10 +22,9 @@ from sapguimcp import lang
 from sapguimcp.backend.manager import get_backend
 from sapguimcp.backend.webgui.parsers.spro_parser import parse_spro_search_results
 from sapguimcp.backend.webgui.types import AriaSnapshot
-from sapguimcp.models.spro_models import SPROActivity, SPROFileSummary, SPROSearchResult
+from sapguimcp.models.spro_models import SPROFileSummary, SPROSearchResult
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
 
@@ -42,22 +41,13 @@ _SEARCH_POLL_INTERVAL_MS = 2_000
 _F5_POLL_INTERVAL_S = 1.0
 _F5_MAX_POLLS = 10  # 10 * 1s = 10 seconds max wait
 
-#: The desktop search reads the IMG tree itself, two levels deep; the WebGUI search covers the whole text index.
-_DESKTOP_SCOPE_NOTE = (
-    "Only the top two levels of the IMG tree (areas and their direct entries) were searched, not the activities "
-    "below them: more matches may exist than are listed."
-)
-
-# SPRO IMG tree control element ID (stable across languages)
-_SPRO_TREE_ID = "wnd[0]/usr/cntlTREE_CONTROL_CONTAINER/shellcont/shell"
-
 
 # =============================================================================
 # SPRO Navigation Helpers
 # =============================================================================
 
 
-async def _click_sap_ref_img(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> str | None:
+async def _click_sap_ref_img(backend: "WebGuiBackend", t: LanguagePack) -> str | None:
     """Open the SAP Reference IMG via F5.
 
     On the SPRO initial screen, F5 triggers the SAP Reference IMG view.
@@ -88,7 +78,7 @@ async def _click_sap_ref_img(backend: "WebGuiBackend | DesktopBackend", t: Langu
     return "Failed to enter IMG tree (heading not found after F5)"
 
 
-async def _open_search_dialog(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> str | None:
+async def _open_search_dialog(backend: "WebGuiBackend", t: LanguagePack) -> str | None:
     """Open the SPRO search dialog by clicking the search button.
 
     Ctrl+F is intercepted by the browser, so we click the button directly
@@ -148,7 +138,7 @@ async def _fill_search_and_execute(backend: "WebGuiBackend", query: str) -> str 
     return None
 
 
-async def _wait_for_results(backend: "WebGuiBackend | DesktopBackend", t: LanguagePack) -> str:
+async def _wait_for_results(backend: "WebGuiBackend", t: LanguagePack) -> str:
     """Wait for SPRO search results dialog to appear.
 
     Polls for the results dialog title which appears when search completes.
@@ -186,120 +176,6 @@ async def _wait_for_results(backend: "WebGuiBackend | DesktopBackend", t: Langua
     # Timeout — return whatever we have
     logger.warning("SPRO search timed out after %d ms", _SEARCH_TIMEOUT_MS)
     return await backend.get_snapshot()
-
-
-def _spro_img_tree_loaded(session: Any) -> bool:
-    """Predicate: True once the IMG tree control exists and has nodes, or a popup is open."""
-    if session.find_by_id("wnd[1]", raise_error=False) is not None:
-        return True
-    tree = session.find_by_id(_SPRO_TREE_ID, raise_error=False)
-    if tree is None:
-        return False
-    raw: Any = getattr(tree, "com", getattr(tree, "_com", tree))
-    return int(raw.GetAllNodeKeys().Count) > 0
-
-
-async def _search_img_desktop(  # pylint: disable=too-many-locals
-    backend: "WebGuiBackend | DesktopBackend", query: str
-) -> SPROSearchResult:
-    """Desktop-specific SPRO IMG search using tree control node reading.
-
-    The desktop SAP GUI doesn't expose the SPRO search dialog available in WebGUI.
-    Instead, we expand the IMG tree nodes (2 levels deep) and filter by query text.
-    """
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-
-    now = datetime.now(UTC)
-
-    # Navigate to SPRO and open IMG tree
-    tx = await backend.enter_transaction("SPRO")
-    if not tx.success:
-        return SPROSearchResult.failure(
-            error=f"Failed to navigate to SPRO: {tx.error}",
-            query=query,
-            activities=[],
-            activity_count=0,
-            retrieved_at=now,
-        )
-    await backend.wait_for_ready()
-
-    # Press F5 for SAP Reference IMG
-    if not isinstance(backend, DesktopBackend):
-        return SPROSearchResult.failure(
-            error="SPRO desktop search requires DesktopBackend",
-            query=query,
-            activities=[],
-            activity_count=0,
-            retrieved_at=now,
-        )
-
-    await backend.press_key("F5")
-    await backend.wait_for_ready()
-    # The next step reads the IMG tree's node keys: wait until the tree is populated (or a popup blocks it).
-    await backend.wait_for_condition(_spro_img_tree_loaded)
-
-    session = backend.require_session()
-    com = backend.com
-
-    def _read_and_search() -> list[dict[str, str]]:
-        """Expand top-level nodes, read children, filter by query."""
-        tree = session.find_by_id(_SPRO_TREE_ID)
-        raw: Any = getattr(tree, "com", getattr(tree, "_com", tree))
-
-        keys = raw.GetAllNodeKeys()
-        query_lower = query.lower()
-        matches: list[dict[str, str]] = []
-
-        # Expand all level-02 nodes to reveal level-03 children (activities)
-        # Key format: 'LL  P      N' where LL is a 2-digit zero-padded level
-        level2_keys: list[str] = []
-        for i in range(keys.Count):
-            k: str = keys(i)
-            if k[:2] == "02":
-                level2_keys.append(k)
-
-        for k in level2_keys:
-            try:
-                raw.ExpandNode(k)
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
-
-        # Re-read all nodes after expansion
-        keys = raw.GetAllNodeKeys()
-        # Build parent context map
-        current_l2 = ""
-        for i in range(keys.Count):
-            k = keys(i)
-            text: str = raw.GetItemText(k, "TEXT")
-            level = k[:2]
-
-            if level == "02":
-                current_l2 = text
-            if query_lower in text.lower() and level in ("02", "03"):
-                matches.append(
-                    {
-                        "activity_name": text,
-                        "parent_node": current_l2 if level == "03" else "SAP Customizing",
-                        "area": current_l2,
-                    }
-                )
-
-        return matches
-
-    raw_matches = await com.run(_read_and_search, retry_server_fault=True)
-
-    # Navigate back: F3 exits IMG tree, F3 exits SPRO
-    await backend.press_key("F3")
-    await backend.press_key("F3")
-
-    activities = [SPROActivity(**m) for m in raw_matches]
-    return SPROSearchResult(
-        query=query,
-        activities=activities,
-        activity_count=len(activities),
-        retrieved_at=now,
-        scope_note=_DESKTOP_SCOPE_NOTE,
-    )
 
 
 async def _search_img(backend: "WebGuiBackend", t: LanguagePack, query: str) -> SPROSearchResult:
@@ -415,34 +291,19 @@ def register_spro_tools(mcp: FastMCP) -> None:
                 retrieved_at=now,
             )
 
-        # Desktop backend: use tree control reading instead of ARIA parsing
-        if backend.backend_type == "desktop":
-            try:
-                result = await _search_img_desktop(backend, query)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception("SPRO desktop search query=%r", query)
-                result = SPROSearchResult.failure(
-                    error=f"Error searching IMG for '{query}': {e}",
-                    query=query,
-                    activities=[],
-                    activity_count=0,
-                    retrieved_at=now,
-                )
-        else:
-            # Resolved outside the try: an unsupported session language must reach the caller (the desktop search
-            # reads the tree control and needs no texts).
-            t = lang.current("sap_spro_search")
-            try:
-                result = await _search_img(cast("WebGuiBackend", backend), t, query)
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.exception("SPRO search query=%r", query)
-                result = SPROSearchResult.failure(
-                    error=f"Error searching IMG for '{query}': {e}",
-                    query=query,
-                    activities=[],
-                    activity_count=0,
-                    retrieved_at=now,
-                )
+        # Resolved outside the try: an unsupported session language must reach the caller.
+        t = lang.current("sap_spro_search")
+        try:
+            result = await _search_img(backend, t, query)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.exception("SPRO search query=%r", query)
+            result = SPROSearchResult.failure(
+                error=f"Error searching IMG for '{query}': {e}",
+                query=query,
+                activities=[],
+                activity_count=0,
+                retrieved_at=now,
+            )
 
         # Write to file if requested
         if output_file and result.success:

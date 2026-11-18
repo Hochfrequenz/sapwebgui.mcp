@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sapguimcp.backend.desktop import DesktopBackend
+from sapguimcp.backend.webgui.backend import WebGuiBackend
 from sapguimcp.models.abapgit_models import AbapGitActionResult
 from sapguimcp.models.sap_results import StatusBarInfo
 from sapguimcp.tools import abapgit_tools
@@ -34,8 +34,8 @@ def _no_settings_credentials():
 
 
 def _backend(status: StatusBarInfo) -> Any:
-    backend = MagicMock(spec=DesktopBackend)
-    backend.backend_type = "desktop"
+    backend = MagicMock(spec=WebGuiBackend)
+    backend.backend_type = "webgui"
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
     # the first read (right after the OK-code) is the transaction check; the report answers after F8
     backend.get_status_bar = AsyncMock(side_effect=[StatusBarInfo(type="none", message=""), status, status, status])
@@ -255,14 +255,14 @@ async def test_old_report_is_reported_as_too_old_for_a_key_pull_only() -> None:
 
 @pytest.mark.anyio
 async def test_transport_popup_guidance_names_key_for_a_key_pull() -> None:
-    popup = SimpleNamespace(message="Transport required: provide P_TRKORR", title="Error")
+    popup_text = "Transport required: provide P_TRKORR"
     for key, repo, expected in (
         (KEY, None, "sap_abapgit_pull(key=..., trkorr="),
         (None, "R", "sap_abapgit_pull(repo=..."),
     ):
         backend = _backend(StatusBarInfo(type="S", message="x"))
-        backend.check_popup = AsyncMock(return_value=popup)
-        result = await _abapgit_pull_via_api(backend, repo, None, None, None, key=key)
+        with patch.object(abapgit_tools, "_check_for_error_popup_webgui", new=AsyncMock(return_value=popup_text)):
+            result = await _abapgit_pull_via_api(backend, repo, None, None, None, key=key)
         assert not result.success
         assert expected in (result.error or "")
 

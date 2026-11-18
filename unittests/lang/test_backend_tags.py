@@ -64,6 +64,22 @@ KNOWN_UNUSED = {
     "spro.column_hits",
     "spro.column_parent",
     "spro.column_area",
+    # Read only by the desktop paths of the tools, which are deleted. The language-pack cleanup deletes these texts.
+    "common.no_entries",
+    "se09.compress",
+    "se09.expand",
+    "se16.results_title",
+    "se24.properties_tab",
+    "se37.attributes_tab",
+    "slg1.col_date",
+    "slg1.col_messages",
+    "slg1.col_time",
+    "sm37.col_client",
+    "sm37.col_created_by",
+    "sm37.col_duration",
+    "sm37.col_start_date",
+    "sm37.col_start_time",
+    "sm37.col_status",
 }
 
 EN = lang.pack_for("EN")

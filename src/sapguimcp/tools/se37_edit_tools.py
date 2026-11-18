@@ -21,7 +21,6 @@ from sapguimcp.tools.edit_helpers import describe_failed_replace
 from sapguimcp.tools.field_helpers import fill_field_with_keyboard, toggle_to_change_mode
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
 
@@ -29,9 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def _fill_fm_field(
-    backend: WebGuiBackend | DesktopBackend, function_module: str, attempt: int, t: LanguagePack
-) -> bool:
+async def _fill_fm_field(backend: WebGuiBackend, function_module: str, attempt: int, t: LanguagePack) -> bool:
     """Fill the SE37 function module name field. attempt==0 uses JS, retries use keyboard."""
     if attempt == 0:
         for label in t.se37.fm_field_label:
@@ -44,9 +41,7 @@ async def _fill_fm_field(
     return await fill_field_with_keyboard(backend, list(t.se37.fm_field_label), function_module)
 
 
-async def _open_fm_in_change_mode(
-    backend: WebGuiBackend | DesktopBackend, function_module: str, t: LanguagePack
-) -> str | None:
+async def _open_fm_in_change_mode(backend: WebGuiBackend, function_module: str, t: LanguagePack) -> str | None:
     """Navigate to SE37, display FM via F7, and toggle to change mode.
 
     Returns error message or None on success.
@@ -81,7 +76,7 @@ async def _open_fm_in_change_mode(
     return await toggle_to_change_mode(backend, t)
 
 
-async def _click_source_tab(backend: WebGuiBackend | DesktopBackend, t: LanguagePack) -> str | None:
+async def _click_source_tab(backend: WebGuiBackend, t: LanguagePack) -> str | None:
     """Click the source code tab in SE37. Returns error or None on success."""
     for tab_name in t.se37.source_tab:
         try:
@@ -94,9 +89,7 @@ async def _click_source_tab(backend: WebGuiBackend | DesktopBackend, t: Language
     return f"Could not find source code tab. Page: {str(snapshot)[:500]}"
 
 
-async def _navigate_to_fm_editor(
-    backend: WebGuiBackend | DesktopBackend, function_module: str, t: LanguagePack
-) -> str | None:
+async def _navigate_to_fm_editor(backend: WebGuiBackend, function_module: str, t: LanguagePack) -> str | None:
     """Navigate to SE37, open FM in change mode, click source tab.
 
     Returns error message or None on success.
@@ -108,7 +101,7 @@ async def _navigate_to_fm_editor(
 
 
 async def _edit_check_activate_fm(
-    backend: WebGuiBackend | DesktopBackend, function_module: str, new_source: str, t: LanguagePack
+    backend: WebGuiBackend, function_module: str, new_source: str, t: LanguagePack
 ) -> SE37EditResult:
     """Core edit logic: navigate, read backup, replace, check, activate, revert on failure."""
     nav_error = await _navigate_to_fm_editor(backend, function_module, t)

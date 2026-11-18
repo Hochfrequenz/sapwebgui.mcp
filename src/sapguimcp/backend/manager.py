@@ -3,15 +3,10 @@
 from __future__ import annotations
 
 import logging
-import sys
-from typing import TYPE_CHECKING
 
 from sapguimcp.backend.webgui.backend import WebGuiBackend
 from sapguimcp.backend.webgui.browser import close_browser_manager, get_browser_manager
 from sapguimcp.session_language import set_session_language
-
-if sys.platform == "win32" or TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +24,7 @@ class BackendManager:  # pylint: disable=too-few-public-methods
         session: str | None = None,
         agent_id: str | None = None,
         tool_name: str = "",
-    ) -> WebGuiBackend | DesktopBackend:
+    ) -> WebGuiBackend:
         """Get or create the WebGUI backend instance for the given session.
 
         Caches WebGuiBackend instances by session ID. Returns cached instance
@@ -72,24 +67,13 @@ async def get_backend(
     session: str | None = None,
     agent_id: str | None = None,
     tool_name: str = "",
-) -> WebGuiBackend | DesktopBackend:
+) -> WebGuiBackend:
     """Convenience: get a backend instance for the given session.
 
     This is the primary entry point for all tools.
     """
     manager = get_backend_manager()
     return await manager.get_or_create(session, agent_id, tool_name)
-
-
-async def get_desktop_backend(
-    session: str | None = None,
-    agent_id: str | None = None,
-    tool_name: str = "",
-) -> DesktopBackend:
-    """Get a DesktopBackend instance. Asserts backend_type is desktop."""
-    backend = await get_backend(session, agent_id, tool_name)
-    assert isinstance(backend, DesktopBackend)
-    return backend
 
 
 async def get_webgui_backend(

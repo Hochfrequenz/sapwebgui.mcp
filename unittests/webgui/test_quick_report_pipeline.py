@@ -108,14 +108,6 @@ class TestQuickReportPipeline:
         assert result.table is not None
         assert len(result.table.rows) == 1
 
-    async def test_desktop_backend_rejected(self) -> None:
-        """Desktop backend → immediate failure."""
-        backend = _make_backend()
-        backend.backend_type = "desktop"
-        result = await _execute_quick_report(backend, tcode="VA05")
-        assert result.success is False
-        assert "WebGUI" in result.error
-
     async def test_max_rows_zero_rejected(self) -> None:
         """max_rows=0 → immediate failure."""
         backend = _make_backend()

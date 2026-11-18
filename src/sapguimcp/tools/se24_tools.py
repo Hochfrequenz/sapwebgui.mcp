@@ -11,13 +11,12 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from sapguimcp import lang
-from sapguimcp.backend.desktop._com_thread import _RPC_E_DISCONNECTED, RERAISE_COM_ERRORS, _get_com_error_code
 from sapguimcp.backend.manager import get_backend
 from sapguimcp.backend.webgui.parsers.se24_parser import SE24TabSnapshots, map_visibility, parse_se24_snapshot
 from sapguimcp.backend.webgui.types import AriaSnapshot
@@ -27,18 +26,10 @@ from sapguimcp.models import (
     SE24FileSummary,
     SE24Result,
 )
-from sapguimcp.models.se24_models import SE24Attribute, SE24Method, SE24ObjectType
-from sapguimcp.tools.desktop_wait_predicates import (
-    named_text_field_present,
-    popup_closed_and_screen_changed,
-    screen_changed,
-    tab_table_control_loaded,
-)
+from sapguimcp.models.se24_models import SE24Attribute, SE24Method
 from sapguimcp.tools.field_helpers import fill_and_display
-from sapguimcp.tools.table_helpers import read_table_control_all_rows
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
     from sapguimcp.lang.text import Text
@@ -98,230 +89,7 @@ def _parse_attributes(rows: list[dict[str, str]], t: LanguagePack) -> list[SE24A
     return attributes
 
 
-# Upper bound for waiting on a state change after F7 / Enter. A lookup whose title and status text stay unchanged (e.g.
-# the same 'does not exist' message as before) must not cost more than the 3 s the former fixed waits took.
-_SE24_SCREEN_WAIT_MS = 3000
-
-
-async def _click_tab(backend: DesktopBackend, tab: Text) -> str | None:
-    """Click a tab trying each label of the pack text. Returns the label that matched, or None when none did."""
-    for label in tab:
-        try:
-            await backend.click_tab(label)
-            await backend.wait_for_ready()
-            return label
-        except Exception:  # pylint: disable=broad-exception-caught
-            continue
-    logger.warning("Tab not found: %s", " / ".join(tab))
-    return None
-
-
-# The header data of a class or interface is on its properties tab, read by field name:
-# the description and package of a class and of an interface have different names
-_HEADER_TEXT_FIELDS = {
-    "VSEOCLASS-DESCRIPT": "description",
-    "VSEOINTERF-DESCRIPT": "description",
-    "DY_0152-DEVCLASS": "package",
-    "DY_0153-DEVCLASS": "package",
-    "DY_0152-SUPERCLASS": "superclass",
-}
-_HEADER_INTERFACE_DESCRIPTION = "VSEOINTERF-DESCRIPT"
-_HEADER_DESCRIPTION_FIELDS = ("VSEOCLASS-DESCRIPT", _HEADER_INTERFACE_DESCRIPTION)
-_HEADER_FINAL = "VSEOCLASS-CLSFINAL"  # checkbox
-_HEADER_INSTANTIATION = "SEOX-CREATABLE"  # combo box: public / protected / private / abstract
-# The key of 'abstract' in the instantiation combo box (private is '0'): the same in every logon language
-_ABSTRACT_INSTANTIATION_KEY = "3"
-_TYPE_TEXT_FIELDS = (31, 32)  # GuiTextField, GuiCTextField
-_TYPE_COMBO_BOX = 34
-_TYPE_CHECK_BOX = 42
-
-
-def _reraise_if_transient(exc: Exception) -> None:
-    """Re-raise a lost connection, the errors the COM thread retries and server faults: swallowing them would return
-    partial header data instead of surfacing the error."""
-    if _get_com_error_code(exc) in (_RPC_E_DISCONNECTED, *RERAISE_COM_ERRORS):
-        raise exc
-
-
-def _is_abstract_instantiation(session: Any, elem: Any, t: LanguagePack) -> bool:
-    """Whether the instantiation combo box says abstract: by its key, by its text if the key cannot be read."""
-    try:
-        return str(session.find_by_id(elem.id).key).strip() == _ABSTRACT_INSTANTIATION_KEY
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        _reraise_if_transient(exc)
-        logger.debug("SE24 instantiation key not readable, using the text", exc_info=True)
-        return t.se24.abstract.equals(str(elem.text).strip())
-
-
-def _read_se24_header(session: Any, flatten_fn: Any, t: LanguagePack) -> dict[str, str | bool]:
-    """The header data of the class or interface from the active properties tab (COM thread), by field name.
-
-    Keys: ``description``, ``package``, ``superclass`` (only a subclass shows it), ``object_type`` (``interface`` if
-    the interface description field is there, else ``class``), ``is_final`` and ``is_abstract``.
-    A value that cannot be read is left out and logged; the others are still read.
-    """
-    values: dict[str, str | bool] = {}
-    try:
-        wnd = session.find_by_id("wnd[0]")
-        elements = list(flatten_fn(wnd.dump_tree()))
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        _reraise_if_transient(exc)
-        logger.warning("SE24 header data could not be read from the properties tab", exc_info=True)
-        return values
-    for elem in elements:
-        name = getattr(elem, "name", "")
-        kind = getattr(elem, "type_as_number", None)
-        try:
-            if name in _HEADER_TEXT_FIELDS and kind in _TYPE_TEXT_FIELDS:
-                values[_HEADER_TEXT_FIELDS[name]] = str(elem.text).strip()
-                if name in _HEADER_DESCRIPTION_FIELDS:
-                    values["object_type"] = (
-                        "interface" if name == _HEADER_INTERFACE_DESCRIPTION else "class"
-                    )  # lang-ok: model value
-            elif name == _HEADER_FINAL and kind == _TYPE_CHECK_BOX:
-                values["is_final"] = bool(session.find_by_id(elem.id).selected)
-            elif name == _HEADER_INSTANTIATION and kind == _TYPE_COMBO_BOX:
-                values["is_abstract"] = _is_abstract_instantiation(session, elem, t)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            _reraise_if_transient(exc)
-            logger.warning("SE24 header field %s could not be read", name, exc_info=True)
-    return values
-
-
-async def _read_tab_rows(
-    backend: DesktopBackend, tab: Text, previous_rows: list[dict[str, str]]
-) -> list[dict[str, str]]:
-    """Select a tab and read its table control (#928).
-
-    SAP instantiates a tab page's subscreen lazily, so right after the click the table control may not exist yet
-    (reads as empty) or the previous tab's rows may still be returned. Only in those cases, i.e. empty rows or
-    rows identical to ``previous_rows``, wait until the clicked tab's own table control is in the tree and read
-    again. A populated tab therefore costs no extra wait.
-    """
-    from sapguimcp.backend.desktop._element_finder import _flatten  # pylint: disable=import-outside-toplevel
-
-    session = backend.require_session()
-    com = backend.com
-
-    def _read_tc() -> list[dict[str, str]]:
-        return read_table_control_all_rows(session, _flatten)
-
-    label = await _click_tab(backend, tab)
-    rows = await com.run(_read_tc, retry_server_fault=True)
-    if label is not None and (not rows or rows == previous_rows):
-        if not await backend.wait_for_condition(tab_table_control_loaded(label), timeout_ms=3000, poll_ms=250):
-            logger.debug("SE24 tab %s: table control did not appear within 3 s", label)
-        rows = await com.run(_read_tc, retry_server_fault=True)
-    return rows
-
-
-async def _lookup_class_desktop(  # pylint: disable=too-many-locals,too-many-statements
-    backend: WebGuiBackend | DesktopBackend, class_name: str, t: LanguagePack
-) -> SE24Entry | SE24Error:
-    """Desktop-specific SE24 lookup using tab navigation and table control reading."""
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-    from sapguimcp.backend.desktop._element_finder import _flatten  # pylint: disable=import-outside-toplevel
-
-    now = datetime.now(UTC)
-    if not isinstance(backend, DesktopBackend):
-        return SE24Error(class_name=class_name, error="Requires DesktopBackend", retrieved_at=now)
-    await backend.wait_for_ready()
-
-    # Fill class name field
-    filled = False
-    for label in t.se24.class_field_label:
-        try:
-            await backend.fill_field(label, class_name.upper())
-            filled = True
-            break
-        except ValueError:
-            continue
-    if not filled:
-        filled = await backend.focus_and_type("SEOCLASS-CLSNAME", class_name.upper())
-    if not filled:
-        return SE24Error(class_name=class_name, error="Could not fill class name field", retrieved_at=now)
-
-    # Press F7 (Display) and wait for a state change (popup, new title or new status text) instead of a fixed
-    # time (#928). Enter is only needed to dismiss a language popup, so it is pressed only if one is open: after
-    # a failed lookup the message disappears on Enter and nothing else changes, which would wait for nothing.
-    before_title = (await backend.get_screen_info()).title or ""
-    before_f7 = (await backend.get_status_bar()).message.strip()
-    await backend.press_key("F7")
-    await backend.wait_for_ready()
-    await backend.wait_for_condition(screen_changed(before_title, before_f7), timeout_ms=_SE24_SCREEN_WAIT_MS)
-    if await backend.check_popup() is not None:
-        try:
-            await backend.press_key("Enter")
-            await backend.wait_for_ready()
-            # screen_changed would already be true because of the popup itself: wait until it is gone as well.
-            await backend.wait_for_condition(
-                popup_closed_and_screen_changed(before_title, before_f7), timeout_ms=_SE24_SCREEN_WAIT_MS
-            )
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-
-    # Check status bar for errors
-    sbar = await backend.get_status_bar()
-    if sbar.type == "E":
-        return SE24Error(class_name=class_name, error=sbar.message or "Class not found", retrieved_at=now)
-
-    # Verify we left the initial screen (title should contain the class name)
-    screen = await backend.get_screen_info()
-    if class_name.upper() not in (screen.title or "").upper():
-        # Always the generic text: the former unconditional Enter cleared SAP's own message ("<type> <name> does
-        # not exist", which also reads wrong in German) before it was read, so callers never saw it.
-        error_msg = f"Class/interface '{class_name}' not found"  # lang-ok: our own message
-        return SE24Error(class_name=class_name, error=error_msg, retrieved_at=now)
-
-    session = backend.require_session()
-    com = backend.com
-
-    def _read_tc() -> list[dict[str, str]]:
-        return read_table_control_all_rows(session, _flatten)
-
-    # Read methods tab: try reading first (default tab), click only if table is empty.
-    # SAP lazily instantiates tab subscreen controls — the table control may not
-    # exist in the widget tree until the tab is explicitly activated by a click.
-    methods_raw = await com.run(_read_tc, retry_server_fault=True)
-    if not methods_raw:
-        methods_raw = await _read_tab_rows(backend, t.se24.methods_tab, previous_rows=[])
-    attrs_raw = await _read_tab_rows(backend, t.se24.attributes_tab, previous_rows=methods_raw)
-    intfs_raw = await _read_tab_rows(backend, t.se24.interfaces_tab, previous_rows=attrs_raw)
-
-    # The header data (description, package, superclass, final, abstract) is on the properties tab. It is read last:
-    # that tab has a table control of its own (type groups) that must not be taken for the methods of the class.
-    await _click_tab(backend, t.se24.properties_tab)
-    # SAP instantiates the subscreen lazily and idle does not prove that it is there: wait for its description field
-    if not await backend.wait_for_condition(
-        named_text_field_present(_HEADER_DESCRIPTION_FIELDS), timeout_ms=3000, poll_ms=250
-    ):
-        logger.warning("SE24 properties tab: the description field did not appear within 3 s")
-    header = await com.run(lambda: _read_se24_header(session, _flatten, t), retry_server_fault=True)
-
-    # Class or interface: by which description field the properties tab shows (language independent)
-    header_type = header.get("object_type")
-    if header_type is None:  # the properties tab could not be read: fall back to the screen title
-        is_interface = t.se24.interface_label.contains(screen.title or "")
-    else:
-        is_interface = header_type == "interface"  # lang-ok: value
-    object_type: SE24ObjectType = "interface" if is_interface else "class"  # lang-ok: value
-
-    return SE24Entry(
-        class_name=class_name.upper(),
-        object_type=object_type,
-        description=str(header.get("description") or ""),
-        package=str(header.get("package") or ""),
-        superclass=str(header.get("superclass") or "") or None,
-        is_abstract=bool(header.get("is_abstract")),
-        is_final=bool(header.get("is_final")),
-        methods=_parse_methods(methods_raw, t),
-        attributes=_parse_attributes(attrs_raw, t),
-        interfaces=[name for row in intfs_raw if (name := t.se24.interface_label.first_key(row))],
-        retrieved_at=now,
-    )
-
-
-async def _capture_tab_snapshot(backend: WebGuiBackend | DesktopBackend, tab: Text) -> str | None:
+async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text) -> str | None:
     """Click a tab and capture its snapshot. Returns snapshot or None.
 
     After clicking, verifies the tab is actually ``[selected]`` in the ARIA
@@ -352,9 +120,7 @@ async def _capture_tab_snapshot(backend: WebGuiBackend | DesktopBackend, tab: Te
     return None
 
 
-async def _fill_and_display(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, t: LanguagePack
-) -> SE24Error | None:
+async def _fill_and_display(backend: WebGuiBackend, class_name: str, t: LanguagePack) -> SE24Error | None:
     """Fill the class field and press F7 (Display). Returns error or None.
 
     Delegates to the shared ``fill_and_display`` helper which uses real
@@ -377,7 +143,7 @@ async def _fill_and_display(
 
 
 async def _lookup_class_on_initial_screen(
-    backend: WebGuiBackend | DesktopBackend, class_name: str, t: LanguagePack
+    backend: WebGuiBackend, class_name: str, t: LanguagePack
 ) -> SE24Entry | SE24Error:
     """Look up a class assuming we're already on the SE24 initial screen.
 
@@ -415,9 +181,7 @@ async def _lookup_class_on_initial_screen(
     )
 
 
-async def _lookup_batch_se24_webgui(
-    backend: WebGuiBackend | DesktopBackend, class_list: list[str], t: LanguagePack
-) -> SE24Result:
+async def _lookup_batch_se24_webgui(backend: WebGuiBackend, class_list: list[str], t: LanguagePack) -> SE24Result:
     """Run SE24 lookups for a batch of classes on the WebGUI backend."""
     entries: list[SE24Entry] = []
     errors: list[SE24Error] = []
@@ -449,42 +213,6 @@ async def _lookup_batch_se24_webgui(
                     class_name=class_name, error=f"Error looking up '{class_name}': {e}", retrieved_at=datetime.now(UTC)
                 )
             )
-
-    if entries:
-        return SE24Result(entries=entries, errors=errors)
-    return SE24Result.failure(error=f"All {len(errors)} lookups failed", entries=[], errors=errors)
-
-
-async def _lookup_batch_se24_desktop(
-    backend: WebGuiBackend | DesktopBackend, class_list: list[str], t: LanguagePack
-) -> SE24Result:
-    """Run SE24 lookups for a batch of classes on the desktop backend."""
-    entries: list[SE24Entry] = []
-    errors: list[SE24Error] = []
-
-    for class_name in class_list:
-        await backend.enter_transaction("/n")
-        await backend.wait_for_ready()
-        tx_result = await backend.enter_transaction("SE24")
-        if not tx_result.success:
-            errors.append(
-                SE24Error(
-                    class_name=class_name,
-                    error=f"Failed to navigate to SE24: {tx_result.error}",
-                    retrieved_at=datetime.now(UTC),
-                )
-            )
-            continue
-        await backend.wait_for_ready()
-        try:
-            result = await _lookup_class_desktop(backend, class_name, t)
-            if isinstance(result, SE24Entry):
-                entries.append(result)
-            else:
-                errors.append(result)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("SE24 desktop lookup failed", extra={"class_name": class_name})
-            errors.append(SE24Error(class_name=class_name, error=f"Error: {e}", retrieved_at=datetime.now(UTC)))
 
     if entries:
         return SE24Result(entries=entries, errors=errors)
@@ -547,11 +275,7 @@ def register_se24_tools(mcp: FastMCP) -> None:
         # Resolved once, outside the per-class error handling: an unsupported language must not become an entry error
         t = lang.current("sap_se24_lookup")
 
-        # Route to desktop or WebGUI batch lookup
-        if backend.backend_type == "desktop":
-            final_result = await _lookup_batch_se24_desktop(backend, class_list, t)
-        else:
-            final_result = await _lookup_batch_se24_webgui(backend, class_list, t)
+        final_result = await _lookup_batch_se24_webgui(backend, class_list, t)
 
         # Write to file if requested
         if output_file:

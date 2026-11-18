@@ -25,7 +25,7 @@ import json
 import logging
 import re
 from importlib import resources
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 from fastmcp import Context, FastMCP
 from fastmcp.utilities.types import Image
@@ -80,7 +80,6 @@ from sapguimcp.tools.session_tools import (
 )
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
 
 __all__ = ["register_sap_tools", "SELECTORS", "parse_shortcut_from_title"]
@@ -209,76 +208,7 @@ SELECTORS: dict[str, str] = {
 # =============================================================================
 
 
-async def _get_button_tooltips_desktop(backend: Any) -> list[str]:
-    """Read Tooltip property from all buttons on the current screen (Desktop backend)."""
-    from typing import cast  # pylint: disable=import-outside-toplevel
-
-    from sapguimcp.backend.desktop import DesktopBackend  # pylint: disable=import-outside-toplevel
-    from sapguimcp.backend.desktop._element_finder import _flatten  # pylint: disable=import-outside-toplevel
-
-    if not isinstance(backend, DesktopBackend):
-        return []
-    session = backend.require_session()
-
-    def _read_tooltips() -> list[str]:
-        wnd = session.find_by_id("wnd[0]")
-        tree = cast(Any, wnd).dump_tree()
-        tooltips: list[str] = []
-        for elem in _flatten(tree):
-            if elem.type_as_number == 40 and elem.tooltip:  # GuiButton
-                tooltips.append(elem.tooltip)
-        return tooltips
-
-    return await backend.com.run(_read_tooltips)
-
-
-async def _transaction_desktop(
-    backend: "WebGuiBackend | DesktopBackend", tcode: str, new_window: bool
-) -> TransactionResult:
-    """Navigate to ``tcode`` on the desktop backend (sap_transaction after the shared reset and popup check)."""
-    if not new_window:
-        # For non-new_window: use backend.enter_transaction (handles OK-Code field)
-        # Backend always uses /n prefix for non-prefixed tcodes
-        result = await backend.enter_transaction(tcode)
-
-        # Small wait to let popup render if it appeared
-        await backend.wait(200)
-
-        if result.success:
-            # SAP stays on the screen it was on and reports the unknown code in the status bar, as a
-            # success message: the navigation itself raised no error.
-            status = await backend.get_status_bar()
-            if (status.message_id, status.message_number) == _TRANSACTION_NOT_FOUND_MESSAGE:
-                return TransactionResult.failure(
-                    status.message or f"Transaction {tcode} does not exist",  # lang-ok: our own message
-                    tcode=tcode,
-                )
-
-        return result
-
-    # new_window=True: delegate to backend
-    new_session_id, session_count, new_title = await backend.open_new_session(tcode)
-
-    if new_session_id is None:
-        return TransactionResult.failure(
-            f"new_window=True but no new session was created for {tcode}. "
-            "Possible causes: SAP session limit reached, popup blocking, or network delay.",
-            tcode=tcode,
-            new_window=True,
-            session_count=session_count,
-        )
-    return TransactionResult(
-        tcode=tcode,
-        page_title=new_title,
-        new_window=True,
-        session_id=new_session_id,
-        session_count=session_count,
-    )
-
-
-async def _transaction_webgui(
-    backend: "WebGuiBackend | DesktopBackend", tcode: str, new_window: bool
-) -> TransactionResult:
+async def _transaction_webgui(backend: "WebGuiBackend", tcode: str, new_window: bool) -> TransactionResult:
     """Navigate to ``tcode`` on the WebGUI backend (sap_transaction after the shared reset and popup check)."""
     if not new_window:
         # For non-new_window: use backend.enter_transaction (handles OK-Code field)
@@ -381,16 +311,8 @@ def _lookup_fields_webgui(tcode_upper: str) -> FieldLookupResult:
         return FieldLookupResult.failure(f"Error looking up fields: {e}", transaction=tcode_upper)
 
 
-async def _get_shortcut_titles_desktop(backend: "WebGuiBackend | DesktopBackend") -> list[str]:
-    """Titles to parse for shortcuts on the Desktop backend: the Tooltip property of all buttons, via COM."""
-    return await _get_button_tooltips_desktop(backend)
-
-
-async def _get_shortcut_titles_webgui(backend: "WebGuiBackend | DesktopBackend") -> list[str]:
+async def _get_shortcut_titles_webgui(backend: "WebGuiBackend") -> list[str]:
     """Titles to parse for shortcuts on the WebGUI backend: all title attributes, via JavaScript."""
-    from sapguimcp.backend.webgui.backend import WebGuiBackend  # pylint: disable=import-outside-toplevel
-
-    assert isinstance(backend, WebGuiBackend)
     titles: list[str] = await backend.evaluate_javascript("""() => {
             const elements = document.querySelectorAll('[title]');
             return Array.from(elements).map(el => el.title).filter(Boolean);
@@ -603,8 +525,6 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             )
 
         try:
-            if backend.backend_type == "desktop":
-                return await _transaction_desktop(backend, tcode, new_window)
             return await _transaction_webgui(backend, tcode, new_window)
 
         except ValueError as e:
@@ -642,12 +562,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return SessionStatus(status="unknown", message=f"Session error: {e}")
 
         try:
-            # Pass the session ID through explicitly. Both backends now accept
-            # an optional ``session_id`` parameter (issue #640) — desktop falls
-            # back to ``require_session()`` (which reads the ContextVar
-            # ``get_backend`` already set), webgui resolves the page from its
-            # registry. Without the explicit pass, the desktop side worked via
-            # the ContextVar but webgui silently probed the wrong session.
+            # Pass the session ID through explicitly: the backend resolves the page from its registry.
+            # Without it, the wrong session would be probed.
             return await backend.get_session_status(session_id=session)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Checking session status")
@@ -735,15 +651,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         try:
             # Fast popup check (~5ms) - only blocks if popup exists BEFORE keystroke
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    logger.debug("Popup already present before keystroke", extra={"key": key})
-                    return KeyboardResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        key=key,
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                logger.debug("Popup already present before keystroke", extra={"key": key})
+                return KeyboardResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    key=key,
+                    popup=popup,
+                )
 
             # Send the keystroke (backend handles bring_to_front, networkidle, status bar)
             result = await backend.press_key(key)
@@ -752,15 +667,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             await backend.wait(300)
 
             # Check if a popup appeared after the keystroke
-            if not backend.backend_type == "desktop":
-                popup_after = await backend.check_popup()
-                if popup_after:
-                    logger.debug("Popup appeared after keystroke", extra={"key": key})
-                    return KeyboardResult.failure(
-                        f"Popup blocking: {popup_after.message or 'confirmation required'}",
-                        key=key,
-                        popup=popup_after,
-                    )
+            popup_after = await backend.check_popup()
+            if popup_after:
+                logger.debug("Popup appeared after keystroke", extra={"key": key})
+                return KeyboardResult.failure(
+                    f"Popup blocking: {popup_after.message or 'confirmation required'}",
+                    key=key,
+                    popup=popup_after,
+                )
 
             return result
 
@@ -1207,10 +1121,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return ShortcutsResult.failure(str(e))
 
         try:
-            if backend.backend_type == "desktop":
-                titles = await _get_shortcut_titles_desktop(backend)
-            else:
-                titles = await _get_shortcut_titles_webgui(backend)
+            titles = await _get_shortcut_titles_webgui(backend)
 
             # Parse titles/tooltips for shortcuts (same format on both backends)
             shortcuts: list[ShortcutInfo] = []
@@ -1343,13 +1254,12 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         try:
             # Fast popup check (~5ms)
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return FillFormResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return FillFormResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    popup=popup,
+                )
 
             result = await backend.fill_form(fields)
 
@@ -1421,15 +1331,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         try:
             # Fast popup check (~5ms)
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return SetFieldResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        value=value,
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return SetFieldResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    value=value,
+                    popup=popup,
+                )
 
             await backend.fill_field(label, value)
             # selector_used is unavailable via the backend protocol (fill_field returns None)
@@ -1481,15 +1390,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return SetFieldResult.failure(str(e), label=label, value=str(checked))
 
         try:
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return SetFieldResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        value=str(checked),
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return SetFieldResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    value=str(checked),
+                    popup=popup,
+                )
             await backend.set_checkbox(label, checked)
             await backend.wait_for_ready()
             return SetFieldResult(label=label, value=str(checked))
@@ -1529,15 +1437,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return SetFieldResult.failure(str(e), label=label, value="selected")
 
         try:
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return SetFieldResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        value="selected",
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return SetFieldResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    value="selected",
+                    popup=popup,
+                )
             await backend.set_radio_button(label)
             await backend.wait_for_ready()
             return SetFieldResult(label=label, value="selected")
@@ -1584,14 +1491,13 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return ClickButtonResult.failure(str(e), label=label)
 
         try:
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return ClickButtonResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return ClickButtonResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    popup=popup,
+                )
             await backend.click_button(label)
             await backend.wait_for_ready()
             return ClickButtonResult(label=label)
@@ -1628,14 +1534,13 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             return SelectTabResult.failure(str(e), label=label)
 
         try:
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return SelectTabResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return SelectTabResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    popup=popup,
+                )
             await backend.click_tab(label)
             await backend.wait_for_ready()
             return SelectTabResult(label=label)
@@ -1677,15 +1582,14 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         try:
             backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_select_dropdown")
-            if not backend.backend_type == "desktop":
-                popup = await backend.check_popup()
-                if popup:
-                    return SelectDropdownResult.failure(
-                        f"Popup blocking: {popup.message or 'confirmation required'}",
-                        label=label,
-                        value=value,
-                        popup=popup,
-                    )
+            popup = await backend.check_popup()
+            if popup:
+                return SelectDropdownResult.failure(
+                    f"Popup blocking: {popup.message or 'confirmation required'}",
+                    label=label,
+                    value=value,
+                    popup=popup,
+                )
             result = await backend.select_dropdown(label, value)
             if not result.success:
                 return SelectDropdownResult.failure(

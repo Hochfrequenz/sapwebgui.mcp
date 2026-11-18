@@ -22,7 +22,6 @@ from sapguimcp.models.screen_state import SelectionScreenState
 from sapguimcp.tools.screen_state_helpers import ensure_screen_state
 
 if TYPE_CHECKING:
-    from sapguimcp.backend.desktop import DesktopBackend
     from sapguimcp.backend.webgui.backend import WebGuiBackend
     from sapguimcp.lang.schema import LanguagePack
 
@@ -37,7 +36,7 @@ _EASY_ACCESS_TITLES: tuple[str, ...] = (
 
 
 async def classify_result_screen(  # pylint: disable=too-many-return-statements
-    backend: WebGuiBackend | DesktopBackend,
+    backend: WebGuiBackend,
     t: LanguagePack,
 ) -> tuple[ScreenClassification, StatusBarInfo]:
     """Classify the current screen after F8.
@@ -102,7 +101,7 @@ _MAX_POST_F8_KEYS = 3
 _F8_MAX_RETRIES = 3
 
 
-async def _press_f8(backend: WebGuiBackend | DesktopBackend, t: LanguagePack, tcode: str, attempt: int) -> None:
+async def _press_f8(backend: WebGuiBackend, t: LanguagePack, tcode: str, attempt: int) -> None:
     """Execute the report by clicking the Execute button or pressing F8.
 
     Prefers a direct DOM click on the Execute button (reliable across all
@@ -132,7 +131,7 @@ async def _press_f8(backend: WebGuiBackend | DesktopBackend, t: LanguagePack, tc
 
 
 async def _execute_quick_report(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches
-    backend: WebGuiBackend | DesktopBackend,
+    backend: WebGuiBackend,
     tcode: str,
     fields: dict[str, str] | None = None,
     checkboxes: dict[str, bool] | None = None,
@@ -148,14 +147,6 @@ async def _execute_quick_report(  # pylint: disable=too-many-arguments,too-many-
     if max_rows < 1:
         return QuickReportResult.failure(
             error=f"max_rows must be >= 1, got {max_rows}",
-            tcode=tcode,
-            screen_type=ScreenClassification.ERROR,
-        )
-
-    # 1. Runtime guard: desktop backend
-    if backend.backend_type == "desktop":
-        return QuickReportResult.failure(
-            error="sap_quick_report requires WebGUI backend. Use individual tools on desktop.",
             tcode=tcode,
             screen_type=ScreenClassification.ERROR,
         )
@@ -186,7 +177,7 @@ async def _execute_quick_report(  # pylint: disable=too-many-arguments,too-many-
 
 
 async def _run_pipeline(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
-    backend: WebGuiBackend | DesktopBackend,
+    backend: WebGuiBackend,
     t: LanguagePack,
     tcode: str,
     fields: dict[str, str] | None,

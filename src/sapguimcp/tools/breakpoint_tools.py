@@ -276,7 +276,7 @@ async def _navigate_prog(backend: DesktopBackend, object_name: str) -> str | Non
     filled = await backend.focus_and_type("RS38M-PROGRAMM", object_name.upper())
     if not filled:
         filled = await fill_field_with_keyboard(
-            backend,
+            backend,  # type: ignore[arg-type]
             ["ABAP-Programmname", "ABAP Program Name", "ABAP program name", "Programm", "Program"],
             object_name.upper(),
         )
@@ -317,7 +317,7 @@ async def _navigate_clas(  # pylint: disable=too-many-statements
 
     filled = await backend.focus_and_type("SEOCLASS-CLSNAME", class_name.upper())
     if not filled:
-        filled = await fill_field_with_keyboard(backend, ["Objekttyp", "Object Type"], class_name.upper())
+        filled = await fill_field_with_keyboard(backend, ["Objekttyp", "Object Type"], class_name.upper())  # type: ignore[arg-type]
     if not filled:
         return f"Could not fill class name field for '{class_name}'"
 
@@ -408,7 +408,7 @@ async def _navigate_fugr(backend: DesktopBackend, function_module: str) -> str |
     # Try direct field fill first (RS37M-FUNCNAME), fall back to label-based keyboard fill
     filled = await backend.focus_and_type("RS37M-FUNCNAME", function_module.upper())
     if not filled:
-        filled = await fill_field_with_keyboard(backend, list(_SE37_FM_LABELS), function_module.upper())
+        filled = await fill_field_with_keyboard(backend, list(_SE37_FM_LABELS), function_module.upper())  # type: ignore[arg-type]
     if not filled:
         return f"Could not fill function module name field for '{function_module}'"
 
