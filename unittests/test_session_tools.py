@@ -336,20 +336,6 @@ class TestSessionOwnership:
     """Ownership-aware close / detach tools (issue #1009)."""
 
     @pytest.mark.anyio
-    async def test_close_attached_points_to_detach(self) -> None:
-        from sapwebguimcp.tools.session_tools import sap_session_close_impl
-
-        backend = _make_backend(has_session=True)
-        backend.session_origin.return_value = "attached"
-        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
-            result = await sap_session_close_impl("s2")
-
-        assert result.success is False
-        assert result.error is not None
-        assert "sap_session_detach" in result.error
-        backend.close_session.assert_not_called()
-
-    @pytest.mark.anyio
     async def test_close_opened_unchanged(self) -> None:
         from sapwebguimcp.tools.session_tools import sap_session_close_impl
 

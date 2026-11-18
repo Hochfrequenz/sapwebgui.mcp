@@ -1,6 +1,7 @@
 """Tests for the server module."""
 
 import asyncio
+import json
 
 from fastmcp import FastMCP
 
@@ -654,12 +655,18 @@ class TestNoRemovedBackendInToolDescriptions:
         "SAPUILandscape",
         "COM engine",
         "COM scripting",
-        "Desktop backend",
-        "desktop backend",
+        "On Desktop",
+        "(Desktop",
     )
 
     def test_descriptions_do_not_mention_the_removed_desktop_backend(self) -> None:
         for tool in asyncio.run(mcp.list_tools()):
-            desc = tool.description or ""
-            for word in self._FORBIDDEN:
-                assert word not in desc, f"{tool.name} description still mentions {word!r}"
+            texts = {
+                "description": tool.description or "",
+                "parameters": json.dumps(tool.parameters),
+                "output_schema": json.dumps(tool.output_schema or {}),
+            }
+            for where, text in texts.items():
+                assert "desktop backend" not in text.lower(), f"{tool.name} {where} mentions the desktop backend"
+                for word in self._FORBIDDEN:
+                    assert word not in text, f"{tool.name} {where} still mentions {word!r}"

@@ -176,25 +176,26 @@ This server only supports SAP Web GUI in a browser.
 
 BROWSER SETUP:
 On Windows, Chrome is auto-launched with debugging flags when not already running.
-If Chrome cannot be found automatically, set CHROME_PATH in the .env file.
+On Windows, if Chrome cannot be found automatically, set CHROME_PATH (MCP client env block).
+CHROME_PATH has no effect on macOS and Linux.
 On macOS and Linux (and in Docker) the user must start Chrome first with --remote-debugging-port=9222.
 The user may also pre-launch Chrome manually on Windows.
 
 IMPORTANT: Do NOT attempt to install Chrome or any browser.
 
 PREREQUISITES:
-- Chrome installed (auto-detected on Windows, or CHROME_PATH set in .env)
+- Chrome installed (Windows: auto-detected, or CHROME_PATH; macOS/Linux: started by the user)
 - VPN connected (if SAP system is on internal network)
 - CDP proxy running (only when this server runs in Docker)
 
 IF CONNECTION FAILS:
 Do NOT try to install browsers. Instead, ask the user to verify:
-1. "Is Chrome installed?" (set CHROME_PATH in .env if not auto-detected; auto-detection works on Windows only)
+1. "Is Chrome running with --remote-debugging-port=9222?" (Windows: the server starts it, set CHROME_PATH if it is not found; macOS/Linux: the user must start it)
 2. "Is your VPN connected?" (for internal SAP systems)
 3. "Is the CDP proxy running?" (Docker setups only: docker compose up -d)
 
 COMMON ERROR CAUSES:
-- "Chrome not found" / "Chrome konnte nicht ... gefunden werden": Set CHROME_PATH in .env
+- "Chrome not found" / "Chrome konnte nicht ... gefunden werden": Windows only: set CHROME_PATH
 - "SAP URL not reachable": VPN not connected
 - Login fails: Check user/password/client in ~/.config/sap-mcp/systems.json
 

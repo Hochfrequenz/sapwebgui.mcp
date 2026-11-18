@@ -386,9 +386,10 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Log into SAP. "
             "Needs Chrome (started with --remote-debugging-port=9222; on Windows it is auto-launched when not running) "
             "and a VPN connection if the SAP system is on an internal network. "
-            "The returned LoginResult.session_id is the registry ID ('s1', 's2', ...) you pass on "
-            "subsequent tool calls to address THIS specific login. "
-            "Use sap_session_list to see all currently active sessions. "
+            "Logs in on the current browser tab (registered as session 's1' on the first login); "
+            "calling sap_login again does not open a parallel session. "
+            "To work in a second session use sap_transaction(tcode, new_window=True), "
+            "which returns its session_id. "
             "Credentials are read from ~/.config/sap-mcp/systems.json. "
             "Use system_key (dictionary key from systems.json) to select a non-default system. "
             "Call sap_list_connections first to see available system keys."
@@ -413,10 +414,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
                 Use sap_list_connections to see available keys. Defaults to default_system.
 
         Returns:
-            LoginResult with ``session_id`` set to the registry ID of the
-            new session ('s1', 's2', ...). Subsequent tools that take a
-            ``session`` / ``session_id`` parameter can use that ID to
-            address this specific login when multiple sessions are active.
+            LoginResult. Its session_id is not set by the Web GUI backend;
+            use sap_session_list for session IDs.
         """
         session_id = get_mcp_session_id(ctx)
         return await sap_login_impl(url=url, client=client, system_key=system_key, session_id=session_id)
@@ -1614,11 +1613,9 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 Returns session IDs, current transaction, screen title, client, user, and
 system_name for each. Use this to see what sessions exist before targeting one.
 
-The first sap_login() registers "s1". Additional sessions come from:
-- repeated sap_login() calls (parallel multi-mandant — each new login adds
-  a session alongside the existing ones, not replacing them — see #671)
-- sap_transaction(tcode, new_window=True) (a /o sub-session of an existing
-  connection, sharing its login)"""
+The first sap_login() registers "s1". Additional sessions come from
+sap_transaction(tcode, new_window=True) (a /o sub-session of an existing
+connection, sharing its login)."""
     )
     async def sap_session_list() -> SessionListResult:
         """List all active sessions."""

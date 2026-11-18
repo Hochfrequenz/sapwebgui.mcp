@@ -65,10 +65,8 @@ class LoginResult(ToolResult):
     session_id: str | None = Field(
         default=None,
         description=(
-            "Registry session ID assigned to the new login (e.g. 's1', 's2'). "
-            "Pass this as the 'session' / 'session_id' parameter on subsequent "
-            "tool calls to address this specific login when multiple parallel "
-            "sessions are active."
+            "Not set by the Web GUI backend (always None). Use sap_session_list to see session IDs; "
+            "sap_transaction(new_window=True) returns the ID of a new session."
         ),
     )
 

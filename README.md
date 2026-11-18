@@ -12,6 +12,7 @@ It controls SAP through a Chrome browser, so it runs on Windows, macOS and Linux
 You use it from Claude Desktop, Claude Code, or [opencode](https://opencode.ai).
 Because it drives the real SAP UI (not a headless API), it is especially well-suited for **end-to-end testing**, **visual validation**, and **capturing screenshots for documentation**.
 The MCP server works with both SAP R/3 and S/4.
+The WebGUI driver is less mature than the SAP GUI for Windows driver in [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp).
 
 Because every SAP screen is a browser tab, the agent can also switch to another tab while the first one is still updating, which allows concurrent workflows (see `sap_session_bind` in [Capabilities](#capabilities)).
 
@@ -43,7 +44,7 @@ Setup is a linear path of five steps:
 4. [Register the server with your MCP client](#step-4-register-the-server-with-your-mcp-client) (Claude Code, Claude Desktop or opencode).
 5. [Verify the setup](#step-5-verify-the-setup) and try a first prompt.
 
-Docker users follow the [Docker section](#docker) instead of steps 1, 3 and 4.
+Docker users follow the [Docker section](#docker) instead of steps 1 and 4; they must still start Chrome themselves ([Step 3](#step-3-start-chrome-with-remote-debugging)).
 
 **Before you start, you need:**
 
@@ -65,6 +66,8 @@ Docker users follow the [Docker section](#docker) instead of steps 1, 3 and 4.
 ### Step 1: Install the server
 
 Pick one way to get the server. Each release on [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest) provides standalone executables and a Docker image.
+
+Until the first release is published, the release links and the Docker image below do not exist yet: install from source (Option B), or build the image yourself with `docker build -t ghcr.io/hochfrequenz/sapwebgui.mcp:latest .` in a clone.
 
 #### Option A: Standalone executable (Windows, macOS - no Python needed)
 
@@ -88,7 +91,7 @@ If Smart App Control still blocks execution, contact your IT administrator rathe
 
 **macOS Gatekeeper:** If macOS refuses to run the binary, clear the quarantine attribute and make it executable: `xattr -c sapwebgui_mcp_macos_arm64_<version>` and `chmod +x sapwebgui_mcp_macos_arm64_<version>`.
 
-There is no Linux binary. On Linux, use [Option B](#option-b-from-source-all-operating-systems) or [Docker](#docker).
+There is no Linux binary. On Linux, use [Option B](#option-b-from-source-all-operating-systems).
 
 The executable cannot start its own Playwright browser: it only supports `BROWSER_MODE=connect` (your own Chrome).
 
@@ -212,7 +215,7 @@ Register the server once with the client you use. The server name is up to you; 
 claude mcp add --scope user sap-webgui '--' C:/path/to/sapwebgui_mcp_windows_<version>.exe
 ```
 
-Together with `systems.json`, this is all Claude Code needs - no `.mcp.json` in any project folder. Two details matter:
+Together with `systems.json`, this is all Claude Code needs - no `.mcp.json` in any project folder. If you add environment variables with `-e` (see [Optional environment variables](#optional-environment-variables)), two details matter:
 
 - **Keep the server name (`sap-webgui`) before `-e`.** The `-e` option accepts several values, so a name placed after it is read as a second environment variable and the command fails with `error: missing required argument 'commandOrUrl'`.
 - **Keep the quotes around `'--'`.** If Claude Code was installed through npm, `claude` is a PowerShell script, and PowerShell silently drops an unquoted `--` before passing the arguments on. `-e` then swallows the executable path and the command fails with the same error. This works in PowerShell, bash and zsh (in bash or zsh, `'--'` and `--` are equivalent). In cmd.exe, single quotes are not quoting characters, so write a plain `--` instead.
@@ -321,9 +324,9 @@ For Claude Code with a user-scope registration there is no config file to edit: 
 
 ### Docker
 
-Use Docker instead of steps 1, 3 and 4 if you prefer not to install the executable or Python. Steps 2 (`systems.json`) and 5 still apply. Because the server then runs in a container, it cannot reach Chrome on your host directly, so a small CDP proxy is needed.
+Use Docker instead of steps 1 and 4 if you prefer not to install the executable or Python. Steps 2 (`systems.json`), 3 (start Chrome yourself) and 5 still apply. Because the server then runs in a container, it cannot reach Chrome on your host directly, so a small CDP proxy is needed.
 
-**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/), Chrome, and a VPN connection if your SAP system is on an internal network. Verify Docker is running:
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/), Chrome, and a VPN connection if your SAP system is on an internal network. (The Docker setup is described for Docker Desktop on Windows and macOS.) Verify Docker is running:
 
 ```powershell
 docker --version
@@ -483,7 +486,7 @@ All of these are optional. The server reads them from its process environment an
 | `BROWSER_TYPE`         | No                          | `chromium`, `firefox`, or `webkit`                                                                                                                 | `chromium`                       |
 | `BROWSER_HEADLESS`     | No                          | Run the browser in headless mode (applies to `BROWSER_MODE=launch`)                                                                                | `false`                          |
 | `CDP_URL`              | When `BROWSER_MODE=connect` | Chrome DevTools Protocol URL                                                                                                                       | `http://localhost:9222`          |
-| `CHROME_PATH`          | No                          | Explicit path to the Chrome binary. If empty, auto-detected (Windows only).                                                                        | `""` (auto-detect)               |
+| `CHROME_PATH`          | No                          | Windows only: explicit path to the Chrome binary for auto-launch. Ignored on macOS and Linux.                                                      | `""` (auto-detect)               |
 | `CHROME_USER_DATA_DIR` | No                          | User data directory for auto-launched Chrome                                                                                                       | `<tempdir>/chrome-debug`         |
 | `GITHUB_PAT`           | No                          | GitHub PAT for `log_feedback` issues and abapGit auth                                                                                              | -                                |
 | `GITHUB_USER`          | No                          | GitHub username for abapGit (falls back to `x-access-token`)                                                                                       | -                                |
@@ -494,18 +497,13 @@ All of these are optional. The server reads them from its process environment an
 
 ### Legacy `BACKEND_TYPE` setting
 
-Earlier versions of the combined project selected their backend with `BACKEND_TYPE`. This server has only the Web GUI backend and does not read that variable. Only one value is noticed, to help users who still have an old configuration: if `BACKEND_TYPE` is `desktop` (case-insensitive, key and value; set in the process environment or in a `.env` file in the working directory, where the environment wins), the server writes a warning to its log at startup and appends a notice to the server instructions that point the agent to [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp). The server still starts and works as a Web GUI server. Any other value is ignored silently. Remove the variable from your configuration.
+Earlier versions of the combined project selected their backend with `BACKEND_TYPE`. This server has only the Web GUI backend and does not read that variable. Only one value is noticed, to help users who still have an old configuration: if `BACKEND_TYPE` is `desktop` (case-insensitive, key and value; set in the process environment or in a `.env` file in the working directory, where the environment wins), the server writes a warning to its log at startup and appends a notice to the server instructions that points the agent to [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp). The server still starts and works as a Web GUI server. Any other value is ignored silently. Remove the variable from your configuration.
 
 ## Logging
 
 The server logs to **stderr** by default using a structured text format (stdout carries the MCP protocol). Set `LOG_FORMAT=json` for machine-readable JSON output and `LOG_LEVEL` to change the level.
 
-Each release publishes binaries for Windows and macOS, plus `checksums.txt`:
-
-- `sapwebgui_mcp_windows_<version>.exe` (Windows)
-- `sapwebgui_mcp_macos_arm64_<version>` (macOS, Apple Silicon)
-
-The binaries honour user overrides via `.env` or environment variables.
+The release binaries (see [Step 1](#option-a-standalone-executable-windows-macos---no-python-needed)) honour user overrides via `.env` or environment variables.
 
 ## Troubleshooting
 
@@ -625,7 +623,7 @@ ports:
 
 ### Docker image pull fails
 
-If you see "unauthorized" or "access denied" when pulling the image, you need to authenticate with GitHub Container Registry.
+If the image is private, you need to authenticate with GitHub Container Registry. If you see "manifest unknown", no release has been published yet.
 
 **Step 1: Create a GitHub Personal Access Token**
 

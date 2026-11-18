@@ -114,7 +114,7 @@ BROWSER_MODE=connect
 CDP_URL=http://localhost:9222
 ```
 
-`SAP_LANGUAGE` is read by the tests only (they pick their expected UI texts and snapshot suffix from it); the language the server logs on with comes from the system's `language` in `systems.json`. Keep both the same. Set `SAP_URL` only if the WebGUI URL differs from `{host}/sap/bc/gui/sap/its/webgui`. To run against another file, point `SAP_CONFIG_FILE` at it.
+`SAP_LANGUAGE` is read by the tests only (they pick their expected UI texts and snapshot suffix from it); the language the server logs on with comes from the system's `language` in `systems.json`. Keep both the same. `SAP_URL` is used only for a system without `host`; it never overrides `host`. To run against another file, point `SAP_CONFIG_FILE` at it.
 
 ## Running the Tests
 
