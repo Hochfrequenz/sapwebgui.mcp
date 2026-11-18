@@ -190,7 +190,8 @@ PREREQUISITES:
 
 IF CONNECTION FAILS:
 Do NOT try to install browsers. Instead, ask the user to verify:
-1. "Is Chrome running with --remote-debugging-port=9222?" (Windows: the server starts it, set CHROME_PATH if it is not found; macOS/Linux: the user must start it)
+1. "Is Chrome running with --remote-debugging-port=9222?"
+   (Windows: the server starts it, set CHROME_PATH if it is not found; macOS/Linux: the user must start it)
 2. "Is your VPN connected?" (for internal SAP systems)
 3. "Is the CDP proxy running?" (Docker setups only: docker compose up -d)
 
