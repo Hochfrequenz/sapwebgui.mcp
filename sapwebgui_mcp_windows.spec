@@ -1,18 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
 """Canonical PyInstaller spec for the Windows .exe build.
 
-Invoked by ``tox -e build_executable`` and by the CI job in
-``.github/workflows/build_executable.yml``.
+Invoked by the CI job in ``.github/workflows/build_executable.yml`` and locally via
+``uv run --group build_executable pyinstaller --noconfirm sapwebgui_mcp_windows.spec``.
 
-Set ``SAPGUI_BUILD_NAME`` to control the output filename (defaults to
-``sapwebgui_mcp_windows`` — public variant).
+Set ``SAPWEBGUI_BUILD_NAME`` to control the output filename (defaults to
+``sapwebgui_mcp_windows``).
 """
 
 import os
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
-# --- CLI flags from the former tox command line, preserved here ---
+# --- PyInstaller options needed by the dependencies ---
 # - fastmcp uses importlib.metadata.version("fastmcp") at import time
 # - fastmcp -> docket -> fakeredis needs commands.json data files
 # - fastmcp -> docket -> fakeredis -> lupa needs Lua runtime submodules
@@ -25,7 +25,7 @@ datas += collect_data_files("sapwebguimcp")
 datas += copy_metadata("fastmcp")
 hiddenimports += collect_submodules("lupa")
 
-name = os.environ.get("SAPGUI_BUILD_NAME", "sapwebgui_mcp_windows")
+name = os.environ.get("SAPWEBGUI_BUILD_NAME", "sapwebgui_mcp_windows")
 
 a = Analysis(
     ["src\\sapwebguimcp\\server.py"],
