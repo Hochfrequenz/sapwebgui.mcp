@@ -24,7 +24,6 @@ class TestSapGuiSettings:
         assert settings.browser_type == BrowserType.CHROMIUM
         assert settings.browser_headless is False
         assert settings.cdp_url == "http://localhost:9222"
-        assert settings.script_roots == ""
 
     def test_env_variable_loading(self) -> None:
         """Test that environment variables are loaded correctly."""
@@ -34,7 +33,6 @@ class TestSapGuiSettings:
             "BROWSER_TYPE": "firefox",
             "BROWSER_HEADLESS": "true",
             "CDP_URL": "http://localhost:9333",
-            "SCRIPT_ROOTS": "/opt/scripts:/home/scripts",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -45,7 +43,6 @@ class TestSapGuiSettings:
         assert settings.browser_type == BrowserType.FIREFOX
         assert settings.browser_headless is True
         assert settings.cdp_url == "http://localhost:9333"
-        assert settings.script_roots == "/opt/scripts:/home/scripts"
 
     def test_validate_for_browser_connect_mode_missing_cdp(self) -> None:
         """Test validation when in connect mode without CDP URL."""

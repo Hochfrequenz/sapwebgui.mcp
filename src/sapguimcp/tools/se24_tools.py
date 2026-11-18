@@ -18,7 +18,7 @@ from mcp.types import ToolAnnotations
 
 from sapguimcp import lang
 from sapguimcp.backend.manager import get_backend
-from sapguimcp.backend.webgui.parsers.se24_parser import SE24TabSnapshots, map_visibility, parse_se24_snapshot
+from sapguimcp.backend.webgui.parsers.se24_parser import SE24TabSnapshots, parse_se24_snapshot
 from sapguimcp.backend.webgui.types import AriaSnapshot
 from sapguimcp.models import (
     SE24Entry,
@@ -26,7 +26,6 @@ from sapguimcp.models import (
     SE24FileSummary,
     SE24Result,
 )
-from sapguimcp.models.se24_models import SE24Attribute, SE24Method
 from sapguimcp.tools.field_helpers import fill_and_display
 
 if TYPE_CHECKING:
@@ -46,47 +45,6 @@ MAX_INLINE_OBJECTS = 5
 # =============================================================================
 # SE24 Navigation Helpers
 # =============================================================================
-
-
-def _parse_methods(rows: list[dict[str, str]], t: LanguagePack) -> list[SE24Method]:
-    """Parse methods table rows into SE24Method models."""
-    methods: list[SE24Method] = []
-    for row in rows:
-        name = t.se24.method_column.first_key(row) or ""
-        if not name:
-            continue
-        kind = t.se24.kind_column.first_key(row) or ""
-        methods.append(
-            SE24Method(
-                name=name,
-                visibility=map_visibility(t, t.se24.visibility_column.first_key(row), exact=False),
-                is_static=t.se24.static.contains(kind),
-                description=t.se24.description_column.first_key(row) or "",
-            )
-        )
-    return methods
-
-
-def _parse_attributes(rows: list[dict[str, str]], t: LanguagePack) -> list[SE24Attribute]:
-    """Parse attributes table rows into SE24Attribute models."""
-    attributes: list[SE24Attribute] = []
-    for row in rows:
-        name = t.se24.attribute_column.first_key(row) or ""
-        if not name:
-            continue
-        kind = t.se24.kind_column.first_key(row) or ""
-        attributes.append(
-            SE24Attribute(
-                name=name,
-                visibility=map_visibility(t, t.se24.visibility_column.first_key(row), exact=False),
-                is_static=t.se24.static.contains(kind),
-                is_constant=t.se24.constant.contains(kind),
-                type_ref=t.se24.type_ref_column.first_key(row) or "",
-                default_value=t.se24.initial_value_column.first_key(row) or None,
-                description=t.se24.description_column.first_key(row) or "",
-            )
-        )
-    return attributes
 
 
 async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text) -> str | None:

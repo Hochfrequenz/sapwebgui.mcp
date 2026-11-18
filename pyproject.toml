@@ -25,10 +25,8 @@ dependencies = [
     "playwright>=1.40.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "pywin32>=306; sys_platform == 'win32'",
     "rapidfuzz>=3.0.0",  # Fuzzy string matching for catalog search
     "sap-mcp-config>=2.0.0,<3",  # Shared SAP system credentials config. 2.0.0 for the required `supported_languages` argument: sapguimcp passes its supported languages (lang.supported_languages()), so an unsupported language in systems.json fails at load time (Hochfrequenz/sap-mcp-config#37 for ${env:VAR} placeholders, available since 1.1.0).
-    "sapsucker>=1.5.0",  # Typed SAP GUI Scripting wrapper. >=1.5.0: the BDT field probe uses the real GuiComponentType numbers (older versions probed radio buttons, checkboxes and labels with 42, 43 and 46 instead of 41, 42 and 30, Hochfrequenz/sapsucker#117); our dump_tree BDT tests rely on the fix. Earlier: >=1.4.0 for GuiStatusbar message_id/message_number/message_parameter (Hochfrequenz/sapsucker#116, Hochfrequenz/sapgui.mcp#917). Earlier: >=1.3.0 for GuiComboBox.key (Hochfrequenz/sapsucker#114, fixes Hochfrequenz/sapgui.mcp#903) — without it `combo.key = ...` in sap_run_script is a silent no-op. Earlier: >=1.1.1 for the SAP GUI COM error 618 "Bad index type for collection access" workaround on collection.Item(int) (Hochfrequenz/sapsucker#61) — without it desktop sap_login spins to a 30s timeout on some Windows/SAP GUI 8.0 hosts (Hochfrequenz/sapgui.mcp#804). Earlier: >=0.6.1 for explicit wrap_com_object re-export (mypy --strict compat, sapsucker#47); >=0.5.1 for post-login client/user verification + parallel-multi-mandant safe behaviour (#24, #27); >=0.4.0 for GuiSession.GetObjectTree fast-path dump_tree.
 ]
 dynamic = ["readme", "version"]
 
@@ -117,7 +115,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["sapguimcp"]
-known-third-party = ["sap_mcp_config", "sapsucker"]
+known-third-party = ["sap_mcp_config"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests: assertions are the point of a test suite (PLR2004 is already ignored globally).
@@ -131,21 +129,10 @@ known-third-party = ["sap_mcp_config", "sapsucker"]
 # is held to the full rule-set. Burn these down in a follow-up (see PR description).
 "scripts/add_inline_results.py" = ["E402", "PTH123"] # module-import-not-at-top-of-file, builtin-open
 "scripts/consolidate_catalog.py" = ["E402", "PTH123"] # module-import-not-at-top-of-file, builtin-open
-"scripts/explore_issue_717.py" = ["F841", "S110"] # unused-variable, try-except-pass
 "scripts/harvest_lang_texts.py" = ["S608"] # hardcoded-sql-expression: every value is checked against a technical-ID regex first
-"scripts/probe_dcs_full_enum.py" = ["PLC0415", "S110", "SIM105"] # import-outside-top-level, try-except-pass, suppressible-exception
-"scripts/probe_tree_context_menu.py" = ["F401", "PLC0415", "RET504", "S110", "SIM105"] # unused-import, import-outside-top-level, unnecessary-assign, try-except-pass, suppressible-exception
 "scripts/smoke_test_exe.py" = ["PTH113", "S101", "S603", "SIM115"] # os-path-isfile, assert, subprocess-without-shell-equals-true, open-file-with-context-handler
-"scripts/validate_pr_629.py" = ["B007", "PLC0415", "PLW1510", "RUF100", "S101", "S603", "S607"] # unused-loop-control-variable, import-outside-top-level, subprocess-run-without-check, unused-noqa, assert, subprocess-without-shell-equals-true, start-process-with-partial-path
 "src/sapguimcp/__init__.py" = ["PLC0415", "RUF022"] # import-outside-top-level, unsorted-dunder-all
 "src/sapguimcp/backend/__init__.py" = ["RUF022"] # unsorted-dunder-all
-"src/sapguimcp/backend/desktop/__init__.py" = ["ARG002", "E402", "PIE810", "PLC0207", "PLC0415", "PTH108", "PTH118", "PTH123", "S110", "SIM108", "TC006", "UP041"] # unused-method-argument, module-import-not-at-top-of-file, multiple-starts-ends-with, missing-maxsplit-arg, import-outside-top-level, os-unlink, os-path-join, builtin-open, try-except-pass, if-else-block-instead-of-if-exp, runtime-cast-value, timeout-error-alias
-"src/sapguimcp/backend/desktop/_com_thread.py" = ["PLC0415", "UP035"] # import-outside-top-level, deprecated-import
-"src/sapguimcp/backend/desktop/_element_finder.py" = ["S112"] # try-except-continue
-"src/sapguimcp/backend/desktop/_landscape.py" = ["PLC0415", "S314"] # import-outside-top-level, suspicious-xml-element-tree-usage
-"src/sapguimcp/backend/desktop/_session_registry.py" = ["UP035"] # deprecated-import
-"src/sapguimcp/backend/desktop/_snapshot_render.py" = ["TC002"] # typing-only-third-party-import
-"src/sapguimcp/backend/desktop/_truncation.py" = ["TC002"] # typing-only-third-party-import
 "src/sapguimcp/backend/manager.py" = ["S101", "SIM102"] # assert, collapsible-if
 "src/sapguimcp/backend/webgui/backend.py" = ["ARG002", "PIE810", "PLC0207", "PLR0911", "RUF019", "S110", "SIM105", "SIM108"] # unused-method-argument, multiple-starts-ends-with, missing-maxsplit-arg, too-many-return-statements, unnecessary-key-check, try-except-pass, suppressible-exception, if-else-block-instead-of-if-exp
 "src/sapguimcp/backend/webgui/browser.py" = ["PLW0603", "RUF022", "UP045"] # global-statement, unsorted-dunder-all, non-pep604-annotation-optional
@@ -185,7 +172,6 @@ known-third-party = ["sap_mcp_config", "sapsucker"]
 "src/sapguimcp/tables/scraper.py" = ["PLC0415", "PTH123"] # import-outside-top-level, builtin-open
 "src/sapguimcp/tools/__init__.py" = ["RUF022"] # unsorted-dunder-all
 "src/sapguimcp/tools/abapgit_tools.py" = ["PLC0415", "PLW2901", "S101", "S110", "S112", "SIM105", "TC002", "UP037"] # import-outside-top-level, redefined-loop-name, assert, try-except-pass, try-except-continue, suppressible-exception, typing-only-third-party-import, quoted-annotation
-"src/sapguimcp/tools/breakpoint_tools.py" = ["PLC0415", "PLR0911", "RUF100", "S101", "S110", "S112", "SIM102", "SIM105", "TC002", "TC006"] # import-outside-top-level, too-many-return-statements, unused-noqa, assert, try-except-pass, try-except-continue, collapsible-if, suppressible-exception, typing-only-third-party-import, runtime-cast-value
 "src/sapguimcp/tools/browser_tools.py" = ["UP045"] # non-pep604-annotation-optional
 "src/sapguimcp/tools/confirmation_helpers.py" = ["PLR0911", "TC002"] # too-many-return-statements, typing-only-third-party-import
 "src/sapguimcp/tools/feedback_tools.py" = ["RUF006", "RUF022", "UP017"] # asyncio-dangling-task, unsorted-dunder-all, datetime-timezone-utc
@@ -211,28 +197,6 @@ known-third-party = ["sap_mcp_config", "sapsucker"]
 "src/sapguimcp/tools/spro_tools.py" = ["PLC0415", "S110", "SIM102", "SIM105", "TC002", "UP037"] # import-outside-top-level, try-except-pass, collapsible-if, suppressible-exception, typing-only-third-party-import, quoted-annotation
 "src/sapguimcp/tools/st22_tools.py" = ["PLC0415", "PLR0911", "S110", "TC001", "TC002", "UP037"] # import-outside-top-level, too-many-return-statements, try-except-pass, typing-only-first-party-import, typing-only-third-party-import, quoted-annotation
 "unittests/conftest.py" = ["PLC0415"] # import-outside-top-level
-"unittests/desktop/conftest.py" = ["F401", "PLC0415", "PLW0108", "RUF003", "S110", "SIM105", "UP035"] # unused-import, import-outside-top-level, unnecessary-lambda, ambiguous-unicode-character-comment, try-except-pass, suppressible-exception, deprecated-import
-"unittests/desktop/test_breakpoint_list_busy.py" = ["PLW0108"] # unnecessary-lambda
-"unittests/desktop/test_breakpoint_models.py" = ["PLC0415", "RUF012"] # import-outside-top-level, mutable-class-default
-"unittests/desktop/test_breakpoint_tools_confirmation.py" = ["ARG001", "PLW0108"] # unused-function-argument, unnecessary-lambda
-"unittests/desktop/test_breakpoint_tools_integration.py" = ["PLC0415"] # import-outside-top-level
-"unittests/desktop/test_com_thread.py" = ["PLC0415"] # import-outside-top-level
-"unittests/desktop/test_com_thread_stress.py" = ["RUF005", "S110", "SIM105"] # collection-literal-concatenation, try-except-pass, suppressible-exception
-"unittests/desktop/test_contextvar_routing.py" = ["F401", "PLC0415"] # unused-import, import-outside-top-level
-"unittests/desktop/test_desktop_backend.py" = ["ARG001", "F841", "PLC0415", "RUF059", "SIM117"] # unused-function-argument, unused-variable, import-outside-top-level, unused-unpacked-variable, multiple-with-statements
-"unittests/desktop/test_desktop_backend_reconcile.py" = ["ARG001"] # unused-function-argument
-"unittests/desktop/test_dump_tree_unit.py" = ["ARG001", "ARG005", "F401"] # unused-function-argument, unused-lambda-argument, unused-import
-"unittests/desktop/test_element_finder.py" = ["PLC0415", "RUF100"] # import-outside-top-level, unused-noqa
-"unittests/desktop/test_get_session_status_per_id.py" = ["ARG001", "PLC0415", "RUF100"] # unused-function-argument, import-outside-top-level, unused-noqa
-"unittests/desktop/test_issue_799_alv_integration.py" = ["TC006"] # runtime-cast-value
-"unittests/desktop/test_key_mapping.py" = ["PLC0415"] # import-outside-top-level
-"unittests/desktop/test_login_session_lifecycle.py" = ["ARG001", "S106"] # unused-function-argument, hardcoded-password-func-arg
-"unittests/desktop/test_multi_session_integration.py" = ["PLC0415", "PT018", "RUF059"] # import-outside-top-level, pytest-composite-assertion, unused-unpacked-variable
-"unittests/desktop/test_phase2_integration.py" = ["TC006"] # runtime-cast-value
-"unittests/desktop/test_phase3_integration.py" = ["F841"] # unused-variable
-"unittests/desktop/test_popup_rework_exploration.py" = ["F541", "PLC0415", "RUF015"] # f-string-missing-placeholders, import-outside-top-level, unnecessary-iterable-allocation-for-first-element
-"unittests/desktop/test_popup_rework_unit.py" = ["ARG001"] # unused-function-argument
-"unittests/desktop/test_session_bind_strict.py" = ["PLC0415"] # import-outside-top-level
 "unittests/test_backend_manager.py" = ["ARG001", "PT022"] # unused-function-argument, pytest-useless-yield-fixture
 "unittests/test_backend_protocol.py" = ["PLC0415"] # import-outside-top-level
 "unittests/test_catalog.py" = ["PLC0415", "PTH123"] # import-outside-top-level, builtin-open
@@ -344,7 +308,7 @@ sources = ["src"]
 testpaths = ["unittests"]
 strict_markers = true
 markers = [
-    "integration: test talks to a live SAP system (SAP GUI desktop via COM or SAP WebGUI). Deselect with -m 'not integration'.",
+    "integration: test talks to a live SAP system (SAP WebGUI). Deselect with -m 'not integration'.",
 ]
 log_cli = true
 log_cli_level = "INFO"

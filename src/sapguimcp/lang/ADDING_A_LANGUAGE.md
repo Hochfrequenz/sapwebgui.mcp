@@ -97,8 +97,6 @@ These are lessons from migrating DE and EN (#1044, PRs #1055–#1061):
   (`{name}`) and check the result on a real screen, not only on a one-line test string.
 - **Numbers and dates.** Hit counts accept every group separator. The date format still comes
   from the pack's `date_format`, not from the user's own settings (#1043).
-- **Known limitation:** `tools/breakpoint_tools.py` is not migrated (#1025) and still expects DE
-  or EN.
 
 ## Backend tags and the split of the packs (#1099)
 
