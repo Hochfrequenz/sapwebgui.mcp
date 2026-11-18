@@ -11,7 +11,6 @@ import pytest
 
 from sapguimcp.backend.desktop import DesktopBackend
 from sapguimcp.backend.desktop._session_registry import DesktopSessionRegistry
-from sapguimcp.backend.manager import BackendManager
 
 
 class FakeCom:
@@ -188,25 +187,6 @@ async def test_detach_unwatches_even_when_the_registry_held_the_only_reference()
     await backend.detach_session(sid)
 
     com.unwatch_connection.assert_called_once_with("/app/con[0]")
-
-
-@pytest.mark.anyio
-async def test_backend_manager_close_never_closes_sap_sessions() -> None:
-    backend, com = _backend()
-    # Construct neutrally (desktop is rejected off Windows), then select the desktop branch of close().
-    manager = BackendManager(backend_type="webgui")
-    manager.backend_type = "desktop"
-    manager._com_thread = com  # type: ignore[assignment]  # pylint: disable=protected-access
-    conn = MagicMock()
-    backend.registry.register(_session(conn, "/app/con[0]/ses[0]"), origin="attached")
-    manager._backends["desktop"] = backend  # type: ignore[assignment]  # pylint: disable=protected-access
-
-    await manager.close()
-
-    assert com.shutdown_called
-    conn.CloseSession.assert_not_called()
-    conn.CloseConnection.assert_not_called()
-    assert com.run_calls == 0
 
 
 # ---- static guard ----

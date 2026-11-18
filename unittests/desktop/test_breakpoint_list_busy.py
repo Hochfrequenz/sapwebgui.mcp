@@ -10,10 +10,14 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastmcp import Client
+from fastmcp import Client, FastMCP
 
 from sapguimcp.backend.desktop import DesktopBackend
-from sapguimcp.server import mcp
+from sapguimcp.tools import register_breakpoint_tools
+
+# The breakpoint tools are not registered on the server (WebGUI only); register them on a local app.
+mcp = FastMCP("breakpoint-tools-test")
+register_breakpoint_tools(mcp)
 
 _PATCH_GET_BACKEND = "sapguimcp.tools.breakpoint_tools.get_backend"
 _ARGS = {"object_type": "PROG", "object_name": "Z_TICTACTOE"}

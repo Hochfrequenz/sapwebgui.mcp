@@ -25,7 +25,7 @@ async def test_webgui_get_or_create_sets_session_language() -> None:
     browser_manager.get_or_create_session_page_checked = AsyncMock(
         side_effect=lambda session, *_: registry.get_page(session)
     )
-    manager = BackendManager(backend_type="webgui")
+    manager = BackendManager()
     with (
         patch("sapguimcp.backend.manager.get_browser_manager", AsyncMock(return_value=browser_manager)),
         use_language(None),

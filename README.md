@@ -358,7 +358,7 @@ For Claude Code, with a user-scope registration there is no config file to edit:
 
 ### Option B: WebGUI Backend (Browser)
 
-Automates SAP Web GUI through Chrome browser automation. Works on all platforms. This is the default - if you don't set `BACKEND_TYPE`, the server uses WebGUI.
+Automates SAP Web GUI through Chrome browser automation. Works on all platforms. This is the only backend this server uses.
 
 #### Step 1: Start Chrome with remote debugging
 
@@ -894,7 +894,6 @@ An unset or empty variable makes the config invalid, so the first tool call that
 
 | Variable               | Required                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Default                          |
 | ---------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `BACKEND_TYPE`         | No                          | `webgui` (browser automation) or `desktop` (SAP GUI COM, Windows only)                                                                                                                                                                                                                                                                                                                                                                                          | `webgui`                         |
 | `SAP_URL`              | No                          | Override WebGUI URL (default: derived from `host` in systems.json)                                                                                                                                                                                                                                                                                                                                                                                              | `""`                             |
 | `SAP_CONFIG_FILE`      | No                          | Path to systems.json (see table above for default per OS)                                                                                                                                                                                                                                                                                                                                                                                                       | (see above)                      |
 | `OUTPUT_DIR`           | No                          | Directory that `output_file` tool arguments (e.g. `sap_se16_query`) are sandboxed to. Set this when the server's cwd isn't your project directory.                                                                                                                                                                                                                                                                                                              | `""` (current working directory) |
@@ -1083,9 +1082,9 @@ docker pull ghcr.io/hochfrequenz/sapwebgui.mcp:latest
 
 ## Architecture
 
-The server supports two backends. Choose one via `BACKEND_TYPE`.
+The server always uses the WebGUI backend. SAP GUI for Windows support moved to [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp); `BACKEND_TYPE` is no longer read (setting it to `desktop` only logs a warning and adds a pointer to sapgui.mcp to the server instructions).
 
-**WebGUI Backend** (`BACKEND_TYPE=webgui`, default):
+**WebGUI Backend:**
 
 ```mermaid
 graph BT
@@ -1099,7 +1098,7 @@ graph BT
     CDP -- "CDP (Chrome DevTools Protocol)" --> Chrome
 ```
 
-**Desktop Backend** (`BACKEND_TYPE=desktop`, Windows only):
+**Desktop Backend** (legacy, no longer selectable):
 
 ```mermaid
 graph BT

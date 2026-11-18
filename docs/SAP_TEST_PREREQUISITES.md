@@ -98,10 +98,9 @@ The SE09 and ST22 live tests use the user returned by `sap_login`, so no user va
 
 SAP credentials are configured in `~/.config/sap-mcp/systems.json` (see [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config)).
 
-`.env` only needs the backend type and language:
+`.env` only needs the language:
 
 ```env
-BACKEND_TYPE=desktop
 SAP_LANGUAGE=DE
 ```
 
@@ -159,10 +158,9 @@ Invoke-WebRequest -Uri 'http://localhost:9222/json/version' -UseBasicParsing
 
 SAP credentials are configured in `~/.config/sap-mcp/systems.json` (see [sap-mcp-config](https://github.com/Hochfrequenz/sap-mcp-config)).
 
-`.env` only needs the backend type, URL, and browser settings:
+`.env` only needs the URL, language and browser settings:
 
 ```env
-BACKEND_TYPE=webgui
 SAP_URL=https://your-sap-server/sap/bc/gui/sap/its/webgui
 SAP_LANGUAGE=DE
 BROWSER_MODE=connect

@@ -3,8 +3,6 @@
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from sapguimcp.backend.manager import (
     BackendManager,
     close_backend,
@@ -13,23 +11,17 @@ from sapguimcp.backend.manager import (
 )
 
 
-def test_backend_manager_default_type() -> None:
-    """Default backend type should be 'webgui'."""
-    manager = BackendManager()
-    assert manager.backend_type == "webgui"
+def test_backend_manager_is_webgui() -> None:
+    """The backend type is fixed to 'webgui'."""
+    assert BackendManager().backend_type == "webgui"
 
 
-def test_backend_manager_unknown_type_raises() -> None:
-    """Unknown backend type should raise ValueError."""
-    with pytest.raises(ValueError, match="Unknown backend type"):
-        BackendManager(backend_type="unknown")  # type: ignore[arg-type]
-
-
-def test_get_backend_manager_reads_settings() -> None:
-    """get_backend_manager should read backend_type from settings."""
+def test_get_backend_manager_is_singleton() -> None:
+    """get_backend_manager should lazily create one shared manager."""
     reset_backend_manager()
     manager = get_backend_manager()
     assert manager.backend_type == "webgui"
+    assert get_backend_manager() is manager
     reset_backend_manager()
 
 

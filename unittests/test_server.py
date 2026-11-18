@@ -4,10 +4,7 @@ import asyncio
 
 from fastmcp import FastMCP
 
-from sapguimcp.models.config import get_settings
 from sapguimcp.server import mcp
-
-_backend_type = get_settings().backend_type
 
 
 class TestMcpServer:
@@ -19,8 +16,7 @@ class TestMcpServer:
 
     def test_mcp_server_has_correct_name(self) -> None:
         """Test that the server has the expected name."""
-        expected_name = "sap-desktop-mcp" if _backend_type == "desktop" else "sap-webgui-mcp"
-        assert mcp.name == expected_name
+        assert mcp.name == "sap-webgui-mcp"
 
     def test_sap_tools_are_registered(self) -> None:
         """Test that SAP-specific tools are registered."""
@@ -57,11 +53,9 @@ class TestMcpServer:
         assert result.error is None
         assert len(result.tools) > 0
 
-        # Verify known tools are present (browser_click only on webgui)
+        # Verify known tools are present (browser_click is WebGUI-only)
         tool_names = {t.name for t in result.tools}
-        expected_tools = {"sap_login", "sap_transaction", "log_intent"}
-        if _backend_type == "webgui":
-            expected_tools.add("browser_click")
+        expected_tools = {"sap_login", "sap_transaction", "log_intent", "browser_click"}
         assert expected_tools.issubset(tool_names), f"Missing tools: {expected_tools - tool_names}"
 
         # Verify tools have descriptions
@@ -74,8 +68,8 @@ class TestMcpServer:
         assert "Keyboard Shortcuts" in result.sap_knowledge, "Knowledge should contain shortcuts section"
         assert "sap_get_shortcuts" in result.sap_knowledge, "Knowledge should mention sap_get_shortcuts"
 
-    def test_browser_tools_registration_matches_backend(self) -> None:
-        """Browser tools registered on webgui, absent on desktop."""
+    def test_browser_tools_are_registered(self) -> None:
+        """WebGUI browser tools are registered."""
         tool_names = {tool.name for tool in asyncio.run(mcp.list_tools())}
         browser_tools = {
             "browser_click",
@@ -89,10 +83,7 @@ class TestMcpServer:
             "browser_get_html",
             "browser_select_option",
         }
-        if _backend_type == "webgui":
-            assert browser_tools.issubset(tool_names), f"Missing browser tools: {browser_tools - tool_names}"
-        else:
-            assert browser_tools.isdisjoint(tool_names), f"Browser tools should not be registered on desktop"
+        assert browser_tools.issubset(tool_names), f"Missing browser tools: {browser_tools - tool_names}"
 
     def test_catalog_tools_are_registered(self) -> None:
         """Test that transaction catalog tools are registered."""
@@ -512,13 +503,21 @@ class TestMcpServer:
             assert tool.description, f"{tool_name} has empty description"
             assert len(tool.description) > 20, f"{tool_name} description too short"
 
-    def test_sandbox_resource_registered_for_desktop_backend(self) -> None:
-        """Test that sandbox://sap_run_script resource is registered when desktop backend is used."""
+    def test_desktop_only_tools_and_resources_are_not_registered(self) -> None:
+        """COM, tree, script and breakpoint tools and the sandbox resource are not registered."""
+        tool_names = {tool.name for tool in asyncio.run(mcp.list_tools())}
+        desktop_only = {
+            "sap_com_snapshot",
+            "sap_com_evaluate",
+            "sap_run_script",
+            "sap_tree_context_menu",
+            "sap_breakpoint_set",
+            "sap_breakpoint_list",
+            "sap_breakpoint_delete",
+        }
+        assert desktop_only.isdisjoint(tool_names), f"Desktop-only tools registered: {desktop_only & tool_names}"
         resource_uris = {str(r.uri) for r in asyncio.run(mcp.list_resources())}
-        if _backend_type == "desktop":
-            assert "sandbox://sap_run_script" in resource_uris
-        else:
-            assert "sandbox://sap_run_script" not in resource_uris
+        assert "sandbox://sap_run_script" not in resource_uris
 
     # =========================================================================
     # MCP Prompts tests
