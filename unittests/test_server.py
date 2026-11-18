@@ -607,7 +607,6 @@ class TestToolDescriptionsIssue613:
         assert "sap_se16_query" in desc
         assert "sap_sm37_lookup" in desc
         assert "post_f8_keys" in desc
-        assert "WebGUI-only" in desc
 
     def test_sap_quick_report_description_length(self) -> None:
         desc = self._get_tools()["sap_quick_report"].description or ""
@@ -644,27 +643,23 @@ class TestToolDescriptionsIssue613:
         assert "key" not in schema.get("required", [])
 
 
-class TestConcurrencyNotesInSapToolDescriptions:
-    """Regression tests for serialization guidance in SAP scripting tool descriptions."""
+class TestNoRemovedBackendInToolDescriptions:
+    """Tool descriptions must not point the LLM at the removed desktop backend or its tools."""
 
-    @classmethod
-    def _get_tools(cls) -> dict:
-        return {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    _FORBIDDEN = (
+        "sap_com_evaluate",
+        "sap_run_script",
+        "sap_com_snapshot",
+        "sap_tree_read",
+        "SAPUILandscape",
+        "COM engine",
+        "COM scripting",
+        "Desktop backend",
+        "desktop backend",
+    )
 
-    def test_scripting_tools_document_same_connection_serialization(self) -> None:
-        tools = self._get_tools()
-        for tool_name in ["sap_login", "sap_transaction"]:
-            desc = tools[tool_name].description or ""
-            assert "Concurrency note" in desc, f"{tool_name} should include a concurrency note"
-            assert "serialized (no speedup)" in desc or "sequentially (no speedup)" in desc, (
-                f"{tool_name} should document serialization behavior"
-            )
-
-        for tool_name in ["sap_run_script", "sap_com_evaluate"]:
-            if tool_name not in tools:
-                continue
-            desc = tools[tool_name].description or ""
-            assert "Concurrency note" in desc, f"{tool_name} should include a concurrency note"
-            assert "serialized (no speedup)" in desc or "sequentially (no speedup)" in desc, (
-                f"{tool_name} should document serialization behavior"
-            )
+    def test_descriptions_do_not_mention_the_removed_desktop_backend(self) -> None:
+        for tool in asyncio.run(mcp.list_tools()):
+            desc = tool.description or ""
+            for word in self._FORBIDDEN:
+                assert word not in desc, f"{tool.name} description still mentions {word!r}"
