@@ -94,23 +94,12 @@ class PopupSection:
     """Popup titles, texts and buttons, matched in every registered language."""
 
     MERGE: ClassVar[MergeMode] = "all"
-    type_error: Text
-    """Keyword in a desktop popup's title or text that classifies it as an error (substring)."""
-    type_info: Text
-    """Keyword that classifies a desktop popup as information (substring, checked after ``type_error``)."""
-    type_confirm: Text
-    """Keyword that classifies a desktop popup as a confirmation (substring, checked last).
-
-    Short variants such as ``Ja`` and ``No`` also match inside other words, as they always did."""
     inactive_objects: Text
     """Title of the "Inactive Objects" popup during activation. ``fold=False``: the WebGUI checks it
     case-sensitively in the ARIA snapshot; the desktop lower-cases both sides itself."""
     original_language_title: Text
     """Title fragment of the "different original and logon languages" popup in a WebGUI ARIA
     snapshot (case-sensitive)."""
-    original_language_hint: RegexText
-    """The same popup on the desktop, searched in its lower-cased window title (EN: ``original`` and
-    ``language`` in either order)."""
     maintain_in_original: Text
     """Button of that popup that continues in the original language."""
     button_labels: Text
@@ -149,10 +138,6 @@ class StatusTypeSection:
     """Syntax check or activation success fragments (substring)."""
     check_error: Text
     """Syntax check error fragments (substring, checked after ``check_success``)."""
-    activation_confirmed: Text
-    """Desktop status-bar fragment that confirms an activation (substring)."""
-    activation_denied: Text
-    """Fragments that negate it: "konnte nicht aktiviert werden" contains "aktiviert" (substring)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,8 +157,6 @@ class SessionPagesSection:
     """Stem of that title for the case-insensitive ``SELECTORS["settings_button"]`` (test selector)."""
     okcode_option: Text
     """Settings menu entry that shows the OK-code field (Playwright ``text=``)."""
-    debugger_window: Text
-    """Start of the window title of an ABAP debugger session (case-sensitive prefix)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,7 +184,6 @@ class CommonSection:
     """Title fragment of a transaction's initial screen (substring)."""
     not_found: Text
     does_not_exist: Text
-    no_entries: Text
     row_select_hint: Text
     user: Text
     program: Text
@@ -215,8 +197,6 @@ class Se09Section:
     """Case-sensitive on purpose: the WebGUI check scans a whole snapshot, so ``common.display`` is too broad."""
     workbench_requests: Text
     customizing_requests: Text
-    expand: Text
-    compress: Text
     list_region: Text
     organizer_title: Text
     request_word: Text
@@ -277,8 +257,6 @@ class Se16Section:
     """Fragment of the "table does not exist" message; narrow on purpose, it scans a whole snapshot."""
     selection_columns: Text
     """Column headers that only the selection screen grid has (WebGUI)."""
-    results_title: Text
-    """Title fragments of the SE16N result list (desktop)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,17 +277,8 @@ class Se24Section:
     methods_tab: Text
     attributes_tab: Text
     interfaces_tab: Text
-    properties_tab: Text
     source_button: Text
     """Button that opens the source of the selected method."""
-    method_column: Text
-    """Column titles of the methods / attributes table controls (row dict keys, ``Columns(c).Title``)."""
-    attribute_column: Text
-    kind_column: Text
-    visibility_column: Text
-    description_column: Text
-    type_ref_column: Text
-    initial_value_column: Text
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,21 +290,12 @@ class Se37Section:
     fm_field_label: Text
     not_found: Text
     """Status bar / snapshot fragment: the function module does not exist (narrower than ``common``)."""
-    attributes_tab: Text
     import_tab: Text
     export_tab: Text
     changing_tab: Text
     tables_tab: Text
     exceptions_tab: Text
     source_tab: Text
-    parameter_name_column: Text
-    """Column titles of the parameter / exception table controls (row dict keys)."""
-    typing_column: Text
-    type_ref_column: Text
-    default_column: Text
-    optional_column: Text
-    pass_value_column: Text
-    short_text_column: Text
     exception_column: Text
 
 
@@ -379,9 +339,6 @@ class Slg1Section:
     to_datetime: Text
     log_number: Text
     """Log number column title, in the short desktop form and the long WebGUI form."""
-    col_date: Text
-    col_time: Text
-    col_messages: Text
     empty_cell: Text
     """What the WebGUI grid shows for an empty cell."""
 
@@ -403,7 +360,6 @@ class Sm30Section:
 class Sm37Section:
     MERGE: ClassVar[MergeMode] = "session_en"
     status: Mapping[JobStatus, Text]
-    col_status: Text
     job_name: Text
     """Selection label and list column of the job name (case-sensitive: SAP releases differ in the case)."""
     user_name: Text
@@ -422,11 +378,6 @@ class Sm37Section:
     selected_hint: Text
     event_driven: Text
     abap_program: Text
-    col_start_date: Text
-    col_start_time: Text
-    col_duration: Text
-    col_created_by: Text
-    col_client: Text
 
 
 @dataclass(frozen=True, slots=True)

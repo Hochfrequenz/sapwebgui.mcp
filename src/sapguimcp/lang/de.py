@@ -38,12 +38,10 @@ DE = LanguagePack(
     date_format="%d.%m.%Y",
     same_as_en=frozenset(
         {
-            "sm37.col_status",
             "se24.interface_label",
             "se37.import_tab",
             "se37.export_tab",
             "se37.changing_tab",
-            "se37.optional_column",
             "keys.names[Alt]",
             "keys.names[Escape]",
             "se09.organizer_title",
@@ -55,20 +53,15 @@ DE = LanguagePack(
         initial_screen=Text(("Einstieg",)),
         not_found=Text(("nicht gefunden",)),
         does_not_exist=Text(("existiert nicht", "ist noch nicht vorhanden", "nicht vorhanden")),
-        no_entries=Text(("Keine Einträge gefunden",)),
         row_select_hint=Text(("Zum Auswählen einer Zeile", "Zum Auswählen")),
         user=Text(("Benutzer",)),
         program=Text(("Programm",)),
     ),
     popup=PopupSection(
-        type_error=Text(("Fehler",)),
-        type_info=Text(("Information", "Hinweis")),
-        type_confirm=Text(("Bestätigung", "Ja", "Nein")),
         inactive_objects=Text(("Inaktive Objekte",), fold=False),
         original_language_title=Text(
             ("Abweichende Original- und Anmeldesprache", "Originalsprache und Anmeldesprache"), fold=False
         ),
-        original_language_hint=RegexText(("originalsprache", r"original-\s*und\s+anmeldesprache")),
         maintain_in_original=Text(("In Orig.spr. pflegen", "Pflege in Originalsprache")),
         button_labels=Text(("Ja", "Nein", "OK", "Abbrechen")),
         # The stem, as before: matches "Schließen" without depending on the encoding of ß.
@@ -91,8 +84,6 @@ DE = LanguagePack(
             ("keine Syntaxfehler", "kein Syntaxfehler", "Aktives Objekt wurde generiert", "Objekt wurde aktiviert")
         ),
         check_error=Text(("Syntaxfehler",)),
-        activation_confirmed=Text(("aktiviert",)),
-        activation_denied=Text(("nicht aktiv", "konnte nicht", "kann nicht", "fehlgeschlagen", "deaktiv", "inaktiv")),
     ),
     session_pages=SessionPagesSection(
         already_logged_on=Text(("bereits angemeldet",)),
@@ -102,7 +93,6 @@ DE = LanguagePack(
         settings_stem=Text(("Einstellung",)),
         okcode_option=Text(("OK-Code", "Transaktionsfeld")),
         # The DE window title reads "ABAP Debugger(1)  (exklusiv) ..."; other releases hyphenate it.
-        debugger_window=Text(("ABAP Debugger", "ABAP-Debugger"), fold=False),
     ),
     keys=KeysSection(
         names=canonical(
@@ -136,8 +126,6 @@ DE = LanguagePack(
         display_button=Text(("Anzeigen",), fold=False),
         workbench_requests=Text(("Workbench-Aufträge",)),
         customizing_requests=Text(("Customizing-Aufträge",)),
-        expand=Text(("Expandieren",)),
-        compress=Text(("Komprimieren",)),
         list_region=Text(("Liste",)),
         organizer_title=Text(("Transport Organizer",)),
         request_word=Text(("Auftrag", "Aufträge")),
@@ -161,7 +149,6 @@ DE = LanguagePack(
         empty_cell=Text(("Leer",)),
         table_not_found=Text(("existiert nicht",)),
         selection_columns=Text(("Feldname", "Von-Wert", "Bis-Wert", "Technischer Name")),
-        results_title=Text(("Treffer",)),
     ),
     se24=Se24Section(
         class_builder=Text(("Klassenpflege",)),
@@ -188,15 +175,7 @@ DE = LanguagePack(
         methods_tab=Text(("Methoden",)),
         attributes_tab=Text(("Attribute",)),
         interfaces_tab=Text(("Schnittstellen",)),
-        properties_tab=Text(("Eigenschaften",)),
         source_button=Text(("Quelltext", "Sourcecode", "Weiter zu Quelltext")),
-        method_column=Text(("Methode",)),
-        attribute_column=Text(("Attribut",)),
-        kind_column=Text(("Art",)),
-        visibility_column=Text(("Sichtbarkeit",)),
-        description_column=Text(("Beschreibung",)),
-        type_ref_column=Text(("Bezugstyp",)),
-        initial_value_column=Text(("Initialer Wert",)),
     ),
     se37=Se37Section(
         initial_screen=Text(("Function Builder: Einstieg",)),
@@ -204,20 +183,12 @@ DE = LanguagePack(
         function_builder=Text(("Function Builder", "Funktionsbaustein")),
         fm_field_label=Text(("Funktionsbaustein",), fold=False),
         not_found=Text(("ist noch nicht vorhanden", "nicht vorhanden")),
-        attributes_tab=Text(("Eigenschaften",)),
         import_tab=Text(("Import",)),
         export_tab=Text(("Export",)),
         changing_tab=Text(("Changing",)),
         tables_tab=Text(("Tabellen",)),
         exceptions_tab=Text(("Ausnahmen",)),
         source_tab=Text(("Quelltext",)),
-        parameter_name_column=Text(("Parametername",)),
-        typing_column=Text(("Typisierung",)),
-        type_ref_column=Text(("Bezugstyp",)),
-        default_column=Text(("Standardwert",)),
-        optional_column=Text(("Optional",)),
-        pass_value_column=Text(("Wertübergabe",)),
-        short_text_column=Text(("Kurztext",)),
         exception_column=Text(("Ausnahme",)),
     ),
     se38=Se38Section(
@@ -249,9 +220,6 @@ DE = LanguagePack(
         from_datetime=Text(("von (Datum/Uhrzeit)",)),
         to_datetime=Text(("bis (Datum/Uhrzeit)",)),
         log_number=Text(("Protokollnummer", "Protokollnr.")),
-        col_date=Text(("Datum",)),
-        col_time=Text(("Uhrzeit",)),
-        col_messages=Text(("Anzahl Nachr.",)),
         empty_cell=Text(("Leer",)),
     ),
     sm30=Sm30Section(
@@ -275,7 +243,6 @@ DE = LanguagePack(
                 JobStatus.CANCELED: Text(("Abgebrochen",)),
             }
         ),
-        col_status=Text(("Status",)),
         job_name=Text(("Jobname",), fold=False),
         user_name=Text(("Benutzername",), fold=False),
         from_date=Text(("von Datum",)),
@@ -289,11 +256,6 @@ DE = LanguagePack(
         selected_hint=Text(("Selektierte",), fold=False),
         event_driven=Text(("eventgesteuert",), fold=False),
         abap_program=Text(("ABAP Programm",), fold=False),
-        col_start_date=Text(("Startdatum",)),
-        col_start_time=Text(("Startzeit",)),
-        col_duration=Text(("Dauer", "Dauer(s)", "Dauer(sec.)")),
-        col_created_by=Text(("Ersteller", "Job-Erstelle", "Job-Ersteller")),
-        col_client=Text(("Mandant",)),
     ),
     spro=SproSection(
         initial_screen=Text(("Customizing: Projektbearbeitung",)),
