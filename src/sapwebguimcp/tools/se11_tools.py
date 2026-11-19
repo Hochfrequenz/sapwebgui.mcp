@@ -45,7 +45,9 @@ MAX_INLINE_OBJECTS = 10
 
 
 def _row_split_pattern(t: LanguagePack) -> re.Pattern[str]:
-    return compiled(rf'(?=- row "{t.common.row_select_hint.alt})')
+    # A row whose name contains ": " (e.g. a description "Client Control: ...") is written as a single-quoted YAML
+    # scalar, ``- 'row "...":'``, so the quote is optional here (#91).
+    return compiled(rf"""(?=- '?row "{t.common.row_select_hint.alt})""")
 
 
 def _field_name_pattern(t: LanguagePack) -> re.Pattern[str]:
@@ -247,7 +249,11 @@ def _parse_se11_fields(yaml_content: str, t: LanguagePack) -> list[SE11Field]:
         match = row_pattern.search(block)
         if not match:
             continue
-        row_data = _strip_trailing_column_title(match.group("row_data"), header, block)
+        row_data = match.group("row_data")
+        if block.startswith("- '"):
+            # Single-quoted YAML scalar: a literal apostrophe is written twice (#91)
+            row_data = row_data.replace("''", "'")
+        row_data = _strip_trailing_column_title(row_data, header, block)
 
         # Filter out checkbox Unicode chars (Private Use Area U+E000-U+F8FF)
         parts = [p for p in row_data.split() if p and not (len(p) == 1 and ord(p) >= 0xE000)]
