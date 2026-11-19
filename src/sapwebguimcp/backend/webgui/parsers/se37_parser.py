@@ -155,6 +155,15 @@ def _cell_text(cells: list[_GridCell], index: int) -> str:
     return cells[index].text.strip() if index < len(cells) else ""
 
 
+_TYPING_METHODS: tuple[SE37TypingMethod, ...] = ("LIKE", "TYPE", "TYPE REF TO")
+
+
+def _typing_method(cell_text: str) -> SE37TypingMethod | None:
+    """The typing method of a parameter row (LIKE, TYPE, TYPE REF TO); None for an untyped parameter."""
+    text = " ".join(cell_text.upper().split())
+    return next((method for method in _TYPING_METHODS if method == text), None)
+
+
 def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> list[SE37Parameter]:
     """Read the parameters of a tab grid cell by cell. Rows without a parameter name are padding."""
     layout = _PARAM_TAIL_LAYOUT[category]
@@ -162,8 +171,9 @@ def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> li
     seen: set[str] = set()
     for cells in _grid_rows(snapshot)[1]:
         name = _cell_text(cells, 0)
-        typing_str = _cell_text(cells, 1).upper()
-        if not name or typing_str not in ("LIKE", "TYPE"):
+        typing = _typing_method(_cell_text(cells, 1))
+        # an untyped parameter has an empty typing cell; anything else in that cell is not a parameter row
+        if not name or (typing is None and _cell_text(cells, 1)):
             continue
         # The grid renders only the visible rows, so the snapshots of several scroll positions are concatenated
         # and overlap: a parameter name is unique within a tab (#76)
@@ -171,7 +181,6 @@ def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> li
             continue
         seen.add(name)
         tail = {key: cells[3 + i] for i, key in enumerate(layout) if 3 + i < len(cells)}
-        typing: SE37TypingMethod = "LIKE" if typing_str == "LIKE" else "TYPE"
         default = tail["default"].text.strip() if "default" in tail else ""
         parameters.append(
             SE37Parameter(
@@ -302,7 +311,7 @@ def _parse_parameter_rows(snapshot: str, category: SE37ParameterCategory, t: Lan
         ref_type = match.group("ref")
         default = match.group("default")
         desc = re.sub(r"\s+$", "", match.group("desc").strip())
-        typing: SE37TypingMethod = "LIKE" if typing_str == "LIKE" else "TYPE"
+        typing = _typing_method(typing_str)
         optional, pass_by_value = _get_checkbox_flags(snapshot, match, category)
 
         parameters.append(

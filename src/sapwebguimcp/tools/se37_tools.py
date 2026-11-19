@@ -78,6 +78,11 @@ async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text, *, scroll: bo
                     if _grid_content(following) == _grid_content(pages[-1]):
                         break
                     pages.append(following)
+                else:
+                    logger.warning(
+                        "Parameter grid not fully read: scroll limit reached",
+                        extra={"tab": name, "max_pages": _MAX_GRID_PAGES},
+                    )
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.warning("Could not scroll the parameter grid", extra={"tab": name, "error": str(e)})
         return "\n".join(pages)
@@ -110,6 +115,11 @@ async def _lookup_fm_on_initial_screen(backend: WebGuiBackend, fm_name: str, t: 
     # Capture each tab. The properties tab (function group, package, short text, RFC flag) is read first:
     # the parameter tabs do not carry that header data (#76)
     properties_raw = await _capture_tab_snapshot(backend, t.se37.properties_tab, scroll=False)
+    if properties_raw is None:
+        logger.warning(
+            "Attributes tab could not be opened (label mismatch?): function group, package and the RFC flag stay empty",
+            extra={"object": fm_name},
+        )
     import_raw = await _capture_tab_snapshot(backend, t.se37.import_tab)
     export_raw = await _capture_tab_snapshot(backend, t.se37.export_tab)
     changing_raw = await _capture_tab_snapshot(backend, t.se37.changing_tab)

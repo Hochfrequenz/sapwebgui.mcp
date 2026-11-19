@@ -319,3 +319,69 @@ class TestOverlappingScrollPositions:
         twice = parse_se37_exceptions_snapshot(snapshot + "\n" + snapshot, lang_de)
         assert once
         assert [e.name for e in twice] == [e.name for e in once]
+
+
+class TestOtherTypings:
+    """TYPE REF TO and untyped parameters are kept (#76)."""
+
+    _HEADER = [
+        '- row "Parametername Typisierung Bezugstyp Vorschlagswert Optional Wertübergabe Kurztext Langtext":',
+        '  - columnheader "Parametername"',
+        '  - columnheader "Typisierung"',
+        '  - columnheader "Bezugstyp"',
+        '  - columnheader "Vorschlagswert"',
+        '  - columnheader "Optional"',
+        '  - columnheader "Wertübergabe"',
+        '  - columnheader "Kurztext"',
+        '  - columnheader "Langtext"',
+    ]
+
+    def _parse(self, lang_de: LanguagePack, typing_cell: str) -> list:
+        snapshot = "\n".join(
+            [
+                *self._HEADER,
+                '- row "IO_OBJECT":',
+                '  - gridcell "IO_OBJECT":',
+                f'  - gridcell "{typing_cell}":',
+                '  - gridcell "CL_OBJECT":',
+            ]
+        )
+        return parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+
+    def test_type_ref_to_is_kept(self, lang_de: LanguagePack) -> None:
+        (param,) = self._parse(lang_de, "TYPE REF TO")
+        assert (param.name, param.typing, param.reference_type) == ("IO_OBJECT", "TYPE REF TO", "CL_OBJECT")
+
+    def test_untyped_parameter_is_kept_with_typing_none(self, lang_de: LanguagePack) -> None:
+        (param,) = self._parse(lang_de, "Typisierung")  # an empty cell is named after its column
+        assert (param.name, param.typing) == ("IO_OBJECT", None)
+
+    def test_unknown_typing_cell_is_not_a_parameter(self, lang_de: LanguagePack) -> None:
+        assert not self._parse(lang_de, "something else")
+
+
+class TestWarnings:
+    """Incomplete reads are logged, not silent (#76)."""
+
+    @pytest.mark.anyio
+    async def test_scroll_limit_logs_a_warning(self, lang_de: LanguagePack, caplog: pytest.LogCaptureFixture) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        from sapwebguimcp.tools import se37_tools
+
+        counter = {"n": 0}
+
+        async def snapshot() -> str:
+            counter["n"] += 1
+            return f'- gridcell "row {counter["n"]}":'
+
+        backend = MagicMock()
+        backend.click_tab = AsyncMock()
+        backend.click_element = AsyncMock()
+        backend.press_key = AsyncMock()
+        backend.wait = AsyncMock()
+        backend.get_snapshot = snapshot
+        with caplog.at_level("WARNING"):
+            result = await se37_tools._capture_tab_snapshot(backend, lang_de.se37.import_tab)
+        assert result is not None
+        assert any("scroll limit" in record.getMessage() for record in caplog.records)
