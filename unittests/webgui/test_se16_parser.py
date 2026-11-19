@@ -350,10 +350,6 @@ class TestLargeSnapshotParsing:
             assert len(all_rows) >= 20
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-
-
 class TestRepeatedColumnTitlesAndCodes:
     """Repeated titles keep every value; codes with leading zeros stay strings (#78)."""
 
@@ -443,3 +439,62 @@ class TestResultGridSnapshots:
         assert row["NAME_LAST"] == "Mustermann"
         assert row["NAME_FIRST"] == "Max"
         assert row["BPKIND"] == ""
+
+
+class TestUnnamedRows:
+    """Rows without an accessible name (``- row:``) of the result grid, and only of it (#78)."""
+
+    _GRID = """
+  - textbox "Number of Hits": "2"
+    - grid:
+      - row:
+        - columnheader "Column for row selection"
+        - columnheader "Partner"
+        - columnheader "Name"
+      - row:
+        - gridcell "To select a row, press the space bar."
+        - gridcell "4711":
+          - textbox "Partner"
+        - gridcell "Max":
+          - textbox "Name"
+      - row:
+        - gridcell "To select a row, press the space bar."
+        - gridcell "4712":
+          - textbox "Partner"
+        - gridcell:
+          - textbox
+    - rowgroup
+"""
+    _OTHER_GRID = """
+    - grid:
+      - row:
+        - gridcell "Other"
+        - gridcell "NOISE"
+        - gridcell "NOISE2"
+"""
+
+    def test_unnamed_data_rows_are_parsed(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._GRID, lang_en)
+        assert rows == [{"Partner": 4711, "Name": "Max"}, {"Partner": 4712, "Name": ""}]
+
+    def test_unnamed_rows_of_a_later_grid_are_ignored(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._GRID + self._OTHER_GRID, lang_en)
+        assert [r["Partner"] for r in rows] == [4711, 4712]
+
+    def test_unnamed_rows_of_an_earlier_grid_are_ignored(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._OTHER_GRID + self._GRID, lang_en)
+        assert [r["Partner"] for r in rows] == [4711, 4712]
+
+
+class TestRowKey:
+    """Duplicate detection must not collide when values only differ in where they are split (#78)."""
+
+    def test_split_values_do_not_collide(self) -> None:
+        from sapwebguimcp.tools.se16_tools import _row_key
+
+        assert _row_key({"a": "AB", "b": "C"}) != _row_key({"a": "A", "b": "BC"})
+        assert _row_key({"a": "AB", "b": "C"}) == _row_key({"a": "AB", "b": "C"})
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

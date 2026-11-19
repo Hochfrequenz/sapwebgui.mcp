@@ -336,9 +336,9 @@ async def _focus_grid(backend: WebGuiBackend) -> None:
         logger.warning("Could not focus grid", extra={"error": str(e)})
 
 
-def _row_key(row: dict[str, Any]) -> str:
-    """Identity of a result row for duplicate detection: all its cell values."""
-    return "".join(str(value) for value in row.values())
+def _row_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    """Identity of a result row for duplicate detection: all its cell values (no separator collisions)."""
+    return tuple(row.values())
 
 
 async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
@@ -365,10 +365,10 @@ async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-
         List of row dicts
     """
     all_rows: list[dict[str, Any]] = []
-    seen_keys: set[str] = set()  # Track unique row keys to detect duplicates
+    seen_keys: set[tuple[Any, ...]] = set()  # Track unique row keys to detect duplicates
     page_num = 0
     stuck_count = 0
-    last_first_key: str | None = None
+    last_first_key: tuple[Any, ...] | None = None
 
     while len(all_rows) < total_hits and page_num < MAX_PAGES:
         # Get snapshot and parse rows
@@ -679,10 +679,7 @@ async def _execute_se16_query(  # pylint: disable=too-many-locals,too-many-branc
         if field_order is None:
             logger.warning("Could not get field order from SE11, filters may not work")
 
-    # Navigate to SE16N from a clean state: a result list of a previous query that is still open
-    # hides the selection screen, and then the table name field is not found (#78)
-    await backend.enter_transaction("/n")
-    await backend.wait_for_ready()
+    # Navigate to SE16N (enter_transaction prepends /n, so a result list of a previous query is left)
     tx_result = await backend.enter_transaction("SE16N")
     if not tx_result.success:
         return _empty_failure(f"Failed to navigate to SE16N: {tx_result.error}", table, now)

@@ -47,6 +47,31 @@ def _row_start_pattern(t: LanguagePack) -> re.Pattern[str]:
     return compiled(rf"(?m)- (?:'?row \"{t.common.row_select_hint.alt}|row:[ \t]*$)")
 
 
+_GRID_START_PATTERN = re.compile(r"^(?P<indent>\s*)- grid\b")
+
+
+def _result_grid(snapshot: AriaSnapshot) -> str:
+    """Return the block of the result grid (the first grid with column headers), or the whole snapshot.
+
+    Rows without an accessible name (``- row:``) are accepted as data rows, so other grids on the page must not
+    be scanned (#78). The grid block is everything indented deeper than the ``- grid`` line.
+    """
+    lines = snapshot.split("\n")
+    for start, line in enumerate(lines):
+        grid = _GRID_START_PATTERN.match(line)
+        if not grid:
+            continue
+        indent = len(grid.group("indent"))
+        block = [line]
+        for following in lines[start + 1 :]:
+            if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                break
+            block.append(following)
+        if any("columnheader" in entry for entry in block):
+            return "\n".join(block)
+    return snapshot
+
+
 # Extract gridcell values - matches both "gridcell "value"" and "gridcell:"
 _GRIDCELL_WITH_VALUE_PATTERN = re.compile(r'gridcell "(?P<value>[^"]*)"')
 _GRIDCELL_EMPTY_PATTERN = re.compile(r"^\s*- gridcell:\s*$")
@@ -168,6 +193,7 @@ def parse_se16_columns(snapshot: AriaSnapshot, t: LanguagePack) -> list[str]:
         List of column names in order
     """
     columns: list[str] = []
+    snapshot = AriaSnapshot(_result_grid(snapshot))
 
     # Find the header row section - try flexible pattern first
     header_match = _HEADER_ROW_PATTERN.search(snapshot)
@@ -245,7 +271,8 @@ def parse_se16_rows(snapshot: AriaSnapshot, t: LanguagePack, columns: list[str] 
     Extract data rows from SE16N grid snapshot.
 
     Each row is returned as a dict mapping column name to value.
-    Values are type-coerced where possible (int, float).
+    Values are type-coerced where possible (int, float): this numeric coercion is a deliberate design choice, so
+    "4711" comes back as ``4711``; only codes with a leading zero ("0001") stay strings.
 
     Args:
         snapshot: ARIA snapshot YAML content
@@ -263,7 +290,7 @@ def parse_se16_rows(snapshot: AriaSnapshot, t: LanguagePack, columns: list[str] 
         return []
 
     rows: list[dict[str, Any]] = []
-    lines = snapshot.split("\n")
+    lines = _result_grid(snapshot).split("\n")
     in_data_row = False
     current_cells: list[str] = []
     row_start = _row_start_pattern(t)
