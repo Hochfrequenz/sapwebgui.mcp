@@ -93,7 +93,7 @@ def _coerce_value(value: str) -> Any:
 
     Coercion rules:
     1. Empty string -> empty string (preserve)
-    2. Integer-like -> int (e.g., "123", "0", "-45")
+    2. Integer-like -> int (e.g., "123", "0", "-45"), except codes with a leading zero ("0000000123")
     3. Float-like -> float (e.g., "123.45", "-0.5")
     4. Everything else -> string (preserve original)
 
@@ -101,6 +101,10 @@ def _coerce_value(value: str) -> Any:
     vary by locale and context. Dates are returned as strings.
     """
     if not value:
+        return value
+
+    # A leading zero marks a code ("0000000123", a partner or material number), not a quantity: keep it
+    if len(value.lstrip("-")) > 1 and value.lstrip("-").startswith("0") and value.lstrip("-").isdigit():
         return value
 
     # Try integer first (more common in SAP data)
@@ -195,7 +199,22 @@ def parse_se16_columns(snapshot: AriaSnapshot, t: LanguagePack) -> list[str]:
         if not t.se16.column_selection.equals(col_name):
             columns.append(col_name)
 
-    return columns
+    return _unique_column_names(columns)
+
+
+def _unique_column_names(columns: list[str]) -> list[str]:
+    """Make the column titles unique, so a row dict does not lose the value of a repeated title (#78).
+
+    SE16N titles are not unique ("Name 1" may occur several times in a wide table). The second and
+    later occurrences become "Name 1 (2)", "Name 1 (3)", ...
+    """
+    seen: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        count = seen.get(column, 0) + 1
+        seen[column] = count
+        unique.append(column if count == 1 else f"{column} ({count})")
+    return unique
 
 
 def _save_row_if_valid(

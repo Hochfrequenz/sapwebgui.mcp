@@ -352,3 +352,43 @@ class TestLargeSnapshotParsing:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestRepeatedColumnTitlesAndCodes:
+    """Repeated titles keep every value; codes with leading zeros stay strings (#78)."""
+
+    _SNAPSHOT = """
+    - grid:
+      - rowgroup:
+        - row "Column for row selection Partner Name 1 Name 1 Name 1":
+          - columnheader "Column for row selection"
+          - columnheader "Partner"
+          - columnheader "Name 1"
+          - columnheader "Name 1"
+          - columnheader "Name 1"
+      - rowgroup:
+        - row "To select a row, press the space bar. 0000000123 A B C":
+          - gridcell "To select a row, press the space bar."
+          - gridcell "0000000123":
+            - textbox
+          - gridcell "A":
+            - textbox
+          - gridcell "B":
+            - textbox
+          - gridcell "C":
+            - textbox
+    - rowgroup
+    """
+
+    def test_repeated_titles_are_made_unique(self, lang_de: LanguagePack) -> None:
+        columns = parse_se16_columns(self._SNAPSHOT, lang_de)
+        assert columns == ["Partner", "Name 1", "Name 1 (2)", "Name 1 (3)"]
+
+    def test_no_value_is_lost_for_repeated_titles(self, lang_de: LanguagePack) -> None:
+        columns = parse_se16_columns(self._SNAPSHOT, lang_de)
+        (row,) = parse_se16_rows(self._SNAPSHOT, lang_de, columns)
+        assert [row[c] for c in columns[1:]] == ["A", "B", "C"]
+
+    def test_leading_zero_code_stays_a_string(self, lang_de: LanguagePack) -> None:
+        (row,) = parse_se16_rows(self._SNAPSHOT, lang_de)
+        assert row["Partner"] == "0000000123"

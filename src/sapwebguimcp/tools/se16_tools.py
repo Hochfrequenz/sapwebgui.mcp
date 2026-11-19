@@ -647,7 +647,10 @@ async def _execute_se16_query(  # pylint: disable=too-many-locals,too-many-branc
         if field_order is None:
             logger.warning("Could not get field order from SE11, filters may not work")
 
-    # Navigate to SE16N
+    # Navigate to SE16N from a clean state: a result list of a previous query that is still open
+    # hides the selection screen, and then the table name field is not found (#78)
+    await backend.enter_transaction("/n")
+    await backend.wait_for_ready()
     tx_result = await backend.enter_transaction("SE16N")
     if not tx_result.success:
         return _empty_failure(f"Failed to navigate to SE16N: {tx_result.error}", table, now)
