@@ -67,8 +67,6 @@ Docker users follow the [Docker section](#docker) instead of steps 1 and 4; they
 
 Pick one way to get the server. Each release on [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest) provides standalone executables; each release also publishes a Docker image on ghcr.io.
 
-Until the first release is published, the release links and the Docker image below do not exist yet: install from source (Option B), or build the image yourself with `docker build -t ghcr.io/hochfrequenz/sapwebgui.mcp:latest .` in a clone.
-
 #### Option A: Standalone executable (Windows, macOS - no Python needed)
 
 Download the binary for your platform from [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest):
