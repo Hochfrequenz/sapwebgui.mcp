@@ -147,18 +147,18 @@ async def _status(backend: WebGuiBackend) -> tuple[str, str]:
         # Bug fix: the noise filter knew only the German message-bar texts.
         ("se11_initial_en.html", ("none", "")),
         ("sm37_initial_en.html", ("none", "")),
-        ("se16_initial_en.html", ("I", "Table Contents")),
+        ("se16_initial_en.html", ("none", "")),
         (
             "se38_error_popup_en.html",
-            ("I", "Success Program AAAAAAAAAAAAAAAAAAAA does not existProgram AAAAAAAAAAAAAAAAAAAA does not exist"),
+            ("S", "Program AAAAAAAAAAAAAAAAAAAA does not exist"),
         ),
         # German results are unchanged.
         ("se11_initial_de.html", ("none", "")),
         (
             "se16_t000_content_de.html",
-            ("E", "Fehler Bitte einen Tabellennamen eingebenBitte einen Tabellennamen eingebenTabelleninhalt"),
+            ("E", "Bitte einen Tabellennamen eingeben"),
         ),
-        ("se38_error_popup_de.html", ("I", "Das Programm AAAAAAAAAAAAAAAAAAAA ist nicht vorhanden")),
+        ("se38_error_popup_de.html", ("S", "Das Programm AAAAAAAAAAAAAAAAAAAA ist nicht vorhanden")),
     ],
 )
 async def test_status_bar_noise_is_removed_in_both_languages(snapshot: str, expected: tuple[str, str]) -> None:

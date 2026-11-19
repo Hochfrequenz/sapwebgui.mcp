@@ -43,30 +43,6 @@ _CALLS: dict[str, Callable[[WebGuiBackend], Awaitable[Any]]] = {
     "table": lambda backend: backend.read_table(),
 }
 
-_SPLIT_BUTTON_TEXT = (
-    "the message bar's button text is split over two elements (its access key is underlined), so "
-    "the rewriting, which works on one text node at a time, leaves it in real spelling while the "
-    "script reads the joined text; the status bar cannot be compared on this capture"
-)
-_STATUS_BAR_SKIPPED: dict[str, str] = dict.fromkeys(
-    (
-        "easy_access_de.html",
-        "easy_access_en.html",
-        "emmacl_initial_de.html",
-        "emmacl_initial_en.html",
-        "emmacl_results_filtered_en.html",
-        "settings_dialog_de.html",
-        "settings_dialog_en.html",
-        "sm37_initial_de.html",
-        "sm37_initial_en.html",
-        "status_bar_error_de.html",
-        "status_bar_error_en.html",
-    ),
-    _SPLIT_BUTTON_TEXT,
-)
-"""Captures whose status bar is left out of the comparison, with the reason (a limit of the
-rewriting, not of the script). Every other call is still compared on them."""
-
 
 async def _results(page: Page, document: str) -> dict[str, Any]:
     await page.set_content(document, wait_until="domcontentloaded")
@@ -127,23 +103,10 @@ def test_script_result_is_the_same_in_the_pseudo_language(
 ) -> None:
     real, pseudo, replaced = collected[name]
     assert replaced, "no pack text was rewritten in this capture"
-    differing = {
-        call: _difference(real[call], pseudo[call])
-        for call in real
-        if real[call] != pseudo[call] and not (call == "status_bar" and name in _STATUS_BAR_SKIPPED)
-    }
+    differing = {call: _difference(real[call], pseudo[call]) for call in real if real[call] != pseudo[call]}
     assert not differing, f"{name}: the result depends on a real spelling in\n" + "\n".join(
         f"- {call}\n{text}" for call, text in differing.items()
     )
-
-
-def test_the_status_bar_skips_are_still_needed(
-    collected: dict[str, tuple[dict[str, Any], dict[str, Any], int]],
-) -> None:
-    stale = [
-        name for name in _STATUS_BAR_SKIPPED if collected[name][0]["status_bar"] == collected[name][1]["status_bar"]
-    ]
-    assert not stale, f"compare the status bar again on {stale}"
 
 
 @pytest.mark.parametrize("name", NAMES)
