@@ -44,7 +44,7 @@
       - textbox "bis"
       - button "Mehrfachselektion"
       - text: Benutzer
-      - textbox "Benutzer": KLEINK
+      - textbox "Benutzer": TESTUSER
       - text: bis
       - textbox "bis"
       - button "Mehrfachselektion"
@@ -99,11 +99,11 @@
     - button "Abbrechen"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -111,11 +111,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro RSSHOWRABAX/1000":
         - cell

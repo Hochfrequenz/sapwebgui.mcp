@@ -38,11 +38,11 @@
     - link "View Details"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Client 100":
         - cell
@@ -50,11 +50,11 @@
         - cell "Client"
         - cell "100"
         - cell
-      - menuitemradio "User KLEINK":
+      - menuitemradio "User TESTUSER":
         - cell
         - cell
         - cell "User"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Screen SAPLSFUNCTION_BUILDER/1008":
         - cell

@@ -5,7 +5,7 @@
     - 'heading "Class Builder: Klasse CL_ABAP_CHAR_UTILITIES anzeigen" [level=1]'
     - button "Systeminformationen öffnen"
     - toolbar:
-      - button "S4U (100)"
+      - button "ABC (100)"
       - separator
     - toolbar:
       - button "Menü"
@@ -388,11 +388,11 @@
       - rowgroup
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -400,11 +400,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPLSEOD/2000":
         - cell

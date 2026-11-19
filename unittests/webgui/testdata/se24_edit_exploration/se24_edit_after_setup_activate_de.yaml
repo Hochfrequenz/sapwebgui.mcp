@@ -237,11 +237,11 @@
     - button "Abbrechen"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -249,11 +249,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPLSEOD/2000":
         - cell
@@ -279,8 +279,8 @@
         - cell "WebGUI-Zeit"
         - cell "167 ms"
         - cell
-  - dialog "Inaktive Objekte von KLEINK":
-    - heading "Inaktive Objekte von KLEINK" [level=1]
+  - dialog "Inaktive Objekte von TESTUSER":
+    - heading "Inaktive Objekte von TESTUSER" [level=1]
     - button "Schließen": 
     - tablist:
       - tab "Transportierbare Objekte" [selected]
@@ -295,23 +295,23 @@
             - columnheader "Obj-Typ"
             - columnheader "Objektname"
             - columnheader "Benutzer"
-          - row "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste. Leer CPRI ZCL_TEST_MCP_EDIT KLEINK" [selected]:
+          - row "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste. Leer CPRI ZCL_TEST_MCP_EDIT TESTUSER" [selected]:
             - gridcell "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste."
             - gridcell "Leer" [selected]
             - gridcell "CPRI" [selected]:
               - button "CPRI"
             - gridcell "ZCL_TEST_MCP_EDIT" [selected]:
               - textbox
-            - gridcell "KLEINK" [selected]:
+            - gridcell "TESTUSER" [selected]:
               - textbox
-          - row "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste. Leer METH ZCL_TEST_MCP_EDIT DO_SOMETHING KLEINK" [selected]:
+          - row "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste. Leer METH ZCL_TEST_MCP_EDIT DO_SOMETHING TESTUSER" [selected]:
             - gridcell "Zeile ausgewählt. Drücken Sie zum Aufheben der Auswahl Strg und die Leertaste."
             - gridcell "Leer" [selected]
             - gridcell "METH" [selected]:
               - button "METH"
             - gridcell "ZCL_TEST_MCP_EDIT DO_SOMETHING" [selected]:
               - textbox
-            - gridcell "KLEINK" [selected]:
+            - gridcell "TESTUSER" [selected]:
               - textbox
           - row "Row selection disabled. Leer Leer Leer Leer":
             - gridcell "Row selection disabled." [disabled]

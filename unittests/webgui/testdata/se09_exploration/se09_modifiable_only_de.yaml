@@ -5,7 +5,7 @@
     - 'heading "Transport Organizer: Aufträge" [level=1]'
     - button "Systeminformationen schließen"
     - toolbar:
-      - button "S4U (100)"
+      - button "ABC (100)"
       - separator
     - toolbar:
       - button "Menü"
@@ -26,7 +26,7 @@
       - row "Liste":
         - cell "Liste":
           - region "Liste":
-            - text: Änderungsaufträge mit Beteiligung von KLEINK (Konstantin Klein)
+            - text: Änderungsaufträge mit Beteiligung von TESTUSER (Test User)
             - button
             - text: 100 Entwickl., übergre. Cust.
             - button
@@ -36,33 +36,33 @@
             - button
             - text: Änderbar
             - button
-            - text: S4UK902261
+            - text: ABCK902261
             - img
-            - text: KLEINK Paket für Ulli
+            - text: TESTUSER Paket für Ulli
             - button
-            - text: S4UK901796
+            - text: ABCK901796
             - img
             - text: KEMPERU Workbenchauftrag von Kemperu
             - button
-            - text: S4UK902153
+            - text: ABCK902153
             - img
-            - text: KLEINK Zum Test von MCP-basierten edits in se38/se37/se24
+            - text: TESTUSER Zum Test von MCP-basierten edits in se38/se37/se24
             - button
-            - text: S4UK902096
+            - text: ABCK902096
             - img
-            - text: KLEINK fuer Z_SUDOKU_SOLVER
+            - text: TESTUSER fuer Z_SUDOKU_SOLVER
             - button
-            - text: S4UK902008
+            - text: ABCK902008
             - img
-            - text: KLEINK enthält die beiden repositories für abapgit mcp pull
+            - text: TESTUSER enthält die beiden repositories für abapgit mcp pull
             - button
-            - text: S4UK901097
+            - text: ABCK901097
             - img
-            - text: KLEINK WB - HFQ BO4E
+            - text: TESTUSER WB - HFQ BO4E
             - button
-            - text: S4UK901849
+            - text: ABCK901849
             - img
-            - text: KLEINK Ein Test-Request für Konstantin K
+            - text: TESTUSER Ein Test-Request für Test User
         - cell
       - row:
         - cell
@@ -71,11 +71,11 @@
     - button "Auffrischen Hervorgehoben"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -83,11 +83,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPMSSY0/0120":
         - cell

@@ -111,7 +111,7 @@
           - textbox
         - gridcell:
           - textbox
-      - row "To select a row, press the space bar. 100 Entwickl., übergre. Cust. EUR C 1 X MANNN 19.09.2025 S4UCLNT100":
+      - row "To select a row, press the space bar. 100 Entwickl., übergre. Cust. EUR C 1 X MANNN 19.09.2025 ABCCLNT100":
         - gridcell "To select a row, press the space bar."
         - gridcell "100":
           - textbox
@@ -145,9 +145,9 @@
           - textbox
         - gridcell "19.09.2025":
           - textbox
-        - gridcell "S4UCLNT100":
+        - gridcell "ABCCLNT100":
           - textbox
-      - row "To select a row, press the space bar. 200 Customizing LF Dummy EUR C 1 3 X MANNN 19.09.2025 S4UCLNT200":
+      - row "To select a row, press the space bar. 200 Customizing LF Dummy EUR C 1 3 X MANNN 19.09.2025 ABCCLNT200":
         - gridcell "To select a row, press the space bar."
         - gridcell "200":
           - textbox
@@ -181,9 +181,9 @@
           - textbox
         - gridcell "19.09.2025":
           - textbox
-        - gridcell "S4UCLNT200":
+        - gridcell "ABCCLNT200":
           - textbox
-      - row "To select a row, press the space bar. 210 Testdaten LF EUR T 1 3 MANNN 19.09.2025 S4UCLNT210":
+      - row "To select a row, press the space bar. 210 Testdaten LF EUR T 1 3 MANNN 19.09.2025 ABCCLNT210":
         - gridcell "To select a row, press the space bar."
         - gridcell "210":
           - textbox
@@ -217,9 +217,9 @@
           - textbox
         - gridcell "19.09.2025":
           - textbox
-        - gridcell "S4UCLNT210":
+        - gridcell "ABCCLNT210":
           - textbox
-      - row "To select a row, press the space bar. 300 Customizing NB inkl. gMSB EUR C 1 3 X MANNN 19.09.2025 S4UCLNT300":
+      - row "To select a row, press the space bar. 300 Customizing NB inkl. gMSB EUR C 1 3 X MANNN 19.09.2025 ABCCLNT300":
         - gridcell "To select a row, press the space bar."
         - gridcell "300":
           - textbox
@@ -253,9 +253,9 @@
           - textbox
         - gridcell "19.09.2025":
           - textbox
-        - gridcell "S4UCLNT300":
+        - gridcell "ABCCLNT300":
           - textbox
-      - row "To select a row, press the space bar. 310 Testdaten NB inkl. gMSB EUR T 1 3 MANNN 19.09.2025 S4UCLNT310":
+      - row "To select a row, press the space bar. 310 Testdaten NB inkl. gMSB EUR T 1 3 MANNN 19.09.2025 ABCCLNT310":
         - gridcell "To select a row, press the space bar."
         - gridcell "310":
           - textbox
@@ -289,7 +289,7 @@
           - textbox
         - gridcell "19.09.2025":
           - textbox
-        - gridcell "S4UCLNT310":
+        - gridcell "ABCCLNT310":
           - textbox
     - rowgroup
     - rowgroup
@@ -297,11 +297,11 @@
     - link "View Details"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Client 100":
         - cell
@@ -309,11 +309,11 @@
         - cell "Client"
         - cell "100"
         - cell
-      - menuitemradio "User KLEINK":
+      - menuitemradio "User TESTUSER":
         - cell
         - cell
         - cell "User"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Screen SAPLSE16N/0200":
         - cell
