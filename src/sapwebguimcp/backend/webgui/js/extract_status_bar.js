@@ -138,7 +138,8 @@
     // Check for success indicators
     else if (
         parentClasses.includes('success') || // lang-ok: CSS class name
-        statusElement.querySelector('[class*="success" i], .sapMsgSuccess')
+        // the Web GUI message bar marks a success message with its "Ok" icon (#79)
+        statusElement.querySelector('[class*="success" i], .sapMsgSuccess, [class*="__icon--Ok"]')
     ) {
         type = 'S';
     }

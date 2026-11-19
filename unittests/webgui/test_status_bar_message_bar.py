@@ -65,3 +65,10 @@ def test_a_bar_without_text_is_no_message_even_with_footer_buttons() -> None:
     cases = [{"message": "", "footer": "Enter", "iconClass": ""}]
     payload = {"source": load_js("extract_status_bar.js"), "arg": _status_bar_arg(), "cases": cases}
     assert run_node(RUN_JS, payload) == [{"type": "none", "message": ""}]
+
+
+def test_success_type_comes_from_the_ok_icon() -> None:
+    """The message bar marks a success with its "Ok" icon; the text alone has no success keyword."""
+    cases = [{"message": "Index", "footer": "Enter", "iconClass": "__icon--Ok"}]
+    payload = {"source": load_js("extract_status_bar.js"), "arg": _status_bar_arg(), "cases": cases}
+    assert run_node(RUN_JS, payload)[0]["type"] == "S"

@@ -1062,7 +1062,13 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         finished.set()
 
         def on_request(request: Any) -> None:
-            if request.method == "POST":
+            # only the Web GUI's own round trips: a POST of the page's main frame (not of an iframe or a beacon),
+            # so a long-lived request elsewhere cannot hold every key press for the full timeout
+            if (
+                request.method == "POST"
+                and request.frame == page.main_frame
+                and request.resource_type in ("xhr", "fetch", "document")
+            ):
                 outstanding.add(request)
                 started.set()
                 finished.clear()
