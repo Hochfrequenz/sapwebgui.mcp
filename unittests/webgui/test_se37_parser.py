@@ -5,6 +5,8 @@ Tests parsing of YAML accessibility snapshots from SE37 function module display 
 """
 
 from pathlib import Path
+from typing import ClassVar
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -18,6 +20,7 @@ from sapwebguimcp.backend.webgui.parsers.se37_parser import (
 )
 from sapwebguimcp.lang import LanguagePack
 from sapwebguimcp.models import SE37Entry, SE37Error
+from sapwebguimcp.tools import se37_tools
 
 # Path to captured YAML snapshots
 SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "se37_exploration"
@@ -324,7 +327,7 @@ class TestOverlappingScrollPositions:
 class TestOtherTypings:
     """TYPE REF TO and untyped parameters are kept (#76)."""
 
-    _HEADER = [
+    _HEADER: ClassVar[list[str]] = [
         '- row "Parametername Typisierung Bezugstyp Vorschlagswert Optional Wertübergabe Kurztext Langtext":',
         '  - columnheader "Parametername"',
         '  - columnheader "Typisierung"',
@@ -365,10 +368,6 @@ class TestWarnings:
 
     @pytest.mark.anyio
     async def test_scroll_limit_logs_a_warning(self, lang_de: LanguagePack, caplog: pytest.LogCaptureFixture) -> None:
-        from unittest.mock import AsyncMock, MagicMock
-
-        from sapwebguimcp.tools import se37_tools
-
         counter = {"n": 0}
 
         async def snapshot() -> str:
@@ -385,3 +384,24 @@ class TestWarnings:
             result = await se37_tools._capture_tab_snapshot(backend, lang_de.se37.import_tab)
         assert result is not None
         assert any("scroll limit" in record.getMessage() for record in caplog.records)
+
+
+class TestEmptyExceptionsGrid:
+    """An empty Exceptions grid must not yield the system information menu rows as exceptions (#76)."""
+
+    def test_menu_rows_are_not_exceptions(self, lang_en: LanguagePack) -> None:
+        snapshot = "\n".join(
+            [
+                '- row "E2E Time 157 ms":',
+                '  - cell "E2E"',
+                '  - cell "Time 157 ms"',
+                '- row "Exception Short Text Long Text":',
+                '  - columnheader "Exception"',
+                '  - columnheader "Short Text"',
+                '  - columnheader "Long Text"',
+                '- row "":',
+                '  - gridcell ""',
+                '  - gridcell ""',
+            ]
+        )
+        assert parse_se37_exceptions_snapshot(snapshot, lang_en) == []

@@ -332,7 +332,10 @@ def _parse_parameter_rows(snapshot: str, category: SE37ParameterCategory, t: Lan
 
 def _parse_exception_rows(snapshot: str, t: LanguagePack) -> list[SE37Exception]:
     """Parse exception rows from exceptions grid."""
-    if from_cells := _parse_exception_cells(snapshot):
+    from_cells = _parse_exception_cells(snapshot)
+    # A grid with column headers is read cell by cell, even when it holds no exception: the regex fallback would
+    # take the "E2E Time 157 ms" rows of the system information menu for exceptions (#76)
+    if from_cells or _grid_rows(snapshot)[0]:
         return from_cells
     exceptions: list[SE37Exception] = []
 
