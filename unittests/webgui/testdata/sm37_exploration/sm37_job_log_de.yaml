@@ -57,25 +57,25 @@
             - button "Man"
             - button "Verzögerungsgru"
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 31 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 31 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 31 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 31 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 0 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 0 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 0 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 0 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:00:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:00:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:00:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:00:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:01:37 1 37 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:01:37 1 37 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:01:37 1 37 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:01:37 1 37 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:03:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:03:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:03:37 0 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:03:37 0 37 210
         - cell
       - row:
         - cell

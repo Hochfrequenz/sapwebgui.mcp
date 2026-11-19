@@ -64,13 +64,13 @@
     },
     {
       "tag": "SPAN",
-      "text": "\n                  \n                  MANNN\n      ",
+      "text": "\n                  \n                  USER09\n      ",
       "href": null,
       "className": "user-box"
     },
     {
       "tag": "A",
-      "text": "MANNN",
+      "text": "USER09",
       "href": "https://sap.example:44300/sap(cz1PLACEHOLDER)/bc/gui/sap/its/webgui/116/data/1F2A3502C1D2FF4D~69708A88C0990B46E1000000AC16649A/1/HTML000001.htm#sapevent6",
       "className": ""
     },
