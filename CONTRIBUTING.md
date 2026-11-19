@@ -148,7 +148,7 @@ See [docs/SAP_TEST_PREREQUISITES.md](docs/SAP_TEST_PREREQUISITES.md) for the sys
 ### Executable and Docker Image
 
 CI builds a standalone executable (PyInstaller) and a Docker image; see `.github/workflows/build_executable.yml`,
-`.github/workflows/python-publish.yml` and the `Dockerfile`. To try them locally:
+`.github/workflows/docker-publish.yml` and the `Dockerfile` (`.github/workflows/python-publish.yml` uploads the package to PyPI). To try them locally:
 
 ```bash
 # Windows executable (writes dist/sapwebgui_mcp_windows.exe), then the smoke test CI runs
