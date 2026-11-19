@@ -3,77 +3,77 @@
   "actionLinks": [
     {
       "text": "Pull",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Stage",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Patch",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Diff",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Check",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     },
     {
       "text": "Import",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_offline_repo"
     },
     {
       "text": "Export",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_offline_repo"
     },
     {
       "text": "Repo Settings",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     },
     {
       "text": "More",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     },
     {
       "text": "Stage by Transport",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Export by Transport",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_offline_repo"
     },
     {
       "text": "Change Repository Package",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link action_online_repo"
     },
     {
       "text": "Remove Repository",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     },
     {
       "text": "Remove Objects",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     },
     {
       "text": "Uninstall",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6WlAwbFZwTVdFTWc1NTBVRE84NGJRXzVZc0JWUGxYYTRvNFRlLUFUVA=",
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER",
       "className": "action_link"
     }
   ],

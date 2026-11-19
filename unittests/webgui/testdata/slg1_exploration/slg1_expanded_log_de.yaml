@@ -5,7 +5,7 @@
     - heading "Protokolle anzeigen" [level=1]
     - button "Systeminformationen schließen"
     - toolbar:
-      - button "S4U (100)"
+      - button "ABC (100)"
       - separator
     - toolbar:
       - button "Menü"
@@ -77,7 +77,7 @@
         - button "Batch-Betrieb"
       - gridcell "00000000000003944783":
         - button "00000000000003944783"
-    - row " 8 CALM_S4U100_TEST srvhfuhana_S4U_00 /SDF/CALM HEALTH_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944785":
+    - row " 8 CALM_ABC100_TEST sap.example_ABC_00 /SDF/CALM HEALTH_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944785":
       - gridcell "":
         - text: 
         - group "Ebene 0 Komprimiert":
@@ -90,8 +90,8 @@
                   - button "11.03.2026 00:00:43 BATCH"
       - gridcell "8":
         - button "8"
-      - gridcell "CALM_S4U100_TEST srvhfuhana_S4U_00":
-        - button "CALM_S4U100_TEST srvhfuhana_S4U_00"
+      - gridcell "CALM_ABC100_TEST sap.example_ABC_00":
+        - button "CALM_ABC100_TEST sap.example_ABC_00"
       - gridcell "/SDF/CALM":
         - button "/SDF/CALM"
       - gridcell "HEALTH_MON":
@@ -103,7 +103,7 @@
         - button "Dialog-Betrieb"
       - gridcell "00000000000003944785":
         - button "00000000000003944785"
-    - row " 6 CALM_S4U100_TEST srvhfuhana_S4U_00 /SDF/CALM HEALTH_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944784":
+    - row " 6 CALM_ABC100_TEST sap.example_ABC_00 /SDF/CALM HEALTH_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944784":
       - gridcell "":
         - text: 
         - group "Ebene 0 Komprimiert":
@@ -116,8 +116,8 @@
                   - button "11.03.2026 00:00:43 BATCH"
       - gridcell "6":
         - button "6"
-      - gridcell "CALM_S4U100_TEST srvhfuhana_S4U_00":
-        - button "CALM_S4U100_TEST srvhfuhana_S4U_00"
+      - gridcell "CALM_ABC100_TEST sap.example_ABC_00":
+        - button "CALM_ABC100_TEST sap.example_ABC_00"
       - gridcell "/SDF/CALM":
         - button "/SDF/CALM"
       - gridcell "HEALTH_MON":
@@ -178,7 +178,7 @@
         - button "Dialog-Betrieb"
       - gridcell "00000000000003944787":
         - button "00000000000003944787"
-    - row " 69 CALM_S4U100_TEST//20260310230138 /SDF/CALM INT_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944788":
+    - row " 69 CALM_ABC100_TEST//20260310230138 /SDF/CALM INT_MON Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944788":
       - gridcell "":
         - text: 
         - group "Ebene 0 Komprimiert":
@@ -191,8 +191,8 @@
                   - button "11.03.2026 00:01:38 BATCH"
       - gridcell "69":
         - button "69"
-      - gridcell "CALM_S4U100_TEST//20260310230138":
-        - button "CALM_S4U100_TEST//20260310230138"
+      - gridcell "CALM_ABC100_TEST//20260310230138":
+        - button "CALM_ABC100_TEST//20260310230138"
       - gridcell "/SDF/CALM":
         - button "/SDF/CALM"
       - gridcell "INT_MON":
@@ -228,7 +228,7 @@
         - button "Dialog-Betrieb"
       - gridcell "00000000000003944795":
         - button "00000000000003944795"
-    - row " 23 CALM_S4U100_TEST /SDF/CALM EXM Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944792":
+    - row " 23 CALM_ABC100_TEST /SDF/CALM EXM Leer /SDF/CL_CALM_APPLOG===========CP Dialog-Betrieb 00000000000003944792":
       - gridcell "":
         - text: 
         - group "Ebene 0 Komprimiert":
@@ -241,8 +241,8 @@
                   - button "11.03.2026 00:01:38 BATCH"
       - gridcell "23":
         - button "23"
-      - gridcell "CALM_S4U100_TEST":
-        - button "CALM_S4U100_TEST"
+      - gridcell "CALM_ABC100_TEST":
+        - button "CALM_ABC100_TEST"
       - gridcell "/SDF/CALM":
         - button "/SDF/CALM"
       - gridcell "EXM":
@@ -254,7 +254,7 @@
         - button "Dialog-Betrieb"
       - gridcell "00000000000003944792":
         - button "00000000000003944792"
-    - row "0 srvhfuhana_S4U_00-100-MONITOR#000001 tRFC / qRFC - der neue Hintergrund RFC Log zum bgRFC-Monitor Leer SAPMSSY1 Dialog-Betrieb 00000000000003945140":
+    - row "0 sap.example_ABC_00-100-MONITOR#000001 tRFC / qRFC - der neue Hintergrund RFC Log zum bgRFC-Monitor Leer SAPMSSY1 Dialog-Betrieb 00000000000003945140":
       - gridcell:
         - group "Ebene 0":
           - group "Zum Starten der Navigation durch die Einträge drücken Sie Alt+F7. Zur Navigation durch die Einträge verwenden Sie die linke und rechte Pfeiltaste. Drücken Sie erneut Alt+F7 zum Verlassen der Navigation.":
@@ -266,8 +266,8 @@
                   - button "11.03.2026 00:01:38 BATCH"
       - gridcell "0":
         - button "0"
-      - gridcell "srvhfuhana_S4U_00-100-MONITOR#000001":
-        - button "srvhfuhana_S4U_00-100-MONITOR#000001"
+      - gridcell "sap.example_ABC_00-100-MONITOR#000001":
+        - button "sap.example_ABC_00-100-MONITOR#000001"
       - gridcell "tRFC / qRFC - der neue Hintergrund RFC":
         - button "tRFC / qRFC - der neue Hintergrund RFC"
       - gridcell "Log zum bgRFC-Monitor":
@@ -279,7 +279,7 @@
         - button "Dialog-Betrieb"
       - gridcell "00000000000003945140":
         - button "00000000000003945140"
-    - row "0 srvhfuhana_S4U_00-100-MONITOR#000001 tRFC / qRFC - der neue Hintergrund RFC Log zum bgRFC-Monitor Leer SAPMSSY1 Dialog-Betrieb 00000000000003945141":
+    - row "0 sap.example_ABC_00-100-MONITOR#000001 tRFC / qRFC - der neue Hintergrund RFC Log zum bgRFC-Monitor Leer SAPMSSY1 Dialog-Betrieb 00000000000003945141":
       - gridcell:
         - group "Ebene 0":
           - group "Zum Starten der Navigation durch die Einträge drücken Sie Alt+F7. Zur Navigation durch die Einträge verwenden Sie die linke und rechte Pfeiltaste. Drücken Sie erneut Alt+F7 zum Verlassen der Navigation.":
@@ -291,8 +291,8 @@
                   - button "11.03.2026 00:01:38 BATCH"
       - gridcell "0":
         - button "0"
-      - gridcell "srvhfuhana_S4U_00-100-MONITOR#000001":
-        - button "srvhfuhana_S4U_00-100-MONITOR#000001"
+      - gridcell "sap.example_ABC_00-100-MONITOR#000001":
+        - button "sap.example_ABC_00-100-MONITOR#000001"
       - gridcell "tRFC / qRFC - der neue Hintergrund RFC":
         - button "tRFC / qRFC - der neue Hintergrund RFC"
       - gridcell "Log zum bgRFC-Monitor":
@@ -335,11 +335,11 @@
     - rowgroup
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -347,11 +347,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPLSBAL_DISPLAY/0100":
         - cell

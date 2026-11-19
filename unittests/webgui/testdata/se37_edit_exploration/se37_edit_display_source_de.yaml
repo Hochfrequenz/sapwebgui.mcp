@@ -44,11 +44,11 @@
     - textbox: "FUNCTION Z_TEST_MCP_EDIT. *\"---------------------------------------------------------------------- *\"*\"Lokale Schnittstelle: *\"---------------------------------------------------------------------- ENDFUNCTION."
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -56,11 +56,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPLSFUNCTION_BUILDER/3000":
         - cell

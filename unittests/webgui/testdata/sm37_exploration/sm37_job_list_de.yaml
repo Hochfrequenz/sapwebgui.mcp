@@ -5,7 +5,7 @@
     - heading "Jobübersicht" [level=1]
     - button "Systeminformationen öffnen"
     - toolbar:
-      - button "S4U (100)"
+      - button "ABC (100)"
       - separator
     - toolbar:
       - button "Menü"
@@ -57,36 +57,36 @@
             - button "Man"
             - button "Verzögerungsgru"
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 10 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 10 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 10 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 10 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 0 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 0 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB freigegeben 0 0 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 freigegeben 0 0 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:00:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:00:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:00:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:00:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:01:37 1 37 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:01:37 1 37 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:01:37 1 37 310
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:01:37 1 37 310
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:03:37 1 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:03:37 1 37 210
             - checkbox
-            - text: /APE/RP_TRIGGER_TRDOC_MASS TENNHARDTB fertig 11.03.2026 00:03:37 0 37 210
+            - text: /APE/RP_TRIGGER_TRDOC_MASS USER01 fertig 11.03.2026 00:03:37 0 37 210
         - cell
       - row:
         - cell
         - cell
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -94,11 +94,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPMSSY0/0120":
         - cell

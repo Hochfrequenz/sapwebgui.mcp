@@ -23,7 +23,7 @@
       "tag": "A",
       "text": "Pull",
       "className": "action_link action_online_repo",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6ZElXdFJnNGROWUh3cGRzNmxRV1pxeVZZc0JVOG1YYVNlWHJfLUFUVA==)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=git_pull%3Fkey=#"
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=git_pull%3Fkey=#"
     },
     {
       "tag": "LI",
@@ -35,7 +35,7 @@
       "tag": "A",
       "text": "Stage",
       "className": "action_link action_online_repo",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6ZElXdFJnNGROWUh3cGRzNmxRV1pxeVZZc0JVOG1YYVNlWHJfLUFUVA==)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=go_stage%3Fkey=#"
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=go_stage%3Fkey=#"
     },
     {
       "tag": "LI",
@@ -59,7 +59,7 @@
       "tag": "A",
       "text": "Stage by Transport",
       "className": "action_link action_online_repo",
-      "href": "https://srvhfuhana.sap.msp.local:44300/sap(cz1TSUQlM2FBTk9OJTNhc3J2aGZ1aGFuYV9TNFVfMDAlM2EzckJ6ZElXdFJnNGROWUh3cGRzNmxRV1pxeVZZc0JVOG1YYVNlWHJfLUFUVA==)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=go_stage_transport%3Fkey=#"
+      "href": "https://sap.example:44300/sap(cz1PLACEHOLDER)/bc/gui/sap/its/webgui/116/data/292C051116B941C2~696D918BFC591B8CE1000000AC16649A/1/HTML000001.htm?~control=116&~event=OnSAPEvent&ALINK=1&frameName=&PARAMS=go_stage_transport%3Fkey=#"
     },
     {
       "tag": "DIV",

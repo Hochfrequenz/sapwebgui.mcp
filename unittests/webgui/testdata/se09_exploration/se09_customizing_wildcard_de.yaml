@@ -5,7 +5,7 @@
     - 'heading "Transport Organizer: Aufträge" [level=1]'
     - button "Systeminformationen schließen"
     - toolbar:
-      - button "S4U (100)"
+      - button "ABC (100)"
       - separator
     - toolbar:
       - button "Menü"
@@ -30,55 +30,55 @@
             - button
             - text: 100 Entwickl., übergre. Cust.
             - button
-            - text: "-> /S4UALL/ Alle Mandanten"
+            - text: "-> /ABCALL/ Alle Mandanten"
             - button
             - text: Änderbar
             - button
-            - text: S4UK901835 100
+            - text: ABCK901835 100
             - img
-            - text: "RICHARZJ Customizing FI-CA: Bildvariante Rückläufer"
+            - text: "USER03 Customizing FI-CA: Bildvariante Rückläufer"
             - button
-            - text: S4UK901371 100
+            - text: ABCK901371 100
             - img
-            - text: DOBESCHR RTP-Komponente definieren RTP Gas
+            - text: USER04 RTP-Komponente definieren RTP Gas
             - button
-            - text: S4UK901368 100
+            - text: ABCK901368 100
             - img
-            - text: DOBESCHR Tagesoffset Gastag definiert
+            - text: USER04 Tagesoffset Gastag definiert
             - button
-            - text: S4UK901319 100
+            - text: ABCK901319 100
             - img
-            - text: DOBESCHR Neue Maßeinheit Blindmehrarbeit
+            - text: USER04 Neue Maßeinheit Blindmehrarbeit
             - button
-            - text: S4UK901087 100
+            - text: ABCK901087 100
             - img
-            - text: PAGELSDORFK Toc from S4UK901086
+            - text: USER05 Toc from ABCK901086
             - button
-            - text: S4UK900911 100
+            - text: ABCK900911 100
             - img
-            - text: LIPPOLDA CUST_100_Allgemein ODATA Services aktiveren ZUI2_FIORI
+            - text: USER06 CUST_100_Allgemein ODATA Services aktiveren ZUI2_FIORI
             - button
-            - text: S4UK900803 100
+            - text: ABCK900803 100
             - img
-            - text: "RICHARZJ Customizing FI-CA: Vorgänge"
+            - text: "USER03 Customizing FI-CA: Vorgänge"
             - button
-            - text: S4UK900801 100
+            - text: ABCK900801 100
             - img
-            - text: WENINGERR Customizing Kotenstand Grundliste
+            - text: USER07 Customizing Kotenstand Grundliste
             - button
             - text: Freigegeben
             - button
-            - text: S4UK902249 100
+            - text: ABCK902249 100
             - img
-            - text: SPECHTM BC-Sets übergreifend März 26
+            - text: USER08 BC-Sets übergreifend März 26
             - button
-            - text: S4UK900603 100
+            - text: ABCK900603 100
             - img
-            - text: MANNN CU HFQ DXP Customizing Basic
+            - text: USER09 CU HFQ DXP Customizing Basic
             - button
-            - text: S4UK901821 100
+            - text: ABCK901821 100
             - img
-            - text: DETZERF Nummernkreise_Profile definieren
+            - text: USER10 Nummernkreise_Profile definieren
         - cell
       - row:
         - cell
@@ -87,11 +87,11 @@
     - button "Auffrischen Hervorgehoben"
   - menu:
     - rowgroup:
-      - menuitemradio "System S4U (100)" [checked]:
+      - menuitemradio "System ABC (100)" [checked]:
         - cell ""
         - cell
         - cell "System"
-        - cell "S4U (100)"
+        - cell "ABC (100)"
         - cell
       - menuitemradio "Mandant 100":
         - cell
@@ -99,11 +99,11 @@
         - cell "Mandant"
         - cell "100"
         - cell
-      - menuitemradio "Benutzer KLEINK":
+      - menuitemradio "Benutzer TESTUSER":
         - cell
         - cell
         - cell "Benutzer"
-        - cell "KLEINK"
+        - cell "TESTUSER"
         - cell
       - menuitemradio "Dynpro SAPMSSY0/0120":
         - cell
