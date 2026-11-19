@@ -193,24 +193,25 @@ def _last_header_before(yaml_content: str, pos: int) -> str:
 def _last_cell_is_empty(row_block: str, header: str) -> bool:
     """True when the row's own last gridcell is labelled with exactly the column title ``header``.
 
-    Only the row's children count (lines indented deeper than the ``- row`` line), not whatever follows the row
-    in the snapshot. An unnamed last cell (``- gridcell:``) is a plain empty cell: its name contributed nothing to
-    the row name, so there is nothing to strip.
+    Only the row's own cells count, not whatever follows the row in the snapshot. The block starts in the middle
+    of the ``- row`` line (the split pattern is a lookahead), so its indent is unknown; the cells' indent is taken
+    from the first child line instead, and the scan stops at the first line indented less than the cells. An
+    unnamed last cell (``- gridcell:``) is a plain empty cell: its name contributed nothing to the row name, so
+    there is nothing to strip.
     """
     lines = row_block.splitlines()
     if not lines:
         return False
-    row_indent = len(lines[0]) - len(lines[0].lstrip())
     last_label: str | None = None
     child_indent: int | None = None
     for line in lines[1:]:
         if not line.strip():
             continue
         indent = len(line) - len(line.lstrip())
-        if indent <= row_indent:
-            break
         if child_indent is None:
             child_indent = indent
+        if indent < child_indent:
+            break
         if indent != child_indent:
             continue
         cell = re.match(r'\s*- gridcell(?: "([^"]*)")?', line)

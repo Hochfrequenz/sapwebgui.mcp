@@ -304,3 +304,10 @@ class TestTrailingColumnTitleNotInDescription:
         trailing = '- grid "Andere":\n  - row "x":\n    - gridcell "Gruppe"\n'
         yaml_content = self._grid("Material Gruppe", "- gridcell:", trailing)
         assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Material Gruppe"]
+
+    def test_a_later_grid_with_cells_at_the_same_depth_does_not_count(self, lang_de: LanguagePack) -> None:
+        """A later grid whose cells sit at the same depth as the row's cells ends the row at its shallower lines."""
+        # the later grid is nested (indented), and its cells sit exactly at the depth of the row's own cells
+        trailing = '  - grid "Andere":\n    - row "x":\n      - gridcell "Gruppe"\n'
+        yaml_content = self._grid("Material Gruppe", "- gridcell:", trailing)
+        assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Material Gruppe"]
