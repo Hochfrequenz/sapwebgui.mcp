@@ -183,13 +183,48 @@ def _parse_field_row(parts: list[str], key_fields: set[str]) -> SE11Field | None
     )
 
 
+def _last_header_before(yaml_content: str, pos: int) -> str:
+    """Return the text of the last column header before ``pos`` (the trailing grid column title), or ""."""
+    titles = [m.group(1).strip() for m in re.finditer(r'columnheader "([^"]*)"', yaml_content[:pos])]
+    titles = [title for title in titles if title]
+    return titles[-1] if titles else ""
+
+
+def _last_cell_is_empty(row_block: str, header: str) -> bool:
+    """True when the row's last gridcell carries no value of its own (no name, or only the column title as label)."""
+    cells = re.findall(r'^\s*- gridcell(?: "([^"]*)")?', row_block, flags=re.MULTILINE)
+    if not cells:
+        return False
+    return cells[-1].strip() in ("", header)
+
+
+def _strip_trailing_column_title(row_data: str, header: str, row_block: str) -> str:
+    """Remove the accessible name of the empty trailing column from a row name.
+
+    The row's accessible name is the concatenation of its cells. The last column (e.g. "Gruppe") is
+    usually empty but its cell is labelled with the column title, which then ends up as a suffix of
+    the last real value (the field description). Strip it only when that last cell holds no value
+    of its own, so a description that legitimately ends with the same word is left alone.
+    """
+    if header and row_data.endswith(" " + header) and _last_cell_is_empty(row_block, header):
+        return row_data[: -len(header)].rstrip()
+    return row_data
+
+
 def _parse_se11_fields(yaml_content: str, t: LanguagePack) -> list[SE11Field]:
     """Parse field rows from SE11 grid."""
     key_fields = _find_key_fields(yaml_content, t)
     fields: list[SE11Field] = []
+    row_pattern = _row_data_pattern(t)
+    first = row_pattern.search(yaml_content)
+    header = _last_header_before(yaml_content, first.start()) if first else ""
+    row_blocks = _row_split_pattern(t).split(yaml_content)
 
-    for match in _row_data_pattern(t).finditer(yaml_content):
-        row_data = match.group("row_data")
+    for block in row_blocks:
+        match = row_pattern.search(block)
+        if not match:
+            continue
+        row_data = _strip_trailing_column_title(match.group("row_data"), header, block)
 
         # Filter out checkbox Unicode chars (Private Use Area U+E000-U+F8FF)
         parts = [p for p in row_data.split() if p and not (len(p) == 1 and ord(p) >= 0xE000)]

@@ -238,3 +238,43 @@ class TestParseSeYamlLanguageParity:
         assert [(f.name, f.datatype, f.length, f.decimals, f.is_key) for f in de.fields] == [
             (f.name, f.datatype, f.length, f.decimals, f.is_key) for f in en.fields
         ]
+
+
+class TestTrailingColumnTitleNotInDescription:
+    """The empty trailing column ("Gruppe") must not leak into the field description (#77)."""
+
+    @staticmethod
+    def _with_group_label(yaml_content: str) -> str:
+        """Mimic the live DOM: the row name and the empty last cell carry the column title."""
+        out: list[str] = []
+        in_row = False
+        for line in yaml_content.splitlines():
+            out_line = line
+            if line.lstrip().startswith("- row "):
+                in_row = "Zum Auswählen" in line
+                if in_row:
+                    out_line = line[: line.rindex('":')] + ' Gruppe":'
+            elif in_row and line.strip() == "- gridcell:":
+                out_line = line.replace("- gridcell:", '- gridcell "Gruppe":')
+            out.append(out_line)
+        return "\n".join(out)
+
+    def test_group_suffix_is_stripped(self, lang_de: LanguagePack) -> None:
+        yaml_content = self._with_group_label(load_yaml_snapshot("se11_t000_fields_de.yaml"))
+        assert " Gruppe" in yaml_content
+        fields = _parse_se11_fields(yaml_content, lang_de)
+        assert fields
+        assert fields[0].name == "MANDT"
+        assert fields[0].description == "Mandant"
+        assert all(not f.description.endswith("Gruppe") for f in fields)
+
+    def test_description_ending_in_column_title_is_kept(self, lang_de: LanguagePack) -> None:
+        """A real description ending in the title word stays when the last cell is not an empty label."""
+        yaml_content = load_yaml_snapshot("se11_t000_fields_de.yaml")
+        yaml_content = yaml_content.replace('Mandant":' + chr(10), 'Mandant Gruppe":' + chr(10), 1).replace(
+            "- gridcell:" + chr(10) + "            - textbox" + chr(10),
+            '- gridcell "X":' + chr(10) + "            - textbox" + chr(10),
+            1,
+        )
+        fields = _parse_se11_fields(yaml_content, lang_de)
+        assert fields[0].description == "Mandant Gruppe"
