@@ -158,6 +158,15 @@ def _status_bar_arg() -> dict[str, object]:
     )
 
 
+# Chrome reports an untrusted or mismatched TLS certificate as net::ERR_CERT_* (#80).
+_CERT_ERROR_RE = re.compile(r"ERR_CERT_|ERR_SSL_")
+_CERT_ERROR_GUIDANCE = (
+    "The browser rejected the SAP system's TLS certificate; this is not an SAP-side error. "
+    "Set 'tls_skip_verify': true for the system in systems.json to let sap_login accept it, "
+    "or start Chrome with --ignore-certificate-errors (a Chrome this server launches already has it), "
+    "or install the certificate authority in the operating system's trust store."
+)
+
 # ---------------------------------------------------------------------------
 # WebGuiBackend
 # ---------------------------------------------------------------------------
@@ -329,6 +338,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         language: str,
         session_id: str | None = None,
         connection_name: str | None = None,  # ignored for WebGUI; SAP_URL is the system selector
+        tls_skip_verify: bool = False,
     ) -> LoginResult:
         """Navigate to SAP WebGUI and log in.
 
@@ -340,6 +350,9 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             "tools and their descriptions before proceeding."
         )
         try:
+            if tls_skip_verify:
+                # A Chrome the user started themselves does not carry --ignore-certificate-errors (#80).
+                await (await get_browser_manager()).ignore_certificate_errors()
             logger.info(
                 "Navigating to SAP Web GUI",
                 extra={"sap_host": urlparse(url).hostname or "unknown"},
@@ -420,6 +433,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Logging in to SAP")
+            if _CERT_ERROR_RE.search(str(e)):
+                return LoginResult.failure(f"Error during SAP login: {e}", url=url, guidance=_CERT_ERROR_GUIDANCE)
             return LoginResult.failure(f"Error during SAP login: {e}", url=url)
 
     async def list_connections(self) -> list[Any]:
