@@ -350,5 +350,151 @@ class TestLargeSnapshotParsing:
             assert len(all_rows) >= 20
 
 
+class TestRepeatedColumnTitlesAndCodes:
+    """Repeated titles keep every value; codes with leading zeros stay strings (#78)."""
+
+    _SNAPSHOT = """
+    - grid:
+      - rowgroup:
+        - row "Column for row selection Partner Name 1 Name 1 Name 1":
+          - columnheader "Column for row selection"
+          - columnheader "Partner"
+          - columnheader "Name 1"
+          - columnheader "Name 1"
+          - columnheader "Name 1"
+      - rowgroup:
+        - row "To select a row, press the space bar. 0000000123 A B C":
+          - gridcell "To select a row, press the space bar."
+          - gridcell "0000000123":
+            - textbox
+          - gridcell "A":
+            - textbox
+          - gridcell "B":
+            - textbox
+          - gridcell "C":
+            - textbox
+    - rowgroup
+    """
+
+    def test_repeated_titles_are_made_unique(self, lang_de: LanguagePack) -> None:
+        columns = parse_se16_columns(self._SNAPSHOT, lang_de)
+        assert columns == ["Partner", "Name 1", "Name 1 (2)", "Name 1 (3)"]
+
+    def test_no_value_is_lost_for_repeated_titles(self, lang_de: LanguagePack) -> None:
+        columns = parse_se16_columns(self._SNAPSHOT, lang_de)
+        (row,) = parse_se16_rows(self._SNAPSHOT, lang_de, columns)
+        assert [row[c] for c in columns[1:]] == ["A", "B", "C"]
+
+    def test_leading_zero_code_stays_a_string(self, lang_de: LanguagePack) -> None:
+        (row,) = parse_se16_rows(self._SNAPSHOT, lang_de)
+        assert row["Partner"] == "0000000123"
+
+
+class TestResultGridSnapshots:
+    """Result grids captured from a live SE16N (German UI, sanitized), #78."""
+
+    _DIR = Path(__file__).parent / "testdata" / "se16_result_grids"
+
+    @staticmethod
+    def _read(name: str) -> str:
+        return (TestResultGridSnapshots._DIR / name).read_text(encoding="utf-8")
+
+    def test_every_row_of_a_grid_with_a_repeating_first_column_is_parsed(self, lang_de: LanguagePack) -> None:
+        """T002 (max_hits 5): the first column has the same value in all rows, only the text differs."""
+        result = parse_se16_snapshot(self._read("t002_result_de.aria.txt"), lang_de)
+        assert parse_se16_hit_count(self._read("t002_result_de.aria.txt"), lang_de) == 5
+        assert result.columns == ["Sprache", "Spezifika", "Üb.grad", "SprCode", "Bezeichnung"]
+        assert [row["Bezeichnung"] for row in result.rows] == [
+            "Chinesisch",
+            "Koreanisch",
+            "Rumänisch",
+            "Serbisch",
+            "Thailändisch",
+        ]
+
+    def test_rows_without_an_accessible_name_are_parsed(self, lang_de: LanguagePack) -> None:
+        """BUT000: a row with 114 cells has no name in the ARIA tree (``- row:``), so no row was found."""
+        snapshot = self._read("but000_result_de.aria.txt")
+        columns = parse_se16_columns(snapshot, lang_de)
+        assert len(columns) == 114
+        (row,) = parse_se16_rows(snapshot, lang_de, columns)
+        assert row["GPartner"] == 4711
+        assert row["Grp."] == "0001"
+        assert row["Nachname"] == "Mustermann"
+
+    def test_empty_cells_stay_empty(self, lang_de: LanguagePack) -> None:
+        """An empty cell is ``- gridcell:`` and must not become its column title."""
+        snapshot = self._read("but000_result_de.aria.txt")
+        (row,) = parse_se16_rows(snapshot, lang_de)
+        assert row["Art"] == ""
+        assert row["Externe Nr"] == ""
+
+    def test_rows_can_be_keyed_by_technical_names(self, lang_de: LanguagePack) -> None:
+        snapshot = self._read("but000_result_de.aria.txt")
+        names = self._read("but000_technical_names.txt").split()
+        assert len(names) == len(parse_se16_columns(snapshot, lang_de))
+        (row,) = parse_se16_rows(snapshot, lang_de, names)
+        assert row["PARTNER"] == 4711
+        assert row["BU_GROUP"] == "0001"
+        assert row["NAME_LAST"] == "Mustermann"
+        assert row["NAME_FIRST"] == "Max"
+        assert row["BPKIND"] == ""
+
+
+class TestUnnamedRows:
+    """Rows without an accessible name (``- row:``) of the result grid, and only of it (#78)."""
+
+    _GRID = """
+  - textbox "Number of Hits": "2"
+    - grid:
+      - row:
+        - columnheader "Column for row selection"
+        - columnheader "Partner"
+        - columnheader "Name"
+      - row:
+        - gridcell "To select a row, press the space bar."
+        - gridcell "4711":
+          - textbox "Partner"
+        - gridcell "Max":
+          - textbox "Name"
+      - row:
+        - gridcell "To select a row, press the space bar."
+        - gridcell "4712":
+          - textbox "Partner"
+        - gridcell:
+          - textbox
+    - rowgroup
+"""
+    _OTHER_GRID = """
+    - grid:
+      - row:
+        - gridcell "Other"
+        - gridcell "NOISE"
+        - gridcell "NOISE2"
+"""
+
+    def test_unnamed_data_rows_are_parsed(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._GRID, lang_en)
+        assert rows == [{"Partner": 4711, "Name": "Max"}, {"Partner": 4712, "Name": ""}]
+
+    def test_unnamed_rows_of_a_later_grid_are_ignored(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._GRID + self._OTHER_GRID, lang_en)
+        assert [r["Partner"] for r in rows] == [4711, 4712]
+
+    def test_unnamed_rows_of_an_earlier_grid_are_ignored(self, lang_en: LanguagePack) -> None:
+        rows = parse_se16_rows(self._OTHER_GRID + self._GRID, lang_en)
+        assert [r["Partner"] for r in rows] == [4711, 4712]
+
+
+class TestRowKey:
+    """Duplicate detection must not collide when values only differ in where they are split (#78)."""
+
+    def test_split_values_do_not_collide(self) -> None:
+        from sapwebguimcp.tools.se16_tools import _row_key
+
+        assert _row_key({"a": "AB", "b": "C"}) != _row_key({"a": "A", "b": "BC"})
+        assert _row_key({"a": "AB", "b": "C"}) == _row_key({"a": "AB", "b": "C"})
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -69,10 +69,15 @@ _EXPOSE_GRID_CELL_VALUES_JS = r"""() => {
     if (text) {
       undo.push([td, 'aria-label', td.getAttribute('aria-label')]);
       td.setAttribute('aria-label', text);
-    } else if (box.hasAttribute('aria-label')) {
-      // an empty cell would otherwise be named after its column header (the textbox label)
-      undo.push([box, 'aria-label', box.getAttribute('aria-label')]);
-      box.removeAttribute('aria-label');
+    } else {
+      // an empty cell would otherwise be named after its column header (the textbox label, or the header the
+      // textbox points to with aria-labelledby), and then read as the value "Name 1" (#78)
+      for (const attr of ['aria-label', 'aria-labelledby']) {
+        if (box.hasAttribute(attr)) {
+          undo.push([box, attr, box.getAttribute(attr)]);
+          box.removeAttribute(attr);
+        }
+      }
     }
   }
   // sortable column headers append a "press space to select the column" hint (``*-selectionlabel``) to their name

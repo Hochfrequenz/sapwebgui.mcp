@@ -42,8 +42,34 @@ def _row_start_pattern(t: LanguagePack) -> re.Pattern[str]:
 
     - row "To select a row..."  (no colons in row text)
     - 'row "To select a row..."':  (has colons, YAML quotes the whole line)
+    - row:  (a row of many cells has no accessible name at all, e.g. every BUT000 row, #78)
     """
-    return compiled(rf"- '?row \"{t.common.row_select_hint.alt}")
+    return compiled(rf"(?m)- (?:'?row \"{t.common.row_select_hint.alt}|row:[ \t]*$)")
+
+
+_GRID_START_PATTERN = re.compile(r"^(?P<indent>\s*)- grid\b")
+
+
+def _result_grid(snapshot: AriaSnapshot) -> str:
+    """Return the block of the result grid (the first grid with column headers), or the whole snapshot.
+
+    Rows without an accessible name (``- row:``) are accepted as data rows, so other grids on the page must not
+    be scanned (#78). The grid block is everything indented deeper than the ``- grid`` line.
+    """
+    lines = snapshot.split("\n")
+    for start, line in enumerate(lines):
+        grid = _GRID_START_PATTERN.match(line)
+        if not grid:
+            continue
+        indent = len(grid.group("indent"))
+        block = [line]
+        for following in lines[start + 1 :]:
+            if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                break
+            block.append(following)
+        if any("columnheader" in entry for entry in block):
+            return "\n".join(block)
+    return snapshot
 
 
 # Extract gridcell values - matches both "gridcell "value"" and "gridcell:"
@@ -55,7 +81,7 @@ _COLUMNHEADER_PATTERN = re.compile(r'columnheader "(?P<name>[^"]+)"')
 
 # Match header row (contains columnheader elements) - flexible multiline matching
 _HEADER_ROW_PATTERN = re.compile(
-    r'- row "[^"]*":\s*\n(?:\s*- columnheader "[^"]+"[^\n]*\n?)+',
+    r'- row(?: "[^"]*")?:\s*\n(?:\s*- columnheader "[^"]+"[^\n]*\n?)+',
     re.MULTILINE,
 )
 
@@ -93,7 +119,7 @@ def _coerce_value(value: str) -> Any:
 
     Coercion rules:
     1. Empty string -> empty string (preserve)
-    2. Integer-like -> int (e.g., "123", "0", "-45")
+    2. Integer-like -> int (e.g., "123", "0", "-45"), except codes with a leading zero ("0000000123")
     3. Float-like -> float (e.g., "123.45", "-0.5")
     4. Everything else -> string (preserve original)
 
@@ -101,6 +127,10 @@ def _coerce_value(value: str) -> Any:
     vary by locale and context. Dates are returned as strings.
     """
     if not value:
+        return value
+
+    # A leading zero marks a code ("0000000123", a partner or material number), not a quantity: keep it
+    if len(value.lstrip("-")) > 1 and value.lstrip("-").startswith("0") and value.lstrip("-").isdigit():
         return value
 
     # Try integer first (more common in SAP data)
@@ -163,6 +193,7 @@ def parse_se16_columns(snapshot: AriaSnapshot, t: LanguagePack) -> list[str]:
         List of column names in order
     """
     columns: list[str] = []
+    snapshot = AriaSnapshot(_result_grid(snapshot))
 
     # Find the header row section - try flexible pattern first
     header_match = _HEADER_ROW_PATTERN.search(snapshot)
@@ -195,7 +226,22 @@ def parse_se16_columns(snapshot: AriaSnapshot, t: LanguagePack) -> list[str]:
         if not t.se16.column_selection.equals(col_name):
             columns.append(col_name)
 
-    return columns
+    return _unique_column_names(columns)
+
+
+def _unique_column_names(columns: list[str]) -> list[str]:
+    """Make the column titles unique, so a row dict does not lose the value of a repeated title (#78).
+
+    SE16N titles are not unique ("Name 1" may occur several times in a wide table). The second and
+    later occurrences become "Name 1 (2)", "Name 1 (3)", ...
+    """
+    seen: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        count = seen.get(column, 0) + 1
+        seen[column] = count
+        unique.append(column if count == 1 else f"{column} ({count})")
+    return unique
 
 
 def _save_row_if_valid(
@@ -225,7 +271,8 @@ def parse_se16_rows(snapshot: AriaSnapshot, t: LanguagePack, columns: list[str] 
     Extract data rows from SE16N grid snapshot.
 
     Each row is returned as a dict mapping column name to value.
-    Values are type-coerced where possible (int, float).
+    Values are type-coerced where possible (int, float): this numeric coercion is a deliberate design choice, so
+    "4711" comes back as ``4711``; only codes with a leading zero ("0001") stay strings.
 
     Args:
         snapshot: ARIA snapshot YAML content
@@ -243,7 +290,7 @@ def parse_se16_rows(snapshot: AriaSnapshot, t: LanguagePack, columns: list[str] 
         return []
 
     rows: list[dict[str, Any]] = []
-    lines = snapshot.split("\n")
+    lines = _result_grid(snapshot).split("\n")
     in_data_row = False
     current_cells: list[str] = []
     row_start = _row_start_pattern(t)

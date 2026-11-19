@@ -294,6 +294,39 @@ def _check_selection_screen_columns(columns: list[str], t: LanguagePack) -> bool
     return sum(1 for column in set(columns) if t.se16.selection_columns.equals(column)) >= 2
 
 
+# Technical field names of the result grid columns. The column header cells carry the name in the SID of their
+# lsdata (``wnd[0]/shellcont/shell/colSPRAS``); the selection column has the SID ``.../shell/col`` without a name.
+_TECHNICAL_COLUMN_NAMES_JS = r"""() => {
+  const found = [];
+  for (const th of document.querySelectorAll('[role="grid"] th[role="columnheader"]')) {
+    const match = /"SID":"[^"]*\/shell\/col([^"]+)"/.exec(th.getAttribute('lsdata') || '');
+    if (match) { found.push([parseInt(th.getAttribute('lsmatrixcolindex') || '0', 10), match[1]]); }
+  }
+  found.sort((a, b) => a[0] - b[0]);
+  return found.map((entry) => entry[1]);
+}"""
+
+
+async def _read_technical_column_names(backend: WebGuiBackend, titles: list[str]) -> list[str]:
+    """Return the technical field names of the result columns, or ``titles`` when they cannot be read (#78).
+
+    The ARIA tree only knows the column titles, which are not unique ("Name 1", "Verantw. Stelle" ...) and differ
+    from the field names the desktop server returns. The names are only used when there is exactly one per title.
+    """
+    try:
+        names = await backend.evaluate_javascript(_TECHNICAL_COLUMN_NAMES_JS)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.warning("Could not read the technical column names", extra={"error": str(e)})
+        return titles
+    if isinstance(names, list) and len(names) == len(titles) and len(set(names)) == len(names):
+        return [str(name) for name in names]
+    logger.warning(
+        "Technical column names do not match the column titles, keeping the titles",
+        extra={"names": len(names) if isinstance(names, list) else None, "titles": len(titles)},
+    )
+    return titles
+
+
 async def _focus_grid(backend: WebGuiBackend) -> None:
     """Focus the ALV grid for pagination (required for PageDown to work)."""
     try:
@@ -301,6 +334,11 @@ async def _focus_grid(backend: WebGuiBackend) -> None:
         await backend.wait(500)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.warning("Could not focus grid", extra={"error": str(e)})
+
+
+def _row_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    """Identity of a result row for duplicate detection: all its cell values (no separator collisions)."""
+    return tuple(row.values())
 
 
 async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
@@ -327,12 +365,10 @@ async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-
         List of row dicts
     """
     all_rows: list[dict[str, Any]] = []
-    seen_keys: set[str] = set()  # Track unique row keys to detect duplicates
+    seen_keys: set[tuple[Any, ...]] = set()  # Track unique row keys to detect duplicates
     page_num = 0
     stuck_count = 0
-    last_first_key: str | None = None
-    # Deduplicate by first column only (typically the primary key). See issue #136.
-    first_col = columns[0] if columns else None
+    last_first_key: tuple[Any, ...] | None = None
 
     while len(all_rows) < total_hits and page_num < MAX_PAGES:
         # Get snapshot and parse rows
@@ -350,25 +386,21 @@ async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-
 
         stuck_count = 0
 
-        # Get first row's key (first column value) for duplicate detection
-        first_key = str(rows[0].get(first_col, "")) if rows and first_col else None
+        # A row is identified by all its cells: the first column alone is not unique (the key column of
+        # a table may repeat, e.g. T002 or a language-dependent text table) and dropped all but one row (#78)
+        first_key = _row_key(rows[0])
 
         # Detect if we're stuck on the same page
         if first_key == last_first_key:
-            logger.debug("Same first key, likely at end", extra={"page": page_num})
+            logger.debug("Same first row, likely at end", extra={"page": page_num})
             break
 
         last_first_key = first_key
 
-        # Add new rows (skip duplicates by first column - see first_col above)
+        # Add new rows (skip rows already collected from a previous page)
         new_count = 0
         for row in rows:
-            if first_col:
-                row_key = str(row.get(first_col, ""))
-            else:
-                # Fallback: empty key to avoid reintroducing column alignment issues.
-                # This edge case shouldn't occur (columns validated earlier).
-                row_key = ""
+            row_key = _row_key(row)
             if row_key not in seen_keys:
                 seen_keys.add(row_key)
                 all_rows.append(row)
@@ -647,7 +679,7 @@ async def _execute_se16_query(  # pylint: disable=too-many-locals,too-many-branc
         if field_order is None:
             logger.warning("Could not get field order from SE11, filters may not work")
 
-    # Navigate to SE16N
+    # Navigate to SE16N (enter_transaction prepends /n, so a result list of a previous query is left)
     tx_result = await backend.enter_transaction("SE16N")
     if not tx_result.success:
         return _empty_failure(f"Failed to navigate to SE16N: {tx_result.error}", table, now)
@@ -752,6 +784,9 @@ async def _execute_se16_query(  # pylint: disable=too-many-locals,too-many-branc
             filter_warnings=filter_warnings,
             retrieved_at=now,
         )
+
+    # The rows are keyed by the technical field names, like the desktop server does (#78)
+    columns = await _read_technical_column_names(backend, columns)
 
     # Focus grid and collect all rows with pagination
     await _focus_grid(backend)
