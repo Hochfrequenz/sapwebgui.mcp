@@ -64,10 +64,7 @@ class LoginResult(ToolResult):
     )
     session_id: str | None = Field(
         default=None,
-        description=(
-            "Not set by the Web GUI backend (always None). Use sap_session_list to see session IDs; "
-            "sap_transaction(new_window=True) returns the ID of a new session."
-        ),
+        description="Registry ID of the session of this login (e.g. 's1'); pass it as `session` to later calls.",
     )
 
 

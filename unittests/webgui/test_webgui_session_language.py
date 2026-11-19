@@ -117,7 +117,7 @@ async def test_login_already_logged_in_passes_no_requested_language() -> None:
     backend._page.wait_for_load_state = AsyncMock()
     with (
         patch.object(type(backend), "_find_okcode_field", new=AsyncMock(return_value=object())),
-        patch.object(type(backend), "_post_login_setup", new=AsyncMock()) as setup,
+        patch.object(type(backend), "_post_login_setup", new=AsyncMock(return_value="s1")) as setup,
     ):
         result = await backend.login("https://sap.example", "u", "p", "100", "EN")
 
