@@ -22,7 +22,7 @@ from sapwebguimcp import lang
 from sapwebguimcp.backend.webgui.browser import get_browser_manager
 from sapwebguimcp.backend.webgui.js_helpers import load_js, load_js_with_field_utils, script_arg
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
-from sapwebguimcp.backend.webgui.utils import escape_css_selector, is_sap_shortcut
+from sapwebguimcp.backend.webgui.utils import escape_css_selector, is_sap_shortcut, to_playwright_key
 from sapwebguimcp.lang import UnsupportedLanguageError, alt_of, english_first, language_for_html_lang, pack_for
 from sapwebguimcp.lang.text import compiled
 from sapwebguimcp.middleware.logging import set_sap_identity
@@ -1082,7 +1082,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         page.on("requestfinished", on_done)
         page.on("requestfailed", on_done)
         try:
-            await page.keyboard.press(key)
+            await page.keyboard.press(to_playwright_key(key))
             with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(started.wait(), timeout=_KEY_ROUND_TRIP_START_S)
             if started.is_set():
@@ -1105,7 +1105,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
 
             title = await self._page.title()
 
-            if is_sap_shortcut(key):
+            if is_sap_shortcut(to_playwright_key(key)):
                 try:
                     status_info = await self._page.evaluate(load_js("extract_status_bar.js"), _status_bar_arg())
                     return KeyboardResult(

@@ -617,7 +617,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
           To dismiss a popup use sap_close_popup.
 
         Args:
-            key: Keyboard shortcut. Use "Ctrl+", "Shift+", "Alt+" prefixes for modifiers.
+            key: Keyboard shortcut. Use "Ctrl+", "Shift+", "Alt+" prefixes as modifiers; "Strg+" works too.
             session: Session ID (e.g., "s1", "s2"). None uses primary session.
             agent_id: Agent identifier for binding check. Optional.
 
