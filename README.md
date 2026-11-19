@@ -147,7 +147,7 @@ On **Windows**, open Windows Explorer and paste `%USERPROFILE%\.config\sap-mcp` 
 - You do **not** need `connection_name` (that field belongs to SAP Logon, which this server does not use).
 
 > [!NOTE]
-> This server does not read `tls_skip_verify`: the browser accepts self-signed certificates (Chrome is started with `--ignore-certificate-errors` in [Step 3](#step-3-start-chrome-with-remote-debugging)). Other tools that share `systems.json` may need `"tls_skip_verify": true` for a self-signed or internally-signed certificate.
+> `tls_skip_verify: true` makes `sap_login` accept a self-signed or internally-signed certificate in a Chrome you started yourself (applied over CDP, no restart needed). A Chrome that this server launches always accepts such certificates (it is started with `--ignore-certificate-errors`, see [Step 3](#step-3-start-chrome-with-remote-debugging)). Without the setting, a Chrome without that flag shows `net::ERR_CERT_AUTHORITY_INVALID`; `sap_login` then returns guidance.
 
 > [!IMPORTANT]
 > After editing `systems.json`, restart Claude Desktop, Claude Code, or opencode for the changes to take effect.

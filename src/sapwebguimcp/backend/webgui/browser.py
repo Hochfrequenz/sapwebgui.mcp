@@ -12,7 +12,7 @@ from datetime import timedelta
 from typing import NoReturn, Optional
 from urllib.parse import urlparse
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright, async_playwright
 
 from sapwebguimcp.backend.webgui.chrome_finder import (
     extract_port_from_cdp_url,
@@ -63,6 +63,8 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
         self._initialized = False
         self._registry = SessionRegistry()
         self._chrome_process: Optional[subprocess.Popen[bytes]] = None
+        self._cert_errors_ignored = False
+        self._browser_cdp_session: Optional[CDPSession] = None
 
     @property
     def is_initialized(self) -> bool:
@@ -398,9 +400,32 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
                     pass
             self._chrome_process = None
 
+    async def ignore_certificate_errors(self) -> None:
+        """Make the connected browser accept untrusted TLS certificates (``tls_skip_verify``, #80).
+
+        A Chrome this server launches gets ``--ignore-certificate-errors``; a Chrome the user started
+        themselves does not, so the setting is applied over CDP (``Security.setIgnoreCertificateErrors`` on the
+        browser target). Chrome drops it when the CDP session is detached, so the session is kept open for the
+        lifetime of the connection. Without a browser (or when CDP refuses), this logs and returns: the login
+        then fails with the browser's own certificate error, which sap_login explains.
+        """
+        if self._cert_errors_ignored or self._browser is None:
+            return
+        try:
+            session = await self._browser.new_browser_cdp_session()
+            await session.send("Security.setIgnoreCertificateErrors", {"ignore": True})
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("Could not make the browser ignore certificate errors", exc_info=True)
+            return
+        self._browser_cdp_session = session
+        self._cert_errors_ignored = True
+        logger.info("Browser set to ignore certificate errors (tls_skip_verify)")
+
     async def _reconnect(self) -> None:
         """Force reconnection to the browser."""
         logger.info("Reconnecting to browser")
+        self._cert_errors_ignored = False
+        self._browser_cdp_session = None
         self._initialized = False
         self._pages.clear()
         self._context = None
@@ -514,6 +539,9 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
 
         if self._context and settings.browser_mode == BrowserMode.LAUNCH:
             await self._context.close()
+
+        self._browser_cdp_session = None
+        self._cert_errors_ignored = False
 
         if self._browser:
             if settings.browser_mode == BrowserMode.LAUNCH:
