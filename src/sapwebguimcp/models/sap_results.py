@@ -1,5 +1,6 @@
 """SAP tool result models."""
 
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
@@ -127,11 +128,27 @@ class SessionListResult(ToolResult):
         return len(self.sessions)
 
 
+@dataclass(frozen=True)
+class SessionCloseOutcome:
+    """What the backend achieved when closing a session (the session is deregistered either way)."""
+
+    tab_closed: bool
+    logoff_done: bool = True
+
+
 class SessionCloseResult(ToolResult):
     """Result from sap_session_close tool."""
 
     session_id: str | None = Field(default=None, description="ID of the session that was closed (e.g., 's2')")
     remaining_sessions: int = Field(default=0, ge=0, description="Sessions still active after closing")
+    tab_closed: bool = Field(
+        default=True,
+        description="False if the browser tab could not be closed; the session is deregistered anyway",
+    )
+    warning: str | None = Field(
+        default=None,
+        description="Guidance when the SAP logoff or the tab close failed (close the tab by hand)",
+    )
 
 
 class SessionDetachResult(ToolResult):

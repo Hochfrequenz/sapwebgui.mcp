@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from sapwebguimcp.models.sap_results import SessionInfo
+from sapwebguimcp.models.sap_results import SessionCloseOutcome, SessionInfo
 
 
 def _make_backend(**overrides: Any) -> AsyncMock:
@@ -13,7 +13,7 @@ def _make_backend(**overrides: Any) -> AsyncMock:
     backend = AsyncMock()
     backend.list_sessions.return_value = overrides.get("list_sessions", [])
     backend.has_session.return_value = overrides.get("has_session", False)
-    backend.close_session.return_value = overrides.get("close_session", True)
+    backend.close_session.return_value = overrides.get("close_session", SessionCloseOutcome(tab_closed=True))
     backend.bind_session.return_value = overrides.get("bind_session", None)
     backend.release_session.return_value = overrides.get("release_session", None)
     if "reset_to_primary" in overrides:
@@ -82,7 +82,7 @@ class TestSessionClose:
         """
         from sapwebguimcp.tools.session_tools import sap_session_close_impl
 
-        backend = _make_backend(has_session=True, close_session=True)
+        backend = _make_backend(has_session=True, close_session=SessionCloseOutcome(tab_closed=True))
         # After close, no sessions remain.
         backend.list_sessions.return_value = []
 
@@ -112,7 +112,7 @@ class TestSessionClose:
         from sapwebguimcp.tools.session_tools import sap_session_close_impl
 
         remaining = [SessionInfo(session_id="s1", is_primary=True)]
-        backend = _make_backend(has_session=True, close_session=True)
+        backend = _make_backend(has_session=True, close_session=SessionCloseOutcome(tab_closed=True))
         # After close, list_sessions returns just s1
         backend.list_sessions.return_value = remaining
 
@@ -124,11 +124,36 @@ class TestSessionClose:
         assert result.remaining_sessions == 1
 
     @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        ("outcome", "expect_tab_closed", "expect_warning"),
+        [
+            (SessionCloseOutcome(tab_closed=True), True, False),
+            (SessionCloseOutcome(tab_closed=False), False, True),
+            (SessionCloseOutcome(tab_closed=True, logoff_done=False), True, True),
+        ],
+    )
+    async def test_close_reports_tab_and_logoff_outcome(
+        self, outcome: SessionCloseOutcome, expect_tab_closed: bool, expect_warning: bool
+    ) -> None:
+        """#25: a stuck tab / failed logoff is reported (with guidance), not hidden behind success."""
+        from sapwebguimcp.tools.session_tools import sap_session_close_impl
+
+        backend = _make_backend(has_session=True, close_session=outcome)
+        with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
+            result = await sap_session_close_impl("s2")
+
+        assert result.success is True
+        assert result.tab_closed is expect_tab_closed
+        assert (result.warning is not None) is expect_warning
+        if expect_warning:
+            assert "by hand" in (result.warning or "")
+
+    @pytest.mark.anyio
     async def test_close_fails(self) -> None:
         """Backend returns False for close -> failure result."""
         from sapwebguimcp.tools.session_tools import sap_session_close_impl
 
-        backend = _make_backend(has_session=True, close_session=False)
+        backend = _make_backend(has_session=True, close_session=None)
         with patch(_PATCH_GET_BACKEND, new=AsyncMock(return_value=backend)):
             result = await sap_session_close_impl("s2")
 

@@ -139,7 +139,7 @@ class TestWebGuiCloseSession:
         """Closing one WebGUI session must not trigger SAP's exit-all command."""
         from unittest.mock import MagicMock
 
-        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.backend import _CLOSE_STEP_TIMEOUT_S, WebGuiBackend
         from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
         registry = SessionRegistry()
@@ -157,6 +157,7 @@ class TestWebGuiCloseSession:
         page2.keyboard.press = AsyncMock()
         page2.wait_for_timeout = AsyncMock()
         page2.close = AsyncMock()
+        page2.is_closed.side_effect = lambda: page2.close.await_count > 0
 
         registry.register(page1)
         session_id = registry.register(page2)
@@ -169,11 +170,13 @@ class TestWebGuiCloseSession:
         with patch(patch_registry_target, new=AsyncMock(return_value=registry)):
             closed = await backend.close_session(session_id)
 
-        assert closed is True
+        assert closed is not None
+        assert closed.tab_closed
         ok_field.fill.assert_awaited_once()
         assert ok_field.fill.await_args.args == ("/i",)
+        assert ok_field.fill.await_args.kwargs == {"timeout": _CLOSE_STEP_TIMEOUT_S * 1000}
         page2.keyboard.press.assert_awaited_once_with("Enter")
-        page2.close.assert_awaited_once()
+        page2.close.assert_awaited_once_with(run_before_unload=True)
         assert registry.has_session("s1")
         assert not registry.has_session(session_id)
 
@@ -200,10 +203,10 @@ class TestWebGuiCloseSession:
         page.on = MagicMock()
         page.query_selector = AsyncMock(return_value=None)
 
-        async def _never() -> None:
+        async def _never(**_k: object) -> None:
             await asyncio.sleep(3600)
 
-        page.close = _never
+        page.close = _never  # is_closed stays False: the tab is stuck
         page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no cdp"))
         backend, registry, sid = self._backend_with_page(page)
 
@@ -215,7 +218,9 @@ class TestWebGuiCloseSession:
         ):
             closed = await asyncio.wait_for(backend.close_session(sid), timeout=5)  # type: ignore[attr-defined]
 
-        assert closed is True
+        assert closed is not None
+        assert closed.tab_closed is False
+        assert closed.logoff_done is True
         assert not registry.has_session(sid)  # type: ignore[attr-defined]
 
     @pytest.mark.anyio
@@ -235,6 +240,7 @@ class TestWebGuiCloseSession:
         ok_field.fill = _never
         page.query_selector = AsyncMock(return_value=ok_field)
         page.close = AsyncMock()
+        page.is_closed.side_effect = lambda: page.close.await_count > 0
         backend, registry, sid = self._backend_with_page(page)
 
         with (
@@ -245,6 +251,8 @@ class TestWebGuiCloseSession:
         ):
             closed = await asyncio.wait_for(backend.close_session(sid), timeout=5)  # type: ignore[attr-defined]
 
-        assert closed is True
+        assert closed is not None
+        assert closed.logoff_done is False
+        assert closed.tab_closed is True
         page.close.assert_awaited_once()
         assert not registry.has_session(sid)  # type: ignore[attr-defined]

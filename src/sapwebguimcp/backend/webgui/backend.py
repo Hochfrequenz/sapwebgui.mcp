@@ -44,6 +44,7 @@ from sapwebguimcp.models.sap_results import (
     SapFieldType,
     ScreenInfo,
     ScreenText,
+    SessionCloseOutcome,
     SessionInfo,
     SessionStatus,
     StatusBarInfo,
@@ -1693,30 +1694,43 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 continue
         return result
 
-    async def close_session(self, session_id: str) -> bool:
-        """Close a session by ID. Returns True if closed, False if not found.
+    async def close_session(self, session_id: str) -> SessionCloseOutcome | None:
+        """Close a session by ID. Returns the outcome, or ``None`` if the session is not found.
 
         Every step is time-bounded (#25): a tab that does not react must not make the
         tool hang, and the session is always deregistered, even when the logoff
-        command or ``page.close()`` fails or times out.
+        command or the tab close fails or times out. The outcome says whether the tab
+        is really gone, so the caller can tell the user to close a stuck tab by hand.
         """
         registry = await self._get_registry()
         if not registry.has_session(session_id):
-            return False
+            return None
         page = registry.get_page(session_id)
+        logoff_done = True
         try:
             await asyncio.wait_for(self._end_sap_mode(page), timeout=_CLOSE_STEP_TIMEOUT_S)
         except Exception as exc:  # pylint: disable=broad-exception-caught
+            logoff_done = False
             logger.warning("Ending SAP mode of session %s failed: %r", session_id, exc)
         try:
             if not page.is_closed():
-                await asyncio.wait_for(page.close(), timeout=_CLOSE_STEP_TIMEOUT_S)
+                # run_before_unload: without it page.close() never returned on some browsers (#25).
+                await asyncio.wait_for(page.close(run_before_unload=True), timeout=_CLOSE_STEP_TIMEOUT_S)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning("Closing tab of session %s failed: %r", session_id, exc)
             await self._close_target_via_cdp(page, session_id)
         finally:
             registry.unregister(session_id)
-        return True
+        return SessionCloseOutcome(tab_closed=await self._wait_until_closed(page), logoff_done=logoff_done)
+
+    @staticmethod
+    async def _wait_until_closed(page: Page) -> bool:
+        """Whether the tab is gone, allowing a short moment for the close event to arrive."""
+        for _ in range(10):
+            if page.is_closed():
+                return True
+            await asyncio.sleep(0.1)
+        return page.is_closed()
 
     @staticmethod
     async def _end_sap_mode(page: Page) -> None:

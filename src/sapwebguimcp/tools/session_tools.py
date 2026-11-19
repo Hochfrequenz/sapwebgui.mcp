@@ -68,14 +68,24 @@ async def sap_session_close_impl(session_id: str) -> SessionCloseResult:
                 f"Session '{session_id}' not found. Active: {available}."  # lang-ok: our own message
             )
 
-        closed = await backend.close_session(session_id)
-        if not closed:
+        outcome = await backend.close_session(session_id)
+        if outcome is None:
             return SessionCloseResult.failure(f"Failed to close session '{session_id}'.")  # lang-ok: our own message
 
         remaining = await backend.list_sessions()
+        warning = None
+        if not outcome.tab_closed or not outcome.logoff_done:
+            warning = (
+                f"Session '{session_id}' is deregistered, but "  # lang-ok: our own message
+                + ("its browser tab could not be closed" if not outcome.tab_closed else "the SAP logoff failed")
+                + "; the SAP session may still be logged on in an untracked tab. "
+                "Close that browser tab by hand."
+            )
         return SessionCloseResult(
             session_id=session_id,
             remaining_sessions=len(remaining),
+            tab_closed=outcome.tab_closed,
+            warning=warning,
         )
 
     except Exception as e:  # pylint: disable=broad-exception-caught
