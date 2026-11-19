@@ -76,6 +76,26 @@ class TestParseSeYamlTable:
         assert isinstance(result, SE11Entry)
         assert len(result.fields) > 0
 
+    def test_parse_t000_all_fields_of_the_snapshot(self, lang_de: LanguagePack) -> None:
+        """The recorded grid holds five single-quoted rows (description with ": "); none may be dropped (#91)."""
+        fields = _parse_se11_fields(load_yaml_snapshot("se11_t000_fields_de.yaml"), lang_de)
+        assert [f.name for f in fields] == [
+            "MANDT",
+            "MTEXT",
+            "ORT01",
+            "MWAER",
+            "ADRNR",
+            "CCCATEGORY",
+            "CCCORACTIV",
+            "CCNOCLIIND",
+            "CCCOPYLOCK",
+            "CCNOCASCAD",
+            "CCSOFTLOCK",
+            "CCORIGCONT",
+            "CCIMAILDIS",
+            "CCTEMPLOCK",
+        ]
+
     def test_parse_t000_mandt_field(self, lang_de: LanguagePack) -> None:
         """Test that MANDT field is parsed correctly."""
         yaml_content = load_yaml_snapshot("se11_t000_fields_de.yaml")
@@ -250,10 +270,11 @@ class TestTrailingColumnTitleNotInDescription:
         in_row = False
         for line in yaml_content.splitlines():
             out_line = line
-            if line.lstrip().startswith("- row "):
+            if line.lstrip().startswith(("- row ", "- 'row ")):
                 in_row = "Zum Auswählen" in line
                 if in_row:
-                    out_line = line[: line.rindex('":')] + ' Gruppe":'
+                    end = "\"':" if line.lstrip().startswith("- '") else '":'  # single-quoted YAML row (#91)
+                    out_line = line[: line.rindex(end)] + " Gruppe" + end
             elif in_row and line.strip() == "- gridcell:":
                 out_line = line.replace("- gridcell:", '- gridcell "Gruppe":')
             out.append(out_line)
@@ -267,6 +288,8 @@ class TestTrailingColumnTitleNotInDescription:
         assert fields[0].name == "MANDT"
         assert fields[0].description == "Mandant"
         assert all(not f.description.endswith("Gruppe") for f in fields)
+        # the quoted rows (description with ": ") are stripped too (#91)
+        assert {f.name: f.description for f in fields}["CCCATEGORY"].startswith("Client Control:")
 
     _GRID = """\
 - grid "Felder":
