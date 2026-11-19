@@ -67,8 +67,6 @@ Docker users follow the [Docker section](#docker) instead of steps 1 and 4; they
 
 Pick one way to get the server. Each release on [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest) provides standalone executables; each release also publishes a Docker image on ghcr.io.
 
-Until the first release is published, the release links and the Docker image below do not exist yet: install from source (Option B), or build the image yourself with `docker build -t ghcr.io/hochfrequenz/sapwebgui.mcp:latest .` in a clone.
-
 #### Option A: Standalone executable (Windows, macOS - no Python needed)
 
 Download the binary for your platform from [GitHub Releases](https://github.com/Hochfrequenz/sapwebgui.mcp/releases/latest):
@@ -434,7 +432,7 @@ claude mcp add --scope user sap-webgui '--' docker run -i --rm --network sap-mcp
 
 Everything after `'--'` is the Docker command and is passed through unchanged, so the `-e` flags there are Docker's, not Claude Code's. Keep the quotes around `'--'` (in cmd.exe, write a plain `--`; see [Claude Code](#claude-code) for why). Write the home folder path out in full instead of using `~`, because how `~` is expanded on the command line depends on the shell. A `GITHUB_PAT` typed on the command line ends up in your shell history. For a per-project registration, use the same `command` and `args` in `.mcp.json`; for opencode use `"command": ["docker", "run", ...]` with the same arguments.
 
-If Docker Desktop isn't running, or you aren't logged in to `ghcr.io` and never pulled the image, you might get a nonspecific error "1 MCP server failed · /mcp". Try pulling manually (and see [Docker image pull fails](#docker-image-pull-fails)):
+If Docker Desktop isn't running, or the image was never pulled, you might get a nonspecific error "1 MCP server failed · /mcp". Try pulling manually (and see [Docker image pull fails](#docker-image-pull-fails)):
 
 ```powershell
 docker pull ghcr.io/hochfrequenz/sapwebgui.mcp:latest
@@ -623,46 +621,15 @@ ports:
 
 ### Docker image pull fails
 
-If the image is private, you need to authenticate with GitHub Container Registry. If you see "manifest unknown", no release has been published yet.
-
-**Step 1: Create a GitHub Personal Access Token**
-
-1. Go to [GitHub Token Settings](https://github.com/settings/tokens)
-2. Click "Generate new token" → **"Generate new token (classic)"**
-    > You must use "classic" tokens. Fine-grained tokens don't support container registry access.
-3. Give it a name like "Docker GHCR read"
-4. Set expiration: Choose "Custom" and set to 1 year. You'll need to create a new token and re-login when it expires
-5. Select scope: `read:packages` (only this one is needed)
-6. Click "Generate token"
-7. **Copy the token immediately** (starts with `ghp_`) - you won't see it again!
-
-**Step 2: Login to GitHub Container Registry**
-
-```powershell
-docker login ghcr.io -u YOUR_GITHUB_USERNAME
-```
-
-When prompted for password:
-
-- Paste your Personal Access Token (not your GitHub password)
-- The password won't show as you type - this is normal
-- In PowerShell, **right-click to paste** (Ctrl+V may not work)
-
-You should see: `Login Succeeded`
-
-**Step 3: Pull the image**
+The image is public, so `docker pull` needs no login:
 
 ```powershell
 docker pull ghcr.io/hochfrequenz/sapwebgui.mcp:latest
 ```
 
-> [!NOTE]
-> You only need to do this once per machine. Docker stores your credentials.
-
-**Still having issues?**
-
-- Verify the token starts with `ghp_`
-- Try: `docker logout ghcr.io` then repeat Step 2
+- **"denied" or "unauthorized":** an old or expired login to `ghcr.io` is still stored. Run `docker logout ghcr.io` and pull again.
+- **"manifest unknown":** the tag does not exist. Image tags have no `v` prefix: use `0.20.1`, not `v0.20.1`, or `latest`.
+- **"failed to connect to the docker API":** Docker Desktop is not running. Start it and pull again.
 
 ## Architecture
 
