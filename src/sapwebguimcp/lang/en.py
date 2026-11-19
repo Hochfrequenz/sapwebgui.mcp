@@ -175,6 +175,11 @@ EN = LanguagePack(
         exceptions_tab=Text(("Exceptions",)),
         source_tab=Text(("Source Code", "Source text")),
         exception_column=Text(("Exception",)),
+        properties_tab=Text(("Attributes",)),
+        function_group_field=Text(("Function Group",)),
+        short_text_field=Text(("Short Text",)),
+        package_field=Text(("Package",)),
+        rfc_radio=Text(("Remote-Enabled Module", "Remote-Enabled Function Module", "RFC-Enabled Function Module")),
     ),
     se38=Se38Section(
         initial_screen=Text(("Initial Screen",)),

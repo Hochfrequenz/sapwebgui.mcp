@@ -47,15 +47,40 @@ MAX_INLINE_OBJECTS = 5
 # =============================================================================
 
 
-async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text) -> str | None:
-    """Click a tab and capture its snapshot. Returns snapshot or None."""
+# The parameter grids render only the rows that fit on the screen: scroll with PageDown until nothing new shows up
+_MAX_GRID_PAGES = 10
+
+
+def _grid_content(snapshot: str) -> str:
+    """The cells of a snapshot, without the system information menu that changes with every round trip."""
+    return "\n".join(line for line in snapshot.splitlines() if "gridcell" in line or "checkbox" in line)
+
+
+async def _capture_tab_snapshot(backend: WebGuiBackend, tab: Text, *, scroll: bool = True) -> str | None:
+    """Click a tab and capture its snapshot, with the further scroll positions of a long grid appended (#76).
+
+    Returns the snapshots joined, or None when the tab is not there.
+    """
     for name in tab:
         try:
             await backend.click_tab(name)
-            snapshot = await backend.get_snapshot()
-            return str(snapshot)
+            snapshot = str(await backend.get_snapshot())
         except Exception:  # pylint: disable=broad-exception-caught
             continue
+        pages = [snapshot]
+        if scroll:
+            try:
+                await backend.click_element("[role='tabpanel'] [role='grid']")
+                for _ in range(_MAX_GRID_PAGES):
+                    await backend.press_key("PageDown")
+                    await backend.wait(400)
+                    following = str(await backend.get_snapshot())
+                    if _grid_content(following) == _grid_content(pages[-1]):
+                        break
+                    pages.append(following)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.warning("Could not scroll the parameter grid", extra={"tab": name, "error": str(e)})
+        return "\n".join(pages)
 
     return None
 
@@ -82,7 +107,9 @@ async def _lookup_fm_on_initial_screen(backend: WebGuiBackend, fm_name: str, t: 
     main_snapshot = await backend.get_snapshot()
     logger.debug("Got main snapshot", extra={"object": fm_name, "length": len(str(main_snapshot))})
 
-    # Capture each tab
+    # Capture each tab. The properties tab (function group, package, short text, RFC flag) is read first:
+    # the parameter tabs do not carry that header data (#76)
+    properties_raw = await _capture_tab_snapshot(backend, t.se37.properties_tab, scroll=False)
     import_raw = await _capture_tab_snapshot(backend, t.se37.import_tab)
     export_raw = await _capture_tab_snapshot(backend, t.se37.export_tab)
     changing_raw = await _capture_tab_snapshot(backend, t.se37.changing_tab)
@@ -94,6 +121,7 @@ async def _lookup_fm_on_initial_screen(backend: WebGuiBackend, fm_name: str, t: 
         changing_tab=AriaSnapshot(changing_raw) if changing_raw is not None else None,
         tables_tab=AriaSnapshot(tables_raw) if tables_raw is not None else None,
         exceptions_tab=AriaSnapshot(exceptions_raw) if exceptions_raw is not None else None,
+        properties_tab=AriaSnapshot(properties_raw) if properties_raw is not None else None,
     )
 
     # Parse all snapshots

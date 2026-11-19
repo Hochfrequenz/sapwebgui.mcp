@@ -297,6 +297,16 @@ class Se37Section:
     exceptions_tab: Text
     source_tab: Text
     exception_column: Text
+    properties_tab: Text
+    """Tab title of the attributes (properties) tab of the function builder."""
+    function_group_field: Text
+    """Label of the function group input on the properties tab."""
+    short_text_field: Text
+    """Label of the short text input on the properties tab."""
+    package_field: Text
+    """Label of the package input on the properties tab."""
+    rfc_radio: Text
+    """Label of the radio button "remote-enabled module" on the properties tab."""
 
 
 @dataclass(frozen=True, slots=True)

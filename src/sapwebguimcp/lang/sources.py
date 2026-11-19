@@ -217,6 +217,11 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se37.exceptions_tab": Manual("tab title of the function builder tab strip"),
         "se37.source_tab": Manual("tab title of the function builder tab strip"),
         "se37.exception_column": Manual("table control column title of the exceptions tab"),
+        "se37.properties_tab": Manual("tab title of the function builder tab strip"),
+        "se37.function_group_field": Manual("label of the function group input on the properties tab"),
+        "se37.short_text_field": Manual("label of the short text input on the properties tab"),
+        "se37.package_field": Manual("label of the package input on the properties tab"),
+        "se37.rfc_radio": Manual("label of the remote-enabled module radio button on the properties tab"),
         "se38.initial_screen": Manual("title fragment of the ABAP editor initial screen"),
         "se38.program_field_title": Manual("title attribute of the program name input"),
         "se93.initial_screen": Manual(

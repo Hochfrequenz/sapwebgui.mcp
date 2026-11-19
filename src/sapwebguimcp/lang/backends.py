@@ -141,6 +141,11 @@ _TAGS: dict[str, Backend] = {
     "se37.exceptions_tab": Backend.BOTH,
     "se37.source_tab": Backend.WEBGUI,
     "se37.exception_column": Backend.BOTH,
+    "se37.properties_tab": Backend.BOTH,
+    "se37.function_group_field": Backend.BOTH,
+    "se37.short_text_field": Backend.BOTH,
+    "se37.package_field": Backend.BOTH,
+    "se37.rfc_radio": Backend.BOTH,
     # se38
     "se38.initial_screen": Backend.BOTH,
     "se38.program_field_title": Backend.BOTH,

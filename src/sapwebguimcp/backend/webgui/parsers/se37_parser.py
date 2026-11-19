@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
 from sapwebguimcp.lang.schema import LanguagePack
-from sapwebguimcp.lang.text import compiled
+from sapwebguimcp.lang.text import Text, compiled
 from sapwebguimcp.models.se37_models import (
     SE37Entry,
     SE37Error,
@@ -31,6 +31,8 @@ __all__ = [
     "parse_se37_snapshot",
     "parse_se37_parameters_snapshot",
     "parse_se37_exceptions_snapshot",
+    "parse_se37_properties_snapshot",
+    "SE37Properties",
     "SE37TabSnapshots",
 ]
 
@@ -157,11 +159,17 @@ def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> li
     """Read the parameters of a tab grid cell by cell. Rows without a parameter name are padding."""
     layout = _PARAM_TAIL_LAYOUT[category]
     parameters: list[SE37Parameter] = []
+    seen: set[str] = set()
     for cells in _grid_rows(snapshot)[1]:
         name = _cell_text(cells, 0)
         typing_str = _cell_text(cells, 1).upper()
         if not name or typing_str not in ("LIKE", "TYPE"):
             continue
+        # The grid renders only the visible rows, so the snapshots of several scroll positions are concatenated
+        # and overlap: a parameter name is unique within a tab (#76)
+        if name in seen:
+            continue
+        seen.add(name)
         tail = {key: cells[3 + i] for i, key in enumerate(layout) if 3 + i < len(cells)}
         typing: SE37TypingMethod = "LIKE" if typing_str == "LIKE" else "TYPE"
         default = tail["default"].text.strip() if "default" in tail else ""
@@ -182,11 +190,67 @@ def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> li
 
 def _parse_exception_cells(snapshot: str) -> list[SE37Exception]:
     """Read the exceptions of the Exceptions tab grid cell by cell."""
-    return [
-        SE37Exception(name=_cell_text(cells, 0), description=_cell_text(cells, 1))
-        for cells in _grid_rows(snapshot)[1]
-        if _cell_text(cells, 0)
-    ]
+    exceptions: dict[str, SE37Exception] = {}
+    for cells in _grid_rows(snapshot)[1]:
+        name = _cell_text(cells, 0)
+        if name and name not in exceptions:  # overlapping scroll positions, see _parse_parameter_cells
+            exceptions[name] = SE37Exception(name=name, description=_cell_text(cells, 1))
+    return list(exceptions.values())
+
+
+# =============================================================================
+# Properties (attributes) tab
+# =============================================================================
+
+_TEXTBOX_LINE = re.compile(
+    r"""^\s*- '?textbox "(?P<label>(?:[^"\\]|\\.)*)"(?: \[[^\]]*\])*(?::[ ]?(?P<value>.*?))?'?\s*$"""
+)
+_RADIO_LINE = re.compile(r"""^\s*- '?radio "(?P<label>(?:[^"\\]|\\.)*)"(?P<flags>(?: \[[^\]]*\])*)""")
+
+
+@dataclass
+class SE37Properties:
+    """Header data of the properties (attributes) tab: what the parameter tabs do not carry."""
+
+    function_group: str | None = None
+    package: str | None = None
+    description: str = ""
+    is_rfc_enabled: bool = False
+
+
+def _textbox_value(snapshot: str, label: Text) -> str | None:
+    """Value of the first text box whose label is one of ``label``; None when there is no such text box."""
+    for line in snapshot.splitlines():
+        match = _TEXTBOX_LINE.match(line)
+        if match is None:
+            continue
+        if not label.equals(_unescape_yaml_name(match.group("label"), line.lstrip().startswith("- '"))):
+            continue
+        value = (match.group("value") or "").strip()
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = value[1:-1].replace('\\"', '"')
+        return value
+    return None
+
+
+def _radio_checked(snapshot: str, label: Text) -> bool:
+    """Whether the radio button labelled ``label`` is selected."""
+    for line in snapshot.splitlines():
+        match = _RADIO_LINE.match(line)
+        if match and label.equals(match.group("label")):
+            return "[checked]" in match.group("flags")
+    return False
+
+
+def parse_se37_properties_snapshot(snapshot: AriaSnapshot, t: LanguagePack) -> SE37Properties:
+    """Parse the properties (attributes) tab: function group, package, short text and the RFC flag."""
+    text = str(snapshot)
+    return SE37Properties(
+        function_group=_textbox_value(text, t.se37.function_group_field) or None,
+        package=_textbox_value(text, t.se37.package_field) or None,
+        description=_textbox_value(text, t.se37.short_text_field) or "",
+        is_rfc_enabled=_radio_checked(text, t.se37.rfc_radio),
+    )
 
 
 def _extract_function_module_name(snapshot: str, t: LanguagePack) -> str | None:
@@ -341,6 +405,7 @@ class SE37TabSnapshots:
     changing_tab: AriaSnapshot | None = None
     tables_tab: AriaSnapshot | None = None
     exceptions_tab: AriaSnapshot | None = None
+    properties_tab: AriaSnapshot | None = None
 
 
 def parse_se37_snapshot(
@@ -393,8 +458,14 @@ def parse_se37_snapshot(
     tables_params = parse_se37_parameters_snapshot(tabs.tables_tab, "tables", t) if tabs.tables_tab else []
     exceptions = parse_se37_exceptions_snapshot(tabs.exceptions_tab, t) if tabs.exceptions_tab else []
 
+    properties = parse_se37_properties_snapshot(tabs.properties_tab, t) if tabs.properties_tab else SE37Properties()
+
     return SE37Entry(
         function_module=found_fm,
+        function_group=properties.function_group,
+        package=properties.package,
+        description=properties.description,
+        is_rfc_enabled=properties.is_rfc_enabled,
         import_parameters=import_params,
         export_parameters=export_params,
         changing_parameters=changing_params,

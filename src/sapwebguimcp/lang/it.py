@@ -228,6 +228,11 @@ IT = LanguagePack(
         exceptions_tab=Text(("Eccezioni",)),
         source_tab=Text(("Testo sorgente",)),
         exception_column=Text(("Eccezione",)),
+        properties_tab=Text(("Attributi",)),
+        function_group_field=Text(("Gruppo funzioni",)),
+        short_text_field=Text(("Testo breve",)),
+        package_field=Text(("Pacchetto",)),
+        rfc_radio=Text(("Modulo con abilitazione RFC",)),
     ),
     se38=Se38Section(
         initial_screen=Text(("videata iniziale",)),

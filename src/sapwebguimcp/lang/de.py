@@ -190,6 +190,11 @@ DE = LanguagePack(
         exceptions_tab=Text(("Ausnahmen",)),
         source_tab=Text(("Quelltext",)),
         exception_column=Text(("Ausnahme",)),
+        properties_tab=Text(("Eigenschaften",)),
+        function_group_field=Text(("Funktionsgruppe",)),
+        short_text_field=Text(("Kurztext",)),
+        package_field=Text(("Paket",)),
+        rfc_radio=Text(("Remote fähiger Baustein",)),
     ),
     se38=Se38Section(
         initial_screen=Text(("Einstieg",)),

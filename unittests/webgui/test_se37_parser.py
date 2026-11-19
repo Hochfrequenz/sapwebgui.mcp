@@ -13,6 +13,7 @@ from sapwebguimcp.backend.webgui.parsers.se37_parser import (
     SE37TabSnapshots,
     parse_se37_exceptions_snapshot,
     parse_se37_parameters_snapshot,
+    parse_se37_properties_snapshot,
     parse_se37_snapshot,
 )
 from sapwebguimcp.lang import LanguagePack
@@ -270,3 +271,51 @@ class TestCellBasedParameterParsing:
         assert param.description == ""
         assert param.optional is False
         assert param.pass_by_value is True
+
+
+class TestPropertiesTab:
+    """Function group, package, short text and RFC flag come from the properties tab (#76)."""
+
+    def test_header_fields_of_a_remote_enabled_module(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_bapi_user_get_detail_properties")
+        properties = parse_se37_properties_snapshot(snapshot, lang_de)
+        assert properties.function_group == "SU_USER"
+        assert properties.package == "SUSR"
+        assert properties.description == "Detaildaten eines Benutzers lesen"
+        assert properties.is_rfc_enabled is True
+
+    def test_normal_module_is_not_rfc_enabled(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_bapi_user_get_detail_properties").replace(
+            'radio "Remote fähiger Baustein" [checked]', 'radio "Remote fähiger Baustein"'
+        )
+        assert parse_se37_properties_snapshot(snapshot, lang_de).is_rfc_enabled is False
+
+    def test_empty_snapshot_gives_empty_header(self, lang_de: LanguagePack) -> None:
+        properties = parse_se37_properties_snapshot("", lang_de)
+        assert (properties.function_group, properties.package, properties.description) == (None, None, "")
+
+    def test_entry_header_is_filled_from_the_properties_tab(self, lang_de: LanguagePack) -> None:
+        main = _load_snapshot("se37_bapi_user_get_detail_main")
+        tabs = SE37TabSnapshots(properties_tab=_load_snapshot("se37_bapi_user_get_detail_properties"))
+        entry = parse_se37_snapshot(main, "BAPI_USER_GET_DETAIL", lang_de, tabs)
+        assert isinstance(entry, SE37Entry)
+        assert (entry.function_group, entry.package, entry.is_rfc_enabled) == ("SU_USER", "SUSR", True)
+        assert entry.description == "Detaildaten eines Benutzers lesen"
+
+
+class TestOverlappingScrollPositions:
+    """The grid renders only visible rows; the snapshots of several scroll positions are concatenated (#76)."""
+
+    def test_parameters_of_overlapping_snapshots_are_not_duplicated(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_rfc_read_table_import")
+        once = parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+        twice = parse_se37_parameters_snapshot(snapshot + "\n" + snapshot, "import", lang_de)
+        assert once
+        assert [p.name for p in twice] == [p.name for p in once]
+
+    def test_exceptions_of_overlapping_snapshots_are_not_duplicated(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_rfc_read_table_exceptions")
+        once = parse_se37_exceptions_snapshot(snapshot, lang_de)
+        twice = parse_se37_exceptions_snapshot(snapshot + "\n" + snapshot, lang_de)
+        assert once
+        assert [e.name for e in twice] == [e.name for e in once]
