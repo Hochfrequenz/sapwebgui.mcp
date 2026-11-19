@@ -67,8 +67,126 @@ _TAB_SELECTED_PATTERN = re.compile(r'tab "(?P<tab>[^"]+)"\s*\[selected\]', re.IG
 
 
 # =============================================================================
-# Parser Functions
+# Positional (cell based) grid parsing
 # =============================================================================
+#
+# The accessible name of a grid row is the concatenation of its cells, which cannot tell an empty default
+# value from a missing one, loses cells whose text contains a double quote, and (in the live DOM) repeats the
+# column title for cells without a value. So the parameter and exception grids are read cell by cell.
+
+_ROW_LINE = re.compile(r"^(?P<indent>\s*)- '?row\b")
+_CELL_LINE = re.compile(
+    r"^(?P<indent>\s*)- '?(?P<kind>gridcell|columnheader)(?: \"(?P<name>.*)\")?(?: \[[^\]]*\])*'?:?\s*$"
+)
+
+# Cell layout after the three leading columns (name, typing, reference type), per parameter category
+_PARAM_TAIL_LAYOUT: dict[str, tuple[str, ...]] = {
+    "import": ("default", "optional", "by_value", "short_text", "long_text"),
+    "changing": ("default", "optional", "by_value", "short_text", "long_text"),
+    "export": ("by_value", "short_text", "long_text"),
+    "tables": ("optional", "short_text", "long_text"),
+}
+
+
+@dataclass
+class _GridCell:
+    """One cell of a grid row: its accessible name, and the state of a checkbox inside it (None: no checkbox)."""
+
+    text: str
+    checked: bool | None = None
+
+
+def _unescape_yaml_name(raw: str, quoted_line: bool) -> str:
+    """Undo the YAML escaping of an accessible name (``\\"`` and, in single-quoted lines, ``''``)."""
+    name = raw.replace('\\"', '"')
+    return name.replace("''", "'") if quoted_line else name
+
+
+def _grid_rows(snapshot: str) -> tuple[list[str], list[list[_GridCell]]]:
+    """Split a grid snapshot into its column titles and its data rows (each a list of cells).
+
+    A cell whose accessible name is just the title of its column is empty: the live DOM labels empty
+    cells with their column title.
+    """
+    headers: list[str] = []
+    rows: list[list[_GridCell]] = []
+    row_indent = -1
+    cells: list[_GridCell] | None = None
+    cell_indent = -1
+    for line in snapshot.splitlines():
+        row_match = _ROW_LINE.match(line)
+        if row_match:
+            cells = []
+            rows.append(cells)
+            row_indent = len(row_match.group("indent"))
+            cell_indent = -1
+            continue
+        if cells is None:
+            continue
+        indent = len(line) - len(line.lstrip())
+        if line.strip() and indent <= row_indent:
+            cells = None
+            continue
+        cell_match = _CELL_LINE.match(line)
+        if cell_match:
+            quoted = line.lstrip().startswith("- '")
+            name = _unescape_yaml_name(cell_match.group("name") or "", quoted)
+            if cell_match.group("kind") == "columnheader":
+                headers.append(name)
+            else:
+                cells.append(_GridCell(text=name))
+                cell_indent = len(cell_match.group("indent"))
+            continue
+        if cells and indent > cell_indent >= 0 and "- checkbox" in line:
+            cells[-1].checked = "[checked]" in line
+    data_rows: list[list[_GridCell]] = []
+    for row in rows:
+        for index, cell in enumerate(row):
+            if index < len(headers) and cell.text.strip() == headers[index].strip():
+                cell.text = ""
+        if row:
+            data_rows.append(row)
+    return headers, data_rows
+
+
+def _cell_text(cells: list[_GridCell], index: int) -> str:
+    return cells[index].text.strip() if index < len(cells) else ""
+
+
+def _parse_parameter_cells(snapshot: str, category: SE37ParameterCategory) -> list[SE37Parameter]:
+    """Read the parameters of a tab grid cell by cell. Rows without a parameter name are padding."""
+    layout = _PARAM_TAIL_LAYOUT[category]
+    parameters: list[SE37Parameter] = []
+    for cells in _grid_rows(snapshot)[1]:
+        name = _cell_text(cells, 0)
+        typing_str = _cell_text(cells, 1).upper()
+        if not name or typing_str not in ("LIKE", "TYPE"):
+            continue
+        tail = {key: cells[3 + i] for i, key in enumerate(layout) if 3 + i < len(cells)}
+        typing: SE37TypingMethod = "LIKE" if typing_str == "LIKE" else "TYPE"
+        default = tail["default"].text.strip() if "default" in tail else ""
+        parameters.append(
+            SE37Parameter(
+                name=name,
+                category=category,
+                typing=typing,
+                reference_type=_cell_text(cells, 2),
+                default_value=default or None,
+                optional=bool("optional" in tail and tail["optional"].checked),
+                pass_by_value=bool("by_value" in tail and tail["by_value"].checked),
+                description=tail["short_text"].text.strip() if "short_text" in tail else "",
+            )
+        )
+    return parameters
+
+
+def _parse_exception_cells(snapshot: str) -> list[SE37Exception]:
+    """Read the exceptions of the Exceptions tab grid cell by cell."""
+    return [
+        SE37Exception(name=_cell_text(cells, 0), description=_cell_text(cells, 1))
+        for cells in _grid_rows(snapshot)[1]
+        if _cell_text(cells, 0)
+    ]
 
 
 def _extract_function_module_name(snapshot: str, t: LanguagePack) -> str | None:
@@ -110,6 +228,8 @@ def _get_checkbox_flags(snapshot: str, match: re.Match[str], category: SE37Param
 
 def _parse_parameter_rows(snapshot: str, category: SE37ParameterCategory, t: LanguagePack) -> list[SE37Parameter]:
     """Parse parameter rows from a grid section."""
+    if from_cells := _parse_parameter_cells(snapshot, category):
+        return from_cells
     parameters: list[SE37Parameter] = []
 
     for match in _param_row_pattern(t).finditer(snapshot):
@@ -139,6 +259,8 @@ def _parse_parameter_rows(snapshot: str, category: SE37ParameterCategory, t: Lan
 
 def _parse_exception_rows(snapshot: str, t: LanguagePack) -> list[SE37Exception]:
     """Parse exception rows from exceptions grid."""
+    if from_cells := _parse_exception_cells(snapshot):
+        return from_cells
     exceptions: list[SE37Exception] = []
 
     for match in _exception_row_pattern(t).finditer(snapshot):

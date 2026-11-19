@@ -204,3 +204,69 @@ class TestHeadingNameOnRealSnapshots:
         result = parse_se37_snapshot(snapshot, "x", lang_en)
         assert isinstance(result, SE37Entry)
         assert result.function_module == "Z_FM"
+
+
+class TestCellBasedParameterParsing:
+    """The parameter grids are read cell by cell (#76)."""
+
+    def test_optional_and_pass_by_value_come_from_their_own_checkboxes(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_import"), "import", lang_de)
+        by_name = {p.name: p for p in params}
+        # mandatory, passed by value: only the second checkbox is checked
+        assert by_name["QUERY_TABLE"].optional is False
+        assert by_name["QUERY_TABLE"].pass_by_value is True
+        assert by_name["DELIMITER"].optional is True
+        assert by_name["DELIMITER"].default_value == "SPACE"
+
+    def test_no_default_and_description_stay_in_their_columns(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_import"), "import", lang_de)
+        query_table = next(p for p in params if p.name == "QUERY_TABLE")
+        assert query_table.default_value is None
+        assert query_table.description == "Tabelle, aus der gelesen wird"
+
+    def test_description_with_quotes_is_not_dropped(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_tables"), "tables", lang_de)
+        options = next(p for p in params if p.name == "OPTIONS")
+        assert options.description == 'Selektionsangaben, "WHERE-Klauseln" (in)'
+        assert [p.name for p in params] == ["OPTIONS", "FIELDS", "DATA"]
+        assert all(p.optional for p in params)
+
+    def test_export_has_no_default_and_is_by_value(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_export"), "export", lang_de)
+        assert [p.name for p in params] == ["ET_DATA"]
+        assert params[0].pass_by_value is True
+        assert params[0].optional is False
+        assert params[0].default_value is None
+
+    def test_cells_labelled_with_the_column_title_are_empty(self, lang_de: LanguagePack) -> None:
+        """The live DOM names empty cells after their column (as the header texts leaked into the values)."""
+        snapshot = "\n".join(
+            [
+                '- row "Parametername Typisierung Bezugstyp Vorschlagswert Optional Wertübergabe Kurztext Langtext":',
+                '  - columnheader "Parametername"',
+                '  - columnheader "Typisierung"',
+                '  - columnheader "Bezugstyp"',
+                '  - columnheader "Vorschlagswert"',
+                '  - columnheader "Optional"',
+                '  - columnheader "Wertübergabe"',
+                '  - columnheader "Kurztext"',
+                '  - columnheader "Langtext"',
+                '- row "USERNAME TYPE BAPIBNAME Vorschlagswert Kurztext":',
+                '  - gridcell "USERNAME":',
+                "    - textbox",
+                '  - gridcell "TYPE":',
+                '  - gridcell "BAPIBNAME":',
+                '  - gridcell "Vorschlagswert":',
+                '  - gridcell "":',
+                "    - checkbox [disabled]",
+                '  - gridcell "":',
+                '    - checkbox "" [checked] [disabled]',
+                '  - gridcell "Kurztext":',
+                '  - gridcell "Langtext":',
+            ]
+        )
+        (param,) = parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+        assert param.default_value is None
+        assert param.description == ""
+        assert param.optional is False
+        assert param.pass_by_value is True

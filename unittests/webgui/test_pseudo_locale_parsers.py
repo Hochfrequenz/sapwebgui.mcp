@@ -504,6 +504,10 @@ def test_the_family_really_reads_pack_texts(family: str, rewritten_dir: Path) ->
 
 
 _NOT_SHOWN: dict[str, dict[str, str]] = {
+    "se37": {
+        "parameters": "read cell by cell: language-independent while the grid has cells (#76)",
+        "exceptions": "read cell by cell: language-independent while the grid has cells (#76)",
+    },
     "se16": {"selection_screen": "language-independent: reads roles and field values only"},
     "sm30": {
         "view_type": "the pack text only tells the initial screen from a view without a grid, "
