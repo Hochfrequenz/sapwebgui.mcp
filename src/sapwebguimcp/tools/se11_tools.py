@@ -183,13 +183,71 @@ def _parse_field_row(parts: list[str], key_fields: set[str]) -> SE11Field | None
     )
 
 
+def _last_header_before(yaml_content: str, pos: int) -> str:
+    """Return the text of the last column header before ``pos`` (the trailing grid column title), or ""."""
+    titles = [m.group(1).strip() for m in re.finditer(r'columnheader "([^"]*)"', yaml_content[:pos])]
+    titles = [title for title in titles if title]
+    return titles[-1] if titles else ""
+
+
+def _last_cell_is_empty(row_block: str, header: str) -> bool:
+    """True when the row's own last gridcell is labelled with exactly the column title ``header``.
+
+    Only the row's own cells count, not whatever follows the row in the snapshot. The block starts in the middle
+    of the ``- row`` line (the split pattern is a lookahead), so its indent is unknown; the cells' indent is taken
+    from the first child line instead, and the scan stops at the first line indented less than the cells. An
+    unnamed last cell (``- gridcell:``) is a plain empty cell: its name contributed nothing to the row name, so
+    there is nothing to strip.
+    """
+    lines = row_block.splitlines()
+    if not lines:
+        return False
+    last_label: str | None = None
+    child_indent: int | None = None
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if child_indent is None:
+            child_indent = indent
+        if indent < child_indent:
+            break
+        if indent != child_indent:
+            continue
+        cell = re.match(r'\s*- gridcell(?: "([^"]*)")?', line)
+        if cell:
+            last_label = cell.group(1)
+    return last_label is not None and last_label == header
+
+
+def _strip_trailing_column_title(row_data: str, header: str, row_block: str) -> str:
+    """Remove the accessible name of the empty trailing column from a row name.
+
+    The row's accessible name is the concatenation of its cells. The last column (e.g. "Gruppe") is
+    usually empty but its cell is labelled with the column title, which then ends up as a suffix of
+    the last real value (the field description). Strip it only when the row's last gridcell is labelled
+    with exactly that title (the rendered label of an empty cell), so a description that legitimately ends with
+    the same word is left alone.
+    """
+    if header and row_data.endswith(" " + header) and _last_cell_is_empty(row_block, header):
+        return row_data[: -len(header)].rstrip()
+    return row_data
+
+
 def _parse_se11_fields(yaml_content: str, t: LanguagePack) -> list[SE11Field]:
     """Parse field rows from SE11 grid."""
     key_fields = _find_key_fields(yaml_content, t)
     fields: list[SE11Field] = []
+    row_pattern = _row_data_pattern(t)
+    first = row_pattern.search(yaml_content)
+    header = _last_header_before(yaml_content, first.start()) if first else ""
+    row_blocks = _row_split_pattern(t).split(yaml_content)
 
-    for match in _row_data_pattern(t).finditer(yaml_content):
-        row_data = match.group("row_data")
+    for block in row_blocks:
+        match = row_pattern.search(block)
+        if not match:
+            continue
+        row_data = _strip_trailing_column_title(match.group("row_data"), header, block)
 
         # Filter out checkbox Unicode chars (Private Use Area U+E000-U+F8FF)
         parts = [p for p in row_data.split() if p and not (len(p) == 1 and ord(p) >= 0xE000)]
