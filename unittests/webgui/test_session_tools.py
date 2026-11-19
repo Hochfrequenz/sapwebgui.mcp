@@ -170,8 +170,81 @@ class TestWebGuiCloseSession:
             closed = await backend.close_session(session_id)
 
         assert closed is True
-        ok_field.fill.assert_awaited_once_with("/i")
+        ok_field.fill.assert_awaited_once()
+        assert ok_field.fill.await_args.args == ("/i",)
         page2.keyboard.press.assert_awaited_once_with("Enter")
         page2.close.assert_awaited_once()
         assert registry.has_session("s1")
         assert not registry.has_session(session_id)
+
+    @staticmethod
+    def _backend_with_page(page: object) -> tuple[object, object, str]:
+        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
+
+        registry = SessionRegistry()
+        sid = registry.register(page)
+        backend = WebGuiBackend.__new__(WebGuiBackend)
+        backend._page = page  # pylint: disable=protected-access
+        backend._keepalive_task = None  # pylint: disable=protected-access
+        return backend, registry, sid
+
+    @pytest.mark.anyio
+    async def test_hanging_page_close_is_bounded_and_session_deregistered(self) -> None:
+        """#25: a page.close() that never returns must not hang the tool or leave the session registered."""
+        import asyncio
+        from unittest.mock import MagicMock
+
+        page = MagicMock()
+        page.is_closed.return_value = False
+        page.on = MagicMock()
+        page.query_selector = AsyncMock(return_value=None)
+
+        async def _never() -> None:
+            await asyncio.sleep(3600)
+
+        page.close = _never
+        page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no cdp"))
+        backend, registry, sid = self._backend_with_page(page)
+
+        with (
+            patch("sapwebguimcp.backend.webgui.backend._CLOSE_STEP_TIMEOUT_S", 0.1),
+            patch(
+                "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry", new=AsyncMock(return_value=registry)
+            ),
+        ):
+            closed = await asyncio.wait_for(backend.close_session(sid), timeout=5)  # type: ignore[attr-defined]
+
+        assert closed is True
+        assert not registry.has_session(sid)  # type: ignore[attr-defined]
+
+    @pytest.mark.anyio
+    async def test_hanging_logoff_is_bounded_and_tab_still_closed(self) -> None:
+        """#25: a logoff step that never returns must not prevent closing the tab."""
+        import asyncio
+        from unittest.mock import MagicMock
+
+        page = MagicMock()
+        page.is_closed.return_value = False
+        page.on = MagicMock()
+
+        async def _never(*_a: object, **_k: object) -> None:
+            await asyncio.sleep(3600)
+
+        ok_field = MagicMock()
+        ok_field.fill = _never
+        page.query_selector = AsyncMock(return_value=ok_field)
+        page.close = AsyncMock()
+        backend, registry, sid = self._backend_with_page(page)
+
+        with (
+            patch("sapwebguimcp.backend.webgui.backend._CLOSE_STEP_TIMEOUT_S", 0.1),
+            patch(
+                "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry", new=AsyncMock(return_value=registry)
+            ),
+        ):
+            closed = await asyncio.wait_for(backend.close_session(sid), timeout=5)  # type: ignore[attr-defined]
+
+        assert closed is True
+        page.close.assert_awaited_once()
+        assert not registry.has_session(sid)  # type: ignore[attr-defined]
