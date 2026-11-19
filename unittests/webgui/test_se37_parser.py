@@ -5,6 +5,8 @@ Tests parsing of YAML accessibility snapshots from SE37 function module display 
 """
 
 from pathlib import Path
+from typing import ClassVar
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,10 +15,12 @@ from sapwebguimcp.backend.webgui.parsers.se37_parser import (
     SE37TabSnapshots,
     parse_se37_exceptions_snapshot,
     parse_se37_parameters_snapshot,
+    parse_se37_properties_snapshot,
     parse_se37_snapshot,
 )
 from sapwebguimcp.lang import LanguagePack
 from sapwebguimcp.models import SE37Entry, SE37Error
+from sapwebguimcp.tools import se37_tools
 
 # Path to captured YAML snapshots
 SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "se37_exploration"
@@ -204,3 +208,200 @@ class TestHeadingNameOnRealSnapshots:
         result = parse_se37_snapshot(snapshot, "x", lang_en)
         assert isinstance(result, SE37Entry)
         assert result.function_module == "Z_FM"
+
+
+class TestCellBasedParameterParsing:
+    """The parameter grids are read cell by cell (#76)."""
+
+    def test_optional_and_pass_by_value_come_from_their_own_checkboxes(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_import"), "import", lang_de)
+        by_name = {p.name: p for p in params}
+        # mandatory, passed by value: only the second checkbox is checked
+        assert by_name["QUERY_TABLE"].optional is False
+        assert by_name["QUERY_TABLE"].pass_by_value is True
+        assert by_name["DELIMITER"].optional is True
+        assert by_name["DELIMITER"].default_value == "SPACE"
+
+    def test_no_default_and_description_stay_in_their_columns(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_import"), "import", lang_de)
+        query_table = next(p for p in params if p.name == "QUERY_TABLE")
+        assert query_table.default_value is None
+        assert query_table.description == "Tabelle, aus der gelesen wird"
+
+    def test_description_with_quotes_is_not_dropped(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_tables"), "tables", lang_de)
+        options = next(p for p in params if p.name == "OPTIONS")
+        assert options.description == 'Selektionsangaben, "WHERE-Klauseln" (in)'
+        assert [p.name for p in params] == ["OPTIONS", "FIELDS", "DATA"]
+        assert all(p.optional for p in params)
+
+    def test_export_has_no_default_and_is_by_value(self, lang_de: LanguagePack) -> None:
+        params = parse_se37_parameters_snapshot(_load_snapshot("se37_rfc_read_table_export"), "export", lang_de)
+        assert [p.name for p in params] == ["ET_DATA"]
+        assert params[0].pass_by_value is True
+        assert params[0].optional is False
+        assert params[0].default_value is None
+
+    def test_cells_labelled_with_the_column_title_are_empty(self, lang_de: LanguagePack) -> None:
+        """The live DOM names empty cells after their column (as the header texts leaked into the values)."""
+        snapshot = "\n".join(
+            [
+                '- row "Parametername Typisierung Bezugstyp Vorschlagswert Optional Wertübergabe Kurztext Langtext":',
+                '  - columnheader "Parametername"',
+                '  - columnheader "Typisierung"',
+                '  - columnheader "Bezugstyp"',
+                '  - columnheader "Vorschlagswert"',
+                '  - columnheader "Optional"',
+                '  - columnheader "Wertübergabe"',
+                '  - columnheader "Kurztext"',
+                '  - columnheader "Langtext"',
+                '- row "USERNAME TYPE BAPIBNAME Vorschlagswert Kurztext":',
+                '  - gridcell "USERNAME":',
+                "    - textbox",
+                '  - gridcell "TYPE":',
+                '  - gridcell "BAPIBNAME":',
+                '  - gridcell "Vorschlagswert":',
+                '  - gridcell "":',
+                "    - checkbox [disabled]",
+                '  - gridcell "":',
+                '    - checkbox "" [checked] [disabled]',
+                '  - gridcell "Kurztext":',
+                '  - gridcell "Langtext":',
+            ]
+        )
+        (param,) = parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+        assert param.default_value is None
+        assert param.description == ""
+        assert param.optional is False
+        assert param.pass_by_value is True
+
+
+class TestPropertiesTab:
+    """Function group, package, short text and RFC flag come from the properties tab (#76)."""
+
+    def test_header_fields_of_a_remote_enabled_module(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_bapi_user_get_detail_properties")
+        properties = parse_se37_properties_snapshot(snapshot, lang_de)
+        assert properties.function_group == "SU_USER"
+        assert properties.package == "SUSR"
+        assert properties.description == "Detaildaten eines Benutzers lesen"
+        assert properties.is_rfc_enabled is True
+
+    def test_normal_module_is_not_rfc_enabled(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_bapi_user_get_detail_properties").replace(
+            'radio "Remote fähiger Baustein" [checked]', 'radio "Remote fähiger Baustein"'
+        )
+        assert parse_se37_properties_snapshot(snapshot, lang_de).is_rfc_enabled is False
+
+    def test_empty_snapshot_gives_empty_header(self, lang_de: LanguagePack) -> None:
+        properties = parse_se37_properties_snapshot("", lang_de)
+        assert (properties.function_group, properties.package, properties.description) == (None, None, "")
+
+    def test_entry_header_is_filled_from_the_properties_tab(self, lang_de: LanguagePack) -> None:
+        main = _load_snapshot("se37_bapi_user_get_detail_main")
+        tabs = SE37TabSnapshots(properties_tab=_load_snapshot("se37_bapi_user_get_detail_properties"))
+        entry = parse_se37_snapshot(main, "BAPI_USER_GET_DETAIL", lang_de, tabs)
+        assert isinstance(entry, SE37Entry)
+        assert (entry.function_group, entry.package, entry.is_rfc_enabled) == ("SU_USER", "SUSR", True)
+        assert entry.description == "Detaildaten eines Benutzers lesen"
+
+
+class TestOverlappingScrollPositions:
+    """The grid renders only visible rows; the snapshots of several scroll positions are concatenated (#76)."""
+
+    def test_parameters_of_overlapping_snapshots_are_not_duplicated(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_rfc_read_table_import")
+        once = parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+        twice = parse_se37_parameters_snapshot(snapshot + "\n" + snapshot, "import", lang_de)
+        assert once
+        assert [p.name for p in twice] == [p.name for p in once]
+
+    def test_exceptions_of_overlapping_snapshots_are_not_duplicated(self, lang_de: LanguagePack) -> None:
+        snapshot = _load_snapshot("se37_rfc_read_table_exceptions")
+        once = parse_se37_exceptions_snapshot(snapshot, lang_de)
+        twice = parse_se37_exceptions_snapshot(snapshot + "\n" + snapshot, lang_de)
+        assert once
+        assert [e.name for e in twice] == [e.name for e in once]
+
+
+class TestOtherTypings:
+    """TYPE REF TO and untyped parameters are kept (#76)."""
+
+    _HEADER: ClassVar[list[str]] = [
+        '- row "Parametername Typisierung Bezugstyp Vorschlagswert Optional Wertübergabe Kurztext Langtext":',
+        '  - columnheader "Parametername"',
+        '  - columnheader "Typisierung"',
+        '  - columnheader "Bezugstyp"',
+        '  - columnheader "Vorschlagswert"',
+        '  - columnheader "Optional"',
+        '  - columnheader "Wertübergabe"',
+        '  - columnheader "Kurztext"',
+        '  - columnheader "Langtext"',
+    ]
+
+    def _parse(self, lang_de: LanguagePack, typing_cell: str) -> list:
+        snapshot = "\n".join(
+            [
+                *self._HEADER,
+                '- row "IO_OBJECT":',
+                '  - gridcell "IO_OBJECT":',
+                f'  - gridcell "{typing_cell}":',
+                '  - gridcell "CL_OBJECT":',
+            ]
+        )
+        return parse_se37_parameters_snapshot(snapshot, "import", lang_de)
+
+    def test_type_ref_to_is_kept(self, lang_de: LanguagePack) -> None:
+        (param,) = self._parse(lang_de, "TYPE REF TO")
+        assert (param.name, param.typing, param.reference_type) == ("IO_OBJECT", "TYPE REF TO", "CL_OBJECT")
+
+    def test_untyped_parameter_is_kept_with_typing_none(self, lang_de: LanguagePack) -> None:
+        (param,) = self._parse(lang_de, "Typisierung")  # an empty cell is named after its column
+        assert (param.name, param.typing) == ("IO_OBJECT", None)
+
+    def test_unknown_typing_cell_is_not_a_parameter(self, lang_de: LanguagePack) -> None:
+        assert not self._parse(lang_de, "something else")
+
+
+class TestWarnings:
+    """Incomplete reads are logged, not silent (#76)."""
+
+    @pytest.mark.anyio
+    async def test_scroll_limit_logs_a_warning(self, lang_de: LanguagePack, caplog: pytest.LogCaptureFixture) -> None:
+        counter = {"n": 0}
+
+        async def snapshot() -> str:
+            counter["n"] += 1
+            return f'- gridcell "row {counter["n"]}":'
+
+        backend = MagicMock()
+        backend.click_tab = AsyncMock()
+        backend.click_element = AsyncMock()
+        backend.press_key = AsyncMock()
+        backend.wait = AsyncMock()
+        backend.get_snapshot = snapshot
+        with caplog.at_level("WARNING"):
+            result = await se37_tools._capture_tab_snapshot(backend, lang_de.se37.import_tab)
+        assert result is not None
+        assert any("scroll limit" in record.getMessage() for record in caplog.records)
+
+
+class TestEmptyExceptionsGrid:
+    """An empty Exceptions grid must not yield the system information menu rows as exceptions (#76)."""
+
+    def test_menu_rows_are_not_exceptions(self, lang_en: LanguagePack) -> None:
+        snapshot = "\n".join(
+            [
+                '- row "E2E Time 157 ms":',
+                '  - cell "E2E"',
+                '  - cell "Time 157 ms"',
+                '- row "Exception Short Text Long Text":',
+                '  - columnheader "Exception"',
+                '  - columnheader "Short Text"',
+                '  - columnheader "Long Text"',
+                '- row "":',
+                '  - gridcell ""',
+                '  - gridcell ""',
+            ]
+        )
+        assert parse_se37_exceptions_snapshot(snapshot, lang_en) == []

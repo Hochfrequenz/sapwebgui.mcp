@@ -1,0 +1,75 @@
+- 'main "Function Builder: BAPI_USER_GET_DETAIL anzeigen"':
+  - banner:
+    - button "Zurück (F3)"
+    - button "Seite und Transaktion neu laden"
+    - 'heading "Function Builder: BAPI_USER_GET_DETAIL anzeigen" [level=1]'
+    - button "Systeminformationen schließen"
+    - toolbar:
+      - button "XXX (000)"
+      - separator
+    - toolbar:
+      - button "Menü"
+      - combobox "Bitte Transaktionscode eingeben"
+      - button "Anzeigen <-> Ändern"
+      - button "Anderes Objekt..."
+      - button "Prüfen"
+      - button "Aktivieren"
+      - button "Mehr"
+      - button "Suchen (Strg+F)"
+      - button "Weiter suchen (Strg+G)"
+      - button "Drucken... (Strg+P)"
+      - button "Beenden"
+  - text: Funktionsbaustein
+  - textbox "Funktionsbaustein": BAPI_USER_GET_DETAIL
+  - text: aktiv
+  - tablist:
+    - tab "Eigenschaften" [selected]
+    - tab "Import"
+    - tab "Export"
+    - tab "Changing"
+    - tab "Tabellen"
+    - tab "Ausnahmen"
+    - tab "Quelltext"
+  - tabpanel "Eigenschaften":
+    - heading "Eigenschaften" [level=2]
+    - group "Klassifizierung":
+      - heading "Klassifizierung" [level=3]
+      - text: Funktionsgruppe
+      - textbox "Funktionsgruppe": SU_USER
+      - textbox "Text zur Funktionsgruppe": Methoden des Objekts USER
+      - text: Kurztext
+      - textbox "Kurztext": Detaildaten eines Benutzers lesen
+    - group "Ablaufart":
+      - heading "Ablaufart" [level=3]
+      - radio "Normaler Funktionsbaustein" [disabled]
+      - radio "Remote fähiger Baustein" [checked] [disabled]
+      - text: Erreichbarkeit
+      - textbox "Erreichbarkeit" [disabled]: Nicht klassifiziert (keine Einschränkung der Erreichbarkeit)
+      - text: Interface Kontrakt
+      - textbox "Interface Kontrakt" [disabled]: beliebig
+      - checkbox "basXML unterstützt" [disabled]
+      - radio "Verbuchungsbaustein" [disabled]
+      - radio "Start sofort" [checked] [disabled]
+      - radio "Start sofort-nicht nachverbuchbar" [disabled]
+      - radio "Start verzögert" [disabled]
+      - radio "Sammellauf" [disabled]
+    - group "Allgemeine Daten":
+      - heading "Allgemeine Daten" [level=3]
+      - text: Verantwortlicher
+      - textbox "Verantwortlicher": SAP
+      - text: letzter Änderer
+      - textbox "letzter Änderer": SAP
+      - text: Änderungsdatum
+      - textbox "Änderungsdatum": 09.09.2026
+      - text: Paket
+      - textbox "Paket": SUSR
+      - text: Programmname
+      - textbox "Programmname": SAPLSU_USER
+      - text: Includename
+      - textbox "Includename": LSU_USERU18
+      - text: Originalsprache
+      - textbox "Originalsprache": DE
+      - text: Freigegeben am
+      - textbox "Freigegeben am": 10.04.2000
+      - checkbox "Editiersperre" [disabled]
+      - checkbox "Global" [disabled]

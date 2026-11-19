@@ -24,7 +24,7 @@ __all__ = [
 SE37ParameterCategory = Literal["import", "export", "changing", "tables"]
 
 # Typing method (how the type is defined)
-SE37TypingMethod = Literal["LIKE", "TYPE"]
+SE37TypingMethod = Literal["LIKE", "TYPE", "TYPE REF TO"]
 
 
 class SE37Parameter(BaseModel):
@@ -32,7 +32,9 @@ class SE37Parameter(BaseModel):
 
     name: str = Field(description="Parameter name")
     category: SE37ParameterCategory = Field(description="Parameter category")
-    typing: SE37TypingMethod = Field(description="Typing method (LIKE or TYPE)")
+    typing: SE37TypingMethod | None = Field(
+        default=None, description="Typing method (LIKE, TYPE or TYPE REF TO); None for an untyped parameter"
+    )
     reference_type: str = Field(description="Reference type (data element, structure, etc.)")
     default_value: str | None = Field(default=None, description="Default value (import parameters)")
     optional: bool = Field(default=False, description="Whether parameter is optional")
@@ -59,7 +61,13 @@ class SE37Entry(BaseModel):
     changing_parameters: list[SE37Parameter] = Field(default_factory=list, description="Changing parameters")
     tables_parameters: list[SE37Parameter] = Field(default_factory=list, description="Tables parameters")
     exceptions: list[SE37Exception] = Field(default_factory=list, description="Exceptions")
-    is_rfc_enabled: bool = Field(default=False, description="Whether function module is RFC-enabled")
+    is_rfc_enabled: bool = Field(
+        default=False,
+        description=(
+            "Whether function module is RFC-enabled. Only reliable when the header data (function group, package) "
+            "was read: when the Attributes tab could not be opened it stays at its default False"
+        ),
+    )
     retrieved_at: AwareDatetime = Field(description="When the data was retrieved")
 
 
