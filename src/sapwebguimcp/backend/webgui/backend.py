@@ -44,6 +44,7 @@ from sapwebguimcp.models.sap_results import (
     SapFieldType,
     ScreenInfo,
     ScreenText,
+    SessionCloseOutcome,
     SessionInfo,
     SessionStatus,
     StatusBarInfo,
@@ -59,6 +60,11 @@ if TYPE_CHECKING:
     from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
 
 logger = logging.getLogger(__name__)
+
+# Upper bound for each step of closing a session (#25); a tab that does not react must not hang the tool.
+_CLOSE_STEP_TIMEOUT_S = 5.0
+_CDP_GET_TARGET_INFO = "Target.getTargetInfo"  # lang-ok: CDP method name
+_CDP_CLOSE_TARGET = "Target.closeTarget"  # lang-ok: CDP method name
 
 _EXPOSE_GRID_CELL_VALUES_JS = r"""() => {
   const undo = [];
@@ -1689,24 +1695,81 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 continue
         return result
 
-    async def close_session(self, session_id: str) -> bool:
-        """Close a session by ID. Returns True if closed, False if not found."""
+    async def close_session(self, session_id: str) -> SessionCloseOutcome | None:
+        """Close a session by ID. Returns the outcome, or ``None`` if the session is not found.
+
+        Every step is time-bounded (#25): a tab that does not react must not make the
+        tool hang, and the session is always deregistered, even when the logoff
+        command or the tab close fails or times out. The outcome says whether the tab
+        is really gone, so the caller can tell the user to close a stuck tab by hand.
+        """
         registry = await self._get_registry()
         if not registry.has_session(session_id):
-            return False
+            return None
         page = registry.get_page(session_id)
+        logoff_done = True
         try:
-            ok_field = await page.query_selector("#ToolbarOkCode")
-            if ok_field:
-                await ok_field.fill("/i")
-                await page.keyboard.press("Enter")
-                await page.wait_for_timeout(500)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-        if not page.is_closed():
-            await page.close()
-        registry.unregister(session_id)
-        return True
+            await asyncio.wait_for(self._end_sap_mode(page), timeout=_CLOSE_STEP_TIMEOUT_S)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logoff_done = False
+            logger.warning("Ending SAP mode of session %s failed: %r", session_id, exc)
+        try:
+            if not page.is_closed():
+                # run_before_unload: on a browser where the plain close() did not take effect, only
+                # this variant closed the tab promptly (#25).
+                await asyncio.wait_for(page.close(run_before_unload=True), timeout=_CLOSE_STEP_TIMEOUT_S)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("Closing tab of session %s failed: %r", session_id, exc)
+        finally:
+            registry.unregister(session_id)
+        tab_closed = await self._wait_until_closed(page)
+        if not tab_closed:
+            # close() returns without waiting, and a beforeunload dialog may have kept the tab open:
+            # Target.closeTarget skips beforeunload.
+            await self._close_target_via_cdp(page, session_id)
+            tab_closed = await self._wait_until_closed(page)
+        return SessionCloseOutcome(tab_closed=tab_closed, logoff_done=logoff_done)
+
+    @staticmethod
+    async def _wait_until_closed(page: Page) -> bool:
+        """Whether the tab is gone, allowing a short moment for the close event to arrive."""
+        for _ in range(10):
+            if page.is_closed():
+                return True
+            await asyncio.sleep(0.1)
+        return page.is_closed()
+
+    @staticmethod
+    async def _end_sap_mode(page: Page) -> None:
+        """End the SAP mode of a tab with ``/i`` (mode-local, unlike the exit-all ``/nex``)."""
+        ok_field = await page.query_selector("#ToolbarOkCode")
+        if ok_field:
+            await ok_field.fill("/i", timeout=_CLOSE_STEP_TIMEOUT_S * 1000)
+            await page.keyboard.press("Enter")
+            await page.wait_for_timeout(500)
+
+    @staticmethod
+    async def _close_target_via_cdp(page: Page, session_id: str) -> None:
+        """Fallback when the tab stays open: ask the browser to close the target (no beforeunload)."""
+        try:
+            page_cdp = await asyncio.wait_for(page.context.new_cdp_session(page), timeout=_CLOSE_STEP_TIMEOUT_S)
+            try:
+                info = await asyncio.wait_for(page_cdp.send(_CDP_GET_TARGET_INFO), timeout=_CLOSE_STEP_TIMEOUT_S)
+            finally:
+                await asyncio.wait_for(page_cdp.detach(), timeout=_CLOSE_STEP_TIMEOUT_S)
+            browser = page.context.browser
+            if browser is None:
+                raise RuntimeError("page has no browser")
+            browser_cdp = await asyncio.wait_for(browser.new_browser_cdp_session(), timeout=_CLOSE_STEP_TIMEOUT_S)
+            try:
+                await asyncio.wait_for(
+                    browser_cdp.send(_CDP_CLOSE_TARGET, {"targetId": info["targetInfo"]["targetId"]}),
+                    timeout=_CLOSE_STEP_TIMEOUT_S,
+                )
+            finally:
+                await asyncio.wait_for(browser_cdp.detach(), timeout=_CLOSE_STEP_TIMEOUT_S)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning("CDP fallback to close tab of session %s failed: %r", session_id, exc)
 
     async def bind_session(self, session_id: str, agent_id: str, *, force: bool = False) -> str | None:
         """Bind an agent to a session. Returns previous agent_id or None.
@@ -1755,16 +1818,19 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         for sid in victims:
             bound = registry.get_bound_agent(sid)
             try:
-                ok = await self.close_session(sid)
+                outcome = await self.close_session(sid)
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 errors.append(f"{sid}: {exc}")
                 continue
-            if ok:
-                closed.append(sid)
-                if bound:
-                    killed_agents.append(bound)
-            else:
-                errors.append(f"{sid}: close returned False")  # lang-ok: our own message
+            if outcome is None:
+                errors.append(f"{sid}: session not found")  # lang-ok: our own message
+                continue
+            closed.append(sid)
+            if bound:
+                killed_agents.append(bound)
+            if not outcome.tab_closed:
+                # Deregistered, but the browser tab is still open.
+                errors.append(f"{sid}: deregistered, tab left open - close it by hand")  # lang-ok: our own message
         remaining = registry.list_sessions()
         logger.info(
             "reset_to_primary",
