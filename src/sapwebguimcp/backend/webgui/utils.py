@@ -2,6 +2,9 @@
 
 import re
 
+from sapwebguimcp import lang
+from sapwebguimcp.lang.schema import Key
+
 _UNESCAPED_CSS_SPECIAL = re.compile(r"(?<!\\)([:\[\]#,])")
 
 
@@ -59,3 +62,42 @@ def is_sap_shortcut(key: str) -> bool:
             return True
 
     return False
+
+
+# Playwright names for the canonical key names of the language packs (the other canonical names are valid as is)
+_PLAYWRIGHT_KEY_NAMES = {Key.CTRL: "Control"}
+
+
+def to_playwright_key(key: str) -> str:
+    """Translate a key as the tool accepts it into the name ``page.keyboard.press`` understands.
+
+    Playwright knows ``Control``, not ``Ctrl``. Every language pack's key names are accepted
+    (``Ctrl``/``Strg``, ``Shift``/``Umschalt``, ``Enter``/``Eingabe``, ...), case-insensitively. Anything that is
+    not a key name of the packs (``S``, ``F8``, ``PageDown``, ``Control``) passes through unchanged, as does a
+    key that itself is ``+``.
+
+    >>> to_playwright_key("Ctrl+S")
+    'Control+S'
+    >>> to_playwright_key("Strg+Umschalt+F1")
+    'Control+Shift+F1'
+    >>> to_playwright_key("Control+S")
+    'Control+S'
+    """
+    if key.endswith("++"):  # the "+" key itself, e.g. "Ctrl++"
+        return to_playwright_key(key[:-1]) + "+"
+    if "+" not in key:
+        parts = [key]
+        joiner = ""
+    else:
+        parts = key.split("+")
+        joiner = "+"
+    names = lang.universal().keys.names
+
+    def translate(part: str) -> str:
+        stripped = part.strip()
+        for canonical, text in names.items():
+            if text.equals(stripped):
+                return _PLAYWRIGHT_KEY_NAMES.get(canonical, canonical.value)
+        return stripped or part
+
+    return joiner.join(translate(part) for part in parts)
