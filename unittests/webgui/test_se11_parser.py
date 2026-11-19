@@ -311,3 +311,50 @@ class TestTrailingColumnTitleNotInDescription:
         trailing = '  - grid "Andere":\n    - row "x":\n      - gridcell "Gruppe"\n'
         yaml_content = self._grid("Material Gruppe", "- gridcell:", trailing)
         assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Material Gruppe"]
+
+
+class TestQuotedRows:
+    """A row name containing ": " is serialised as a single-quoted YAML scalar (#91)."""
+
+    _GRID = """\
+- grid "Felder":
+  - rowgroup:
+    - row "Spalte für Zeilenauswahl Feld Key Datenelement Datentyp Länge Kurzbeschreibung Gruppe":
+      - columnheader "Feld"
+      - columnheader "Gruppe"
+  - rowgroup:
+    - row "@H@ MANDT   MANDT CLNT 3 0 0 Mandant":
+      - gridcell "@H@"
+      - gridcell "MANDT":
+        - textbox
+    - 'row "@H@ CCCATEGORY  CCCATEGORY CHAR 1 0 0 Client Control: Rolle des Mandanten (Productive, Test,...)"':
+      - gridcell "@H@"
+      - gridcell "CCCATEGORY":
+        - textbox
+    - 'row "@H@ ZQUOTE  ZQUOTE CHAR 1 0 0 Steuerung: Kunde''s Kennzeichen"':
+      - gridcell "@H@"
+      - gridcell "ZQUOTE":
+        - textbox
+    - row "@H@ LOGSYS  LOGSYS CHAR 10 0 0 Logisches System":
+      - gridcell "@H@"
+      - gridcell "LOGSYS":
+        - textbox
+""".replace("@H@", "Zum Auswählen einer Zeile drücken Sie die Leertaste.")
+
+    def test_quoted_rows_are_not_dropped(self, lang_de: LanguagePack) -> None:
+        fields = _parse_se11_fields(self._GRID, lang_de)
+        assert [f.name for f in fields] == ["MANDT", "CCCATEGORY", "ZQUOTE", "LOGSYS"]
+
+    def test_quoted_row_values(self, lang_de: LanguagePack) -> None:
+        by_name = {f.name: f for f in _parse_se11_fields(self._GRID, lang_de)}
+        assert by_name["CCCATEGORY"].datatype == "CHAR"
+        assert by_name["CCCATEGORY"].length == 1
+        assert by_name["CCCATEGORY"].description == "Client Control: Rolle des Mandanten (Productive, Test,...)"
+
+    def test_doubled_apostrophe_is_unescaped(self, lang_de: LanguagePack) -> None:
+        by_name = {f.name: f for f in _parse_se11_fields(self._GRID, lang_de)}
+        assert by_name["ZQUOTE"].description == "Steuerung: Kunde's Kennzeichen"
+
+    def test_row_before_a_quoted_row_keeps_its_description(self, lang_de: LanguagePack) -> None:
+        by_name = {f.name: f for f in _parse_se11_fields(self._GRID, lang_de)}
+        assert by_name["MANDT"].description == "Mandant"
