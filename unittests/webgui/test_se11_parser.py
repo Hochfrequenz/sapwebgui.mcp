@@ -268,13 +268,39 @@ class TestTrailingColumnTitleNotInDescription:
         assert fields[0].description == "Mandant"
         assert all(not f.description.endswith("Gruppe") for f in fields)
 
+    _GRID = """\
+- grid "Felder":
+  - rowgroup:
+    - row "Feld Schl Init Datenelement Datentyp Länge Dezimalstellen Kurzbeschreibung Gruppe":
+      - columnheader "Feld"
+      - columnheader "Gruppe"
+  - rowgroup:
+    - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. MATKL \ue05b \ue05b MATKL CHAR 9 0 0 @NAME@":
+      - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+      - gridcell "MATKL":
+        - textbox
+      @LAST@
+@TRAILING@"""
+
+    def _grid(self, name: str, last_cell: str, trailing: str = "") -> str:
+        return self._GRID.replace("@NAME@", name).replace("@LAST@", last_cell).replace("@TRAILING@", trailing)
+
+    def test_label_of_the_last_cell_strips_the_title(self, lang_de: LanguagePack) -> None:
+        yaml_content = self._grid("Materialgruppe Gruppe", '- gridcell "Gruppe":')
+        assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Materialgruppe"]
+
     def test_description_ending_in_column_title_is_kept(self, lang_de: LanguagePack) -> None:
-        """A real description ending in the title word stays when the last cell is not an empty label."""
-        yaml_content = load_yaml_snapshot("se11_t000_fields_de.yaml")
-        yaml_content = yaml_content.replace('Mandant":' + chr(10), 'Mandant Gruppe":' + chr(10), 1).replace(
-            "- gridcell:" + chr(10) + "            - textbox" + chr(10),
-            '- gridcell "X":' + chr(10) + "            - textbox" + chr(10),
-            1,
-        )
-        fields = _parse_se11_fields(yaml_content, lang_de)
-        assert fields[0].description == "Mandant Gruppe"
+        """A real description ending in the title word stays when the last cell is an unlabelled empty cell."""
+        yaml_content = self._grid("Material Gruppe", "- gridcell:")
+        assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Material Gruppe"]
+
+    def test_unlabelled_empty_cell_without_title_in_name(self, lang_de: LanguagePack) -> None:
+        """Empty cells without aria-labelledby (#78 snapshot) contribute no title: nothing to strip."""
+        yaml_content = self._grid("Materialgruppe", "- gridcell:")
+        assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Materialgruppe"]
+
+    def test_only_the_rows_own_cells_count(self, lang_de: LanguagePack) -> None:
+        """A labelled gridcell after the row (another grid) must not make an unlabelled last cell look labelled."""
+        trailing = '- grid "Andere":\n  - row "x":\n    - gridcell "Gruppe"\n'
+        yaml_content = self._grid("Material Gruppe", "- gridcell:", trailing)
+        assert [f.description for f in _parse_se11_fields(yaml_content, lang_de)] == ["Material Gruppe"]

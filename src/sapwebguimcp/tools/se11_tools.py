@@ -191,11 +191,32 @@ def _last_header_before(yaml_content: str, pos: int) -> str:
 
 
 def _last_cell_is_empty(row_block: str, header: str) -> bool:
-    """True when the row's last gridcell carries no value of its own (no name, or only the column title as label)."""
-    cells = re.findall(r'^\s*- gridcell(?: "([^"]*)")?', row_block, flags=re.MULTILINE)
-    if not cells:
+    """True when the row's own last gridcell is labelled with exactly the column title ``header``.
+
+    Only the row's children count (lines indented deeper than the ``- row`` line), not whatever follows the row
+    in the snapshot. An unnamed last cell (``- gridcell:``) is a plain empty cell: its name contributed nothing to
+    the row name, so there is nothing to strip.
+    """
+    lines = row_block.splitlines()
+    if not lines:
         return False
-    return cells[-1].strip() in ("", header)
+    row_indent = len(lines[0]) - len(lines[0].lstrip())
+    last_label: str | None = None
+    child_indent: int | None = None
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent <= row_indent:
+            break
+        if child_indent is None:
+            child_indent = indent
+        if indent != child_indent:
+            continue
+        cell = re.match(r'\s*- gridcell(?: "([^"]*)")?', line)
+        if cell:
+            last_label = cell.group(1)
+    return last_label is not None and last_label == header
 
 
 def _strip_trailing_column_title(row_data: str, header: str, row_block: str) -> str:
@@ -203,8 +224,9 @@ def _strip_trailing_column_title(row_data: str, header: str, row_block: str) -> 
 
     The row's accessible name is the concatenation of its cells. The last column (e.g. "Gruppe") is
     usually empty but its cell is labelled with the column title, which then ends up as a suffix of
-    the last real value (the field description). Strip it only when that last cell holds no value
-    of its own, so a description that legitimately ends with the same word is left alone.
+    the last real value (the field description). Strip it only when the row's last gridcell is labelled
+    with exactly that title (the rendered label of an empty cell), so a description that legitimately ends with
+    the same word is left alone.
     """
     if header and row_data.endswith(" " + header) and _last_cell_is_empty(row_block, header):
         return row_data[: -len(header)].rstrip()
