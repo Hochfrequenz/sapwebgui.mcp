@@ -296,8 +296,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         mandant: str,
         session_id: str | None,
         requested_language: str | None = None,
-    ) -> None:
-        """Register session and capture identity after a successful login."""
+    ) -> str:
+        """Register session and capture identity after a successful login; return the registry session ID."""
         registry = await self._get_registry()
         page_session = registry.session_id_of(self._page)
         if page_session is None:
@@ -307,6 +307,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         # The rest of this sap_login call works on this session (#1044).
         set_session_language(registry.language_of(page_session))
         await self._capture_sap_identity(effective_url, mandant, session_id)
+        return page_session
 
     async def _read_page_language(self) -> str | None:
         """SAP logon language from the page's ``<html lang>``, mapped through the packs' ``html_lang``."""
@@ -349,8 +350,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             # Already logged in?
             okcode_field = await self._find_okcode_field()
             if okcode_field:
-                await self._post_login_setup(url, client, session_id, None)
-                return LoginResult(url=url, already_logged_in=True, guidance=guidance_msg)
+                page_session = await self._post_login_setup(url, client, session_id, None)
+                return LoginResult(url=url, already_logged_in=True, guidance=guidance_msg, session_id=page_session)
 
             # Check for login form
             login_form = await self._page.query_selector('input[type="password"], input[id*="user" i]')
@@ -390,8 +391,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             try:
                 await self._page.wait_for_selector("#ToolbarOkCode", timeout=15000, state="visible")
                 logger.info("Login successful, OK-Code field visible")
-                await self._post_login_setup(url, client, session_id, language)
-                return LoginResult(url=url, user=username, guidance=guidance_msg)
+                page_session = await self._post_login_setup(url, client, session_id, language)
+                return LoginResult(url=url, user=username, guidance=guidance_msg, session_id=page_session)
             except Exception:  # pylint: disable=broad-exception-caught
                 page_content = await self._page.content()
                 pages = lang.universal().session_pages
@@ -402,8 +403,14 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                             timeout=5000,
                         )
                         await self._page.wait_for_selector("#ToolbarOkCode", timeout=10000, state="visible")
-                        await self._post_login_setup(url, client, session_id, language)
-                        return LoginResult(url=url, user=username, already_logged_in=True, guidance=guidance_msg)
+                        page_session = await self._post_login_setup(url, client, session_id, language)
+                        return LoginResult(
+                            url=url,
+                            user=username,
+                            already_logged_in=True,
+                            guidance=guidance_msg,
+                            session_id=page_session,
+                        )
                     except Exception:  # pylint: disable=broad-exception-caught
                         pass
                 return LoginResult.failure(
@@ -1139,11 +1146,14 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         try:
             screen_info = await self._page.evaluate(load_js("extract_screen_info.js"))
             return ScreenInfo(
-                transaction=screen_info.get("transaction"),
+                transaction=screen_info.get("transaction") or None,
                 title=screen_info.get("title", ""),
                 url=screen_info.get("url", ""),
-                program=screen_info.get("program"),
-                dynpro=screen_info.get("dynpro"),
+                program=screen_info.get("program") or None,
+                dynpro=screen_info.get("dynpro") or None,
+                system_name=screen_info.get("systemName") or None,
+                client=screen_info.get("client") or None,
+                user=screen_info.get("user") or None,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Getting screen info")
@@ -1569,6 +1579,16 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         manager = await get_browser_manager()
         return manager.registry
 
+    @staticmethod
+    async def _read_session_details(page: Any) -> dict[str, Any]:
+        """Transaction, system, client and user of *page* from the WebGUI system information; ``{}`` if unreadable."""
+        try:
+            details = await page.evaluate(load_js("extract_screen_info.js"))
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.debug("could not read the session details", exc_info=True)
+            return {}
+        return details if isinstance(details, dict) else {}
+
     async def list_sessions(self) -> list[SessionInfo]:
         """List active sessions with their metadata."""
         registry = await self._get_registry()
@@ -1577,9 +1597,14 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             try:
                 page = registry.get_page(sid)
                 title = await page.title()
+                details = await self._read_session_details(page)
                 result.append(
                     SessionInfo(
                         session_id=sid,
+                        tcode=details.get("transaction") or None,
+                        system_name=details.get("systemName") or None,
+                        client=details.get("client") or None,
+                        user=details.get("user") or None,
                         title=title,
                         is_primary=(sid == registry.primary_session),
                         agent_id=registry.get_bound_agent(sid),

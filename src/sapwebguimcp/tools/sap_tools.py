@@ -414,8 +414,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
                 Use sap_list_connections to see available keys. Defaults to default_system.
 
         Returns:
-            LoginResult. Its session_id is not set by the Web GUI backend;
-            use sap_session_list for session IDs.
+            LoginResult with the session_id of the logged-in session (e.g. 's1').
         """
         session_id = get_mcp_session_id(ctx)
         return await sap_login_impl(url=url, client=client, system_key=system_key, session_id=session_id)
@@ -929,6 +928,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             - url: Current URL
             - program: ABAP program name (if available in page)
             - dynpro: Screen number (if available)
+            - system_name, client, user: from the Web GUI system information
         """
         try:
             backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_get_screen_info")
