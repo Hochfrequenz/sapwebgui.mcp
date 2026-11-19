@@ -98,6 +98,6 @@ def to_playwright_key(key: str) -> str:
         for canonical, text in names.items():
             if text.equals(stripped):
                 return _PLAYWRIGHT_KEY_NAMES.get(canonical, canonical.value)
-        return part
+        return stripped or part
 
     return joiner.join(translate(part) for part in parts)

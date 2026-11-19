@@ -36,7 +36,7 @@ from sapwebguimcp.backend.webgui.models.browser_results import (
     SnapshotResult,
     WaitResult,
 )
-from sapwebguimcp.backend.webgui.utils import escape_css_selector
+from sapwebguimcp.backend.webgui.utils import escape_css_selector, to_playwright_key
 
 __all__ = ["register_browser_tools"]
 
@@ -284,7 +284,7 @@ def register_browser_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-st
 
         try:
             if key:
-                await page.keyboard.press(key)
+                await page.keyboard.press(to_playwright_key(key))
                 return BrowserKeyboardResult(key=key)
             if text:
                 await page.keyboard.type(text)
