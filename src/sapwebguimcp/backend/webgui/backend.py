@@ -167,6 +167,12 @@ _CERT_ERROR_GUIDANCE = (
     "or install the certificate authority in the operating system's trust store."
 )
 
+# How long a key press waits for the Web GUI to start a server round trip, for it to finish, and for the
+# screen to render the response (#79).
+_KEY_ROUND_TRIP_START_S = 1.0
+_KEY_ROUND_TRIP_FINISH_S = 15.0
+_KEY_RENDER_SETTLE_MS = 300
+
 # ---------------------------------------------------------------------------
 # WebGuiBackend
 # ---------------------------------------------------------------------------
@@ -1041,13 +1047,55 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
 
         raise ValueError(f"Tab '{label}' not found")
 
+    async def _press_and_wait_for_round_trip(self, key: str) -> None:
+        """Press *key* and wait until the SAP round trip it triggers is answered and rendered (#79).
+
+        ``wait_for_load_state("networkidle")`` returns at once once the page has been idle before, so it cannot
+        tell a screen that is still waiting for the server from a finished one. Instead the Web GUI's POST
+        requests are counted: wait briefly for one to start, then until all have finished. A key that causes no
+        round trip (e.g. F1 in a field without help) simply times out of the first wait.
+        """
+        page = self._page
+        outstanding: set[Any] = set()
+        started = asyncio.Event()
+        finished = asyncio.Event()
+        finished.set()
+
+        def on_request(request: Any) -> None:
+            if request.method == "POST":
+                outstanding.add(request)
+                started.set()
+                finished.clear()
+
+        def on_done(request: Any) -> None:
+            outstanding.discard(request)
+            if not outstanding:
+                finished.set()
+
+        page.on("request", on_request)
+        page.on("requestfinished", on_done)
+        page.on("requestfailed", on_done)
+        try:
+            await page.keyboard.press(key)
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(started.wait(), timeout=_KEY_ROUND_TRIP_START_S)
+            if started.is_set():
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(finished.wait(), timeout=_KEY_ROUND_TRIP_FINISH_S)
+        finally:
+            page.remove_listener("request", on_request)
+            page.remove_listener("requestfinished", on_done)
+            page.remove_listener("requestfailed", on_done)
+        # The screen is re-rendered from the response a moment after the request has finished.
+        await page.wait_for_timeout(_KEY_RENDER_SETTLE_MS)
+        await page.wait_for_load_state("networkidle", timeout=15000)
+
     async def press_key(self, key: str) -> KeyboardResult:
         """Send a keyboard shortcut to SAP."""
         try:
             await self._page.bring_to_front()
             await self._page.wait_for_timeout(100)
-            await self._page.keyboard.press(key)
-            await self._page.wait_for_load_state("networkidle", timeout=15000)
+            await self._press_and_wait_for_round_trip(key)
 
             title = await self._page.title()
 
