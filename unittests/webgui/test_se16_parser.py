@@ -392,3 +392,54 @@ class TestRepeatedColumnTitlesAndCodes:
     def test_leading_zero_code_stays_a_string(self, lang_de: LanguagePack) -> None:
         (row,) = parse_se16_rows(self._SNAPSHOT, lang_de)
         assert row["Partner"] == "0000000123"
+
+
+class TestResultGridSnapshots:
+    """Result grids captured from a live SE16N (German UI, sanitized), #78."""
+
+    _DIR = Path(__file__).parent / "testdata" / "se16_result_grids"
+
+    @staticmethod
+    def _read(name: str) -> str:
+        return (TestResultGridSnapshots._DIR / name).read_text(encoding="utf-8")
+
+    def test_every_row_of_a_grid_with_a_repeating_first_column_is_parsed(self, lang_de: LanguagePack) -> None:
+        """T002 (max_hits 5): the first column has the same value in all rows, only the text differs."""
+        result = parse_se16_snapshot(self._read("t002_result_de.aria.txt"), lang_de)
+        assert parse_se16_hit_count(self._read("t002_result_de.aria.txt"), lang_de) == 5
+        assert result.columns == ["Sprache", "Spezifika", "Üb.grad", "SprCode", "Bezeichnung"]
+        assert [row["Bezeichnung"] for row in result.rows] == [
+            "Chinesisch",
+            "Koreanisch",
+            "Rumänisch",
+            "Serbisch",
+            "Thailändisch",
+        ]
+
+    def test_rows_without_an_accessible_name_are_parsed(self, lang_de: LanguagePack) -> None:
+        """BUT000: a row with 114 cells has no name in the ARIA tree (``- row:``), so no row was found."""
+        snapshot = self._read("but000_result_de.aria.txt")
+        columns = parse_se16_columns(snapshot, lang_de)
+        assert len(columns) == 114
+        (row,) = parse_se16_rows(snapshot, lang_de, columns)
+        assert row["GPartner"] == 4711
+        assert row["Grp."] == "0001"
+        assert row["Nachname"] == "Mustermann"
+
+    def test_empty_cells_stay_empty(self, lang_de: LanguagePack) -> None:
+        """An empty cell is ``- gridcell:`` and must not become its column title."""
+        snapshot = self._read("but000_result_de.aria.txt")
+        (row,) = parse_se16_rows(snapshot, lang_de)
+        assert row["Art"] == ""
+        assert row["Externe Nr"] == ""
+
+    def test_rows_can_be_keyed_by_technical_names(self, lang_de: LanguagePack) -> None:
+        snapshot = self._read("but000_result_de.aria.txt")
+        names = self._read("but000_technical_names.txt").split()
+        assert len(names) == len(parse_se16_columns(snapshot, lang_de))
+        (row,) = parse_se16_rows(snapshot, lang_de, names)
+        assert row["PARTNER"] == 4711
+        assert row["BU_GROUP"] == "0001"
+        assert row["NAME_LAST"] == "Mustermann"
+        assert row["NAME_FIRST"] == "Max"
+        assert row["BPKIND"] == ""

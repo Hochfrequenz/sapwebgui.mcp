@@ -1,0 +1,72 @@
+  - text: Sprachenschlüssel(Komponente BC-I18) Anzahl Treffer
+  - textbox "Anzahl Treffer": "5"
+    - grid:
+      - row "Spalte für Zeilenauswahl Sprache Spezifika Üb.grad SprCode Bezeichnung":
+        - columnheader "Spalte für Zeilenauswahl": Um alle auszuwählen, drücken Sie die Leertaste.
+        - columnheader "Sprache"
+        - columnheader "Spezifika"
+        - columnheader "Üb.grad"
+        - columnheader "SprCode"
+        - columnheader "Bezeichnung"
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. SR S 0 SR Chinesisch":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "SR":
+          - textbox "Sprache"
+        - gridcell "S":
+          - textbox "Spezifika"
+        - gridcell "0":
+          - textbox "Üb.grad"
+        - gridcell "SR":
+          - textbox "SprCode"
+        - gridcell "Chinesisch":
+          - textbox "Bezeichnung"
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. SR S 0 SR Koreanisch":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "SR":
+          - textbox "Sprache"
+        - gridcell "S":
+          - textbox "Spezifika"
+        - gridcell "0":
+          - textbox "Üb.grad"
+        - gridcell "SR":
+          - textbox "SprCode"
+        - gridcell "Koreanisch":
+          - textbox "Bezeichnung"
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. SR S 0 SR Rumänisch":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "SR":
+          - textbox "Sprache"
+        - gridcell "S":
+          - textbox "Spezifika"
+        - gridcell "0":
+          - textbox "Üb.grad"
+        - gridcell "SR":
+          - textbox "SprCode"
+        - gridcell "Rumänisch":
+          - textbox "Bezeichnung"
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. SR S 0 SR Serbisch":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "SR":
+          - textbox "Sprache"
+        - gridcell "S":
+          - textbox "Spezifika"
+        - gridcell "0":
+          - textbox "Üb.grad"
+        - gridcell "SR":
+          - textbox "SprCode"
+        - gridcell "Serbisch":
+          - textbox "Bezeichnung"
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. SR S 0 SR Thailändisch":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "SR":
+          - textbox "Sprache"
+        - gridcell "S":
+          - textbox "Spezifika"
+        - gridcell "0":
+          - textbox "Üb.grad"
+        - gridcell "SR":
+          - textbox "SprCode"
+        - gridcell "Thailändisch":
+          - textbox "Bezeichnung"
+    - rowgroup
+    - rowgroup

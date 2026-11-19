@@ -42,8 +42,9 @@ def _row_start_pattern(t: LanguagePack) -> re.Pattern[str]:
 
     - row "To select a row..."  (no colons in row text)
     - 'row "To select a row..."':  (has colons, YAML quotes the whole line)
+    - row:  (a row of many cells has no accessible name at all, e.g. every BUT000 row, #78)
     """
-    return compiled(rf"- '?row \"{t.common.row_select_hint.alt}")
+    return compiled(rf"(?m)- (?:'?row \"{t.common.row_select_hint.alt}|row:[ \t]*$)")
 
 
 # Extract gridcell values - matches both "gridcell "value"" and "gridcell:"
@@ -55,7 +56,7 @@ _COLUMNHEADER_PATTERN = re.compile(r'columnheader "(?P<name>[^"]+)"')
 
 # Match header row (contains columnheader elements) - flexible multiline matching
 _HEADER_ROW_PATTERN = re.compile(
-    r'- row "[^"]*":\s*\n(?:\s*- columnheader "[^"]+"[^\n]*\n?)+',
+    r'- row(?: "[^"]*")?:\s*\n(?:\s*- columnheader "[^"]+"[^\n]*\n?)+',
     re.MULTILINE,
 )
 

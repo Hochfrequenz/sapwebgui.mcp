@@ -1,0 +1,351 @@
+  - text: "GP: Allgemeine Daten I Anzahl Treffer"
+  - textbox "Anzahl Treffer": "1"
+    - grid:
+      - row:
+        - columnheader "Spalte für Zeilenauswahl": Um alle auszuwählen, drücken Sie die Leertaste.
+        - columnheader "GPartner"
+        - columnheader "GTyp"
+        - columnheader "Art"
+        - columnheader "Grp."
+        - columnheader "Externe Nr"
+        - columnheader "Suchbegriff 1"
+        - columnheader "Suchbegriff 2"
+        - columnheader "Herkunft"
+        - columnheader "Schlüssel"
+        - columnheader "Archivvorm"
+        - columnheader "Zentral"
+        - columnheader "BGrp"
+        - columnheader "Briefanrede"
+        - columnheader "LogSystem"
+        - columnheader "Kontakt"
+        - columnheader "N.f."
+        - columnheader "N.geschfäh"
+        - columnheader "Druckformat"
+        - columnheader "Dummyfunktion in der Laenge 1"
+        - columnheader "Kost.-/ErlSatz"
+        - columnheader "Name 1"
+        - columnheader "Name 2"
+        - columnheader "Name 3"
+        - columnheader "Name 4"
+        - columnheader "Rechtsform"
+        - columnheader "Branche"
+        - columnheader "RTräger"
+        - columnheader "VS ni. er."
+        - columnheader "Gründung"
+        - columnheader "Liquidation"
+        - columnheader "ILN 1"
+        - columnheader "ILN 2"
+        - columnheader "Prüfziffer"
+        - columnheader "Nachname"
+        - columnheader "Vorname"
+        - columnheader "2. Nachname"
+        - columnheader "Geburtsname"
+        - columnheader "2. Vorname"
+        - columnheader "Akadem. Titel"
+        - columnheader "2.Titel"
+        - columnheader "Schlüssel"
+        - columnheader "Präfixschlüssel"
+        - columnheader "2.Vorsatzwort"
+        - columnheader "Name lang"
+        - columnheader "Rufname"
+        - columnheader "Initialen"
+        - columnheader "Format"
+        - columnheader "L/R"
+        - columnheader "SP"
+        - columnheader "M"
+        - columnheader "W"
+        - columnheader "Geburtsort"
+        - columnheader "Familienstand"
+        - columnheader "Arbeitgeber"
+        - columnheader "Beruf"
+        - columnheader "Nat"
+        - columnheader "Feld obsolet"
+        - columnheader "L/R Herk."
+        - columnheader "Person"
+        - columnheader "U"
+        - columnheader "Benutzer"
+        - columnheader "SP"
+        - columnheader "Geschlecht"
+        - columnheader "GebDatum"
+        - columnheader "Sterbedatum"
+        - columnheader "PersNr"
+        - columnheader "Feld obsolet"
+        - columnheader "Feld obsolet"
+        - columnheader "Stat. Dat."
+        - columnheader "GArt"
+        - columnheader "Name 1"
+        - columnheader "Name 2"
+        - columnheader "Name1/Nach"
+        - columnheader "Name2/Vorn"
+        - columnheader "Angel. von"
+        - columnheader "Angelegt am"
+        - columnheader "Angelegt um"
+        - columnheader "Geänd.von"
+        - columnheader "Datum"
+        - columnheader "Geändert um"
+        - columnheader "Geschäftspartner-GUID"
+        - columnheader "Adreßnum."
+        - columnheader "PartnrConv"
+        - columnheader "Ist OrgCent"
+        - columnheader "UUID"
+        - columnheader "Gültig ab"
+        - columnheader "Gültig bis"
+        - columnheader "Gesperrt"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Verantw. Stelle"
+        - columnheader "Setzen VS"
+        - columnheader "Anford.-ID"
+        - columnheader "Prüfstatus"
+        - columnheader "/ABC/EXAMPLE_FIELD"
+        - columnheader "Bankkreis"
+        - columnheader "HSteuKennz"
+        - columnheader "SSteuKennz"
+        - columnheader "StArt Hab."
+        - columnheader "Soll-Steuerart"
+        - columnheader "Nat. Pers."
+        - columnheader "Mil.Verw."
+        - columnheader "Nuklearsektor"
+        - columnheader "KZFrg"
+        - columnheader "PhonSF"
+        - columnheader "L/R"
+        - columnheader "Bankschl."
+      - row "Zum Auswählen einer Zeile drücken Sie die Leertaste. 4711 1 0001 Mustermann Max DE 1111 X DE 0 MUSTERMANN MAX TESTUSER 01.01.2026 12:00:00 00:00:00 00505600000000000000000000000001 X 00000000000000000000000000000000 10.101.000.000 99.991.231.235.959 X":
+        - gridcell "Zum Auswählen einer Zeile drücken Sie die Leertaste."
+        - gridcell "4711":
+          - textbox "GPartner"
+        - gridcell "1":
+          - textbox "GTyp"
+        - gridcell:
+          - textbox
+        - gridcell "0001":
+          - textbox "Grp."
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "Mustermann":
+          - textbox "Nachname"
+        - gridcell "Max":
+          - textbox "Vorname"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "DE":
+          - textbox "SP"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "1111":
+          - textbox "Person"
+        - gridcell "X":
+          - textbox "U"
+        - gridcell:
+          - textbox
+        - gridcell "DE":
+          - textbox "SP"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "0":
+          - textbox "Feld obsolet"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "MUSTERMANN":
+          - textbox "Name1/Nach"
+        - gridcell "MAX":
+          - textbox "Name2/Vorn"
+        - gridcell "TESTUSER":
+          - textbox "Angel. von"
+        - gridcell "01.01.2026":
+          - textbox "Angelegt am"
+        - gridcell "12:00:00":
+          - textbox "Angelegt um"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "00:00:00":
+          - textbox "Geändert um"
+        - gridcell "00505600000000000000000000000001":
+          - textbox "Geschäftspartner-GUID"
+        - gridcell:
+          - textbox
+        - gridcell "X":
+          - textbox "PartnrConv"
+        - gridcell:
+          - textbox
+        - gridcell "00000000000000000000000000000000":
+          - textbox "UUID"
+        - gridcell "10.101.000.000":
+          - textbox "Gültig ab"
+        - gridcell "99.991.231.235.959":
+          - textbox "Gültig bis"
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell "X":
+          - textbox "Nat. Pers."
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+        - gridcell:
+          - textbox
+    - rowgroup
+    - rowgroup
