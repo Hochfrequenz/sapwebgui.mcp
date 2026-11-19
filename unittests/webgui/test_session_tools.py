@@ -256,3 +256,100 @@ class TestWebGuiCloseSession:
         assert closed.tab_closed is True
         page.close.assert_awaited_once()
         assert not registry.has_session(sid)  # type: ignore[attr-defined]
+
+    @pytest.mark.anyio
+    async def test_close_returning_without_closing_falls_back_to_close_target(self) -> None:
+        """#25: close() returns but a beforeunload dialog keeps the tab open -> Target.closeTarget is used."""
+        from unittest.mock import MagicMock
+
+        page = MagicMock()
+        page.on = MagicMock()
+        page.query_selector = AsyncMock(return_value=None)
+        page.close = AsyncMock()
+        closed_by_target = MagicMock(value=False)
+
+        page_cdp = MagicMock()
+        page_cdp.send = AsyncMock(return_value={"targetInfo": {"targetId": "T1"}})
+        page_cdp.detach = AsyncMock()
+        browser_cdp = MagicMock()
+
+        async def _close_target(method: str, params: dict[str, str]) -> None:
+            assert (method, params) == ("Target.closeTarget", {"targetId": "T1"})
+            closed_by_target.value = True
+
+        browser_cdp.send = _close_target
+        browser_cdp.detach = AsyncMock()
+        page.context.new_cdp_session = AsyncMock(return_value=page_cdp)
+        page.context.browser.new_browser_cdp_session = AsyncMock(return_value=browser_cdp)
+        page.is_closed.side_effect = lambda: closed_by_target.value
+        backend, registry, sid = self._backend_with_page(page)
+
+        with patch(
+            "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry", new=AsyncMock(return_value=registry)
+        ):
+            outcome = await backend.close_session(sid)  # type: ignore[attr-defined]
+
+        assert outcome is not None
+        assert outcome.tab_closed is True
+        assert closed_by_target.value is True
+        assert not registry.has_session(sid)  # type: ignore[attr-defined]
+
+    @pytest.mark.anyio
+    async def test_close_target_failure_reports_tab_not_closed(self) -> None:
+        """#25: if the CDP fallback fails too, the tab is reported as still open."""
+        from unittest.mock import MagicMock
+
+        page = MagicMock()
+        page.on = MagicMock()
+        page.query_selector = AsyncMock(return_value=None)
+        page.close = AsyncMock()
+        page.is_closed.return_value = False
+        page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no cdp"))
+        backend, registry, sid = self._backend_with_page(page)
+
+        with patch(
+            "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry", new=AsyncMock(return_value=registry)
+        ):
+            outcome = await backend.close_session(sid)  # type: ignore[attr-defined]
+
+        assert outcome is not None
+        assert outcome.tab_closed is False
+        assert not registry.has_session(sid)  # type: ignore[attr-defined]
+
+
+class TestWebGuiResetToPrimary:
+    """reset_to_primary must use the close outcome (#25)."""
+
+    @pytest.mark.anyio
+    async def test_uses_close_outcome(self) -> None:
+        from unittest.mock import MagicMock
+
+        from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+        from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
+        from sapwebguimcp.models.sap_results import SessionCloseOutcome
+
+        registry = SessionRegistry()
+        pages = []
+        for _ in range(4):
+            page = MagicMock()
+            page.is_closed.return_value = False
+            page.on = MagicMock()
+            pages.append(page)
+        sids = [registry.register(p) for p in pages]
+        backend = WebGuiBackend.__new__(WebGuiBackend)
+        outcomes = {
+            sids[1]: SessionCloseOutcome(tab_closed=True),
+            sids[2]: SessionCloseOutcome(tab_closed=False),
+            sids[3]: None,
+        }
+        backend.close_session = AsyncMock(side_effect=lambda sid: outcomes[sid])  # type: ignore[method-assign]
+
+        with patch(
+            "sapwebguimcp.backend.webgui.backend.WebGuiBackend._get_registry", new=AsyncMock(return_value=registry)
+        ):
+            result = await backend.reset_to_primary()
+
+        assert result["closed"] == [sids[1], sids[2]]
+        assert len(result["errors"]) == 2
+        assert any(sids[2] in e and "by hand" in e for e in result["errors"])
+        assert any(sids[3] in e and "not found" in e for e in result["errors"])
