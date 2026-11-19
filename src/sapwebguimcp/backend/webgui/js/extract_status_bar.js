@@ -54,7 +54,20 @@
         return cleaned;
     };
 
-    for (const selector of statusSelectors) {
+    // The Web GUI message bar (id "wnd[0]/sbar_msg") holds the message in a dedicated text element, next to
+    // an icon. It sits inside the footer toolbar, whose buttons ("Enter", "Save", ...) must not leak into the
+    // message, so when the bar exists its text is the whole answer (#79).
+    const messageBar = document.querySelector('[id$="/sbar_msg"]');
+    const messageBarText = messageBar && messageBar.querySelector('.lsMessageBar__text');
+    if (messageBarText) {
+        statusElement = messageBar;
+        message = messageBarText.textContent.replace(/\s+/g, ' ').trim(); // exact text, no pattern cleanup
+        if (!message) {
+            return { type: 'none', message: '' };
+        }
+    }
+
+    for (const selector of message ? [] : statusSelectors) {
         statusElement = document.querySelector(selector);
         if (statusElement) {
             // First, try to find a specific text element within the status area
@@ -125,7 +138,8 @@
     // Check for success indicators
     else if (
         parentClasses.includes('success') || // lang-ok: CSS class name
-        statusElement.querySelector('[class*="success" i], .sapMsgSuccess')
+        // the Web GUI message bar marks a success message with its "Ok" icon (#79)
+        statusElement.querySelector('[class*="success" i], .sapMsgSuccess, [class*="__icon--Ok"]')
     ) {
         type = 'S';
     }
