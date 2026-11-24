@@ -31,11 +31,12 @@ This repository and [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp) wer
 November 2026 and are kept in sync by hand. The procedure is in Hochfrequenz/sapwebgui.mcp#93 (the
 same text is in Hochfrequenz/sapgui.mcp#1178). Read it before:
 
-- **opening a pull request.** Every pull request body needs a `## Counterpart in sapgui.mcp` section
-  with a `Counterpart:` line. Decide by the classes in that issue whether the change has a
-  counterpart in sapgui.mcp. If you can create issues in this session, create the issue there
-  (search for an existing one first) and link it. Inside a bugspecht sprint no issues are
-  created: write `Counterpart: pending: ...` there instead; the next sync run creates it.
+- **opening a pull request.** Every pull request body needs a `## Counterpart in sapgui.mcp`
+  section with a `Counterpart:` line. Decide by the classes in that issue whether the change has a
+  counterpart in sapgui.mcp, and create the issue that issue calls for (search for an existing one
+  first) and link it. Only changes to this repository's own CI, release or tooling get
+  `Counterpart: none: <reason>`. Inside a bugspecht sprint, or wherever no issue can be created,
+  write `Counterpart: pending: ...` instead; the next sync run creates it.
 - **a request to sync the two repositories**, for example "sync sapgui.mcp and sapwebgui.mcp",
   possibly with "and start working on the issues". That is the sync run of that issue.
 
