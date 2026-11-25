@@ -28,6 +28,7 @@ from sapwebguimcp.lang.schema import JobStatus
 from sapwebguimcp.models.screen_state import SelectionScreenState
 from sapwebguimcp.models.sm37_models import SM37JobListResult, SM37JobLog
 from sapwebguimcp.tools.screen_state_helpers import ensure_screen_state
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -123,14 +124,17 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
     if errors:
         logger.warning("Selection screen state errors=%r", errors)
 
-    # Date fields are filled manually (not via ensure_screen_state) because they
-    # require the date format of the session's language.
+    # Date fields are filled manually (not via ensure_screen_state) because they require the date format of the SAP
+    # user (read off the pre-filled field, #42), which ensure_screen_state does not know.
     # The ARIA snapshot values use SAP's display format which may differ from the
     # input format, making snapshot-based verification unreliable for dates.
+    date_format = t.date_format
+    if from_date or to_date:
+        date_format = await resolve_user_date_format(backend, [*t.sm37.from_date, *t.sm37.to_date], t.date_format)
     for name, value, labels in (("from_date", from_date, t.sm37.from_date), ("to_date", to_date, t.sm37.to_date)):
         if not value:
             continue
-        sap_value = format_sap_date_as(value, t.date_format)
+        sap_value = format_sap_date_as(value, date_format)
         for label in labels:
             try:
                 await backend.fill_field(label, sap_value)

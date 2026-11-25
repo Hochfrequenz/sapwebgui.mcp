@@ -28,6 +28,7 @@ from sapwebguimcp.models.slg1_models import (
     SLG1FileSummary,
     SLG1LogListResult,
 )
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -85,10 +86,15 @@ async def _slg1_lookup(  # pylint: disable=too-many-arguments,too-many-positiona
         fields.append(("subobject", t.slg1.log_subobject, subobject))
     if external_id:
         fields.append(("external_id", t.slg1.external_id, external_id))
-    if from_date:
-        fields.append(("from_date", t.slg1.from_datetime, format_sap_date_as(from_date, t.date_format)))
-    if to_date:
-        fields.append(("to_date", t.slg1.to_datetime, format_sap_date_as(to_date, t.date_format)))
+    if from_date or to_date:
+        # The date field is pre-filled: read the user's date format off it before it is overwritten (#42)
+        date_format = await resolve_user_date_format(
+            backend, [*t.slg1.from_datetime, *t.slg1.to_datetime], t.date_format
+        )
+        if from_date:
+            fields.append(("from_date", t.slg1.from_datetime, format_sap_date_as(from_date, date_format)))
+        if to_date:
+            fields.append(("to_date", t.slg1.to_datetime, format_sap_date_as(to_date, date_format)))
     unfilled: list[str] = []
     for name, labels, value in fields:
         if not await _fill_by_label(backend, labels, value):

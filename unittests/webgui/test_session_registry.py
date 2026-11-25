@@ -399,3 +399,65 @@ class TestSessionRegistryLanguage:
         with pytest.raises(ValueError, match="expired"):
             reg.get_page(sid)
         assert reg.language_of(sid) is None
+
+
+class TestSessionRegistryDateFormat:
+    """The user's date format per session (#42)."""
+
+    @staticmethod
+    def _page(closed: bool = False) -> MagicMock:
+        page = MagicMock()
+        page.is_closed.return_value = closed
+        return page
+
+    def test_date_format_is_stored_and_dropped_on_unregister(self) -> None:
+        reg = SessionRegistry()
+        sid = reg.register(self._page())
+        assert reg.date_format_of(sid) is None
+        reg.set_date_format(sid, "%Y-%m-%d")
+        assert reg.date_format_of(sid) == "%Y-%m-%d"
+        reg.unregister(sid)
+        assert reg.date_format_of(sid) is None
+
+    def test_date_format_of_unknown_session_is_none(self) -> None:
+        assert SessionRegistry().date_format_of("s9") is None
+
+    def test_date_format_is_per_session(self) -> None:
+        reg = SessionRegistry()
+        first = reg.register(self._page())
+        second = reg.register(self._page())
+        reg.set_date_format(first, "%d.%m.%Y")
+        assert reg.date_format_of(second) is None
+
+    def test_clear_date_format(self) -> None:
+        reg = SessionRegistry()
+        sid = reg.register(self._page())
+        reg.set_date_format(sid, "%d.%m.%Y")
+        reg.clear_date_format(sid)
+        assert reg.date_format_of(sid) is None
+        reg.clear_date_format("s9")  # unknown session: no-op
+
+    def test_page_close_clears_date_format(self) -> None:
+        reg = SessionRegistry()
+        page = self._page()
+        sid = reg.register(page)
+        reg.set_date_format(sid, "%m/%d/%Y")
+        reg._on_page_closed(page)  # pylint: disable=protected-access
+        assert reg.date_format_of(sid) is None
+
+    def test_stale_tab_cleanup_clears_date_format(self) -> None:
+        reg = SessionRegistry()
+        page = self._page()
+        sid = reg.register(page)
+        reg.set_date_format(sid, "%m/%d/%Y")
+        page.is_closed.return_value = True
+        with pytest.raises(ValueError, match="expired"):
+            reg.get_page(sid)
+        assert reg.date_format_of(sid) is None
+
+    def test_a_new_session_starts_without_a_date_format(self) -> None:
+        reg = SessionRegistry()
+        sid = reg.register(self._page())
+        reg.set_date_format(sid, "%m/%d/%Y")
+        reg.unregister(sid)
+        assert reg.date_format_of(reg.register(self._page())) is None
