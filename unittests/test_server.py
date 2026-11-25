@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from importlib import resources
 
 from fastmcp import FastMCP
 
@@ -685,8 +686,6 @@ class TestParallelLoginContractTexts:
         assert "further sap_login()" in (tools["sap_session_list"].description or "")
 
     def test_knowledge_doc_states_the_parallel_login_contract(self) -> None:
-        from importlib import resources
-
         knowledge = resources.files("sapwebguimcp.data").joinpath("sap_knowledge.md").read_text(encoding="utf-8")
         assert "Every further `sap_login()`" in knowledge
         assert "using sap_login again" not in knowledge

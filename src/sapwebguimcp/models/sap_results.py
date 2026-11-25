@@ -65,7 +65,9 @@ class LoginResult(ToolResult):
     )
     session_id: str | None = Field(
         default=None,
-        description="Each login returns the id of its own session (e.g. 's1', 's2'); pass it as `session` to later calls.",
+        description=(
+            "Each login returns the id of its own session (e.g. 's1', 's2'); pass it as `session` to later calls."
+        ),
     )
 
 
