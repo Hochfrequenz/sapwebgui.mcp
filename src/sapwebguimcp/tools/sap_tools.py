@@ -386,10 +386,16 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             "Log into SAP. "
             "Needs Chrome (started with --remote-debugging-port=9222; on Windows it is auto-launched when not running) "
             "and a VPN connection if the SAP system is on an internal network. "
-            "Logs in on the current browser tab (registered as session 's1' on the first login); "
-            "calling sap_login again does not open a parallel session. "
-            "To work in a second session use sap_transaction(tcode, new_window=True), "
-            "which returns its session_id. "
+            "The first login logs in on the current browser tab and registers it (as session 's1' in a fresh server). "
+            "Every further call opens a new parallel session (its own browser context and tab, so another client "
+            "or user of the same system works) and returns its own session_id; pass it as `session` to later calls. "
+            "It never logs in inside an existing session. "
+            "Each login is a separate SAP logon that counts against the user's session limit, "
+            "so close a session you no longer need with sap_session_close. "
+            "A second window of the same logon is sap_transaction(tcode, new_window=True). "
+            "When a session has expired (logon or timeout screen), call sap_login again (it returns a new "
+            "session_id; pass it as `session`), then close the expired session with sap_session_close "
+            "(calls without `session` go to the lowest open session id). "
             "Credentials are read from ~/.config/sap-mcp/systems.json. "
             "Use system_key (dictionary key from systems.json) to select a non-default system. "
             "Call sap_list_connections first to see available system keys."
@@ -414,7 +420,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
                 Use sap_list_connections to see available keys. Defaults to default_system.
 
         Returns:
-            LoginResult with the session_id of the logged-in session (e.g. 's1').
+            LoginResult with the session_id of the session of this login (e.g. 's1' for the first login,
+            's2' for the next one).
         """
         session_id = get_mcp_session_id(ctx)
         return await sap_login_impl(url=url, client=client, system_key=system_key, session_id=session_id)
@@ -1624,9 +1631,9 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 Returns session IDs, current transaction, screen title, client, user, and
 system_name for each. Use this to see what sessions exist before targeting one.
 
-The first sap_login() registers "s1". Additional sessions come from
-sap_transaction(tcode, new_window=True) (a /o sub-session of an existing
-connection, sharing its login)."""
+The first sap_login() registers "s1". Additional sessions come from a
+further sap_login() (its own logon in its own browser context) or from
+sap_transaction(tcode, new_window=True) (a /o sub-session sharing its login)."""
     )
     async def sap_session_list() -> SessionListResult:
         """List all active sessions."""

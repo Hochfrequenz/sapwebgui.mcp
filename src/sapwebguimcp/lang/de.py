@@ -93,6 +93,8 @@ DE = LanguagePack(
     session_pages=SessionPagesSection(
         already_logged_on=Text(("bereits angemeldet",)),
         continue_button=Text(("Weiter", "Fortfahren")),
+        # SAP standard option text of the multiple-logon page; not verified live (no capture of the page yet).
+        keep_other_logons=Text(("ohne die anderen Anmeldungen", "ohne andere Anmeldungen")),
         timed_out=Text(("Sitzung abgelaufen", "Zeitüberschreitung", "abgemeldet")),
         settings_menu=Text(("Einstellungen",), fold=False),
         settings_stem=Text(("Einstellung",)),

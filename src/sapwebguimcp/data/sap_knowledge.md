@@ -60,7 +60,7 @@ So if you search say for a report in se38 which starts with "Z" and contains "en
 2. **Look for popups** - A popup may be waiting for your response - check if it's an error, confirmation, or help dialog
 3. **Try F3 (Back)** - Often helps to back out and retry
 4. **Reset to Easy Access first** - If inputs seem stuck or fields aren't being picked up, use `sap_transaction("YOUR_TCODE", reset_first=True)`. This navigates to SAP Easy Access (`/n`) first, clearing all residual state (popups, error messages, field values) before opening the transaction. This is the most reliable way to recover from state bleeding.
-5. **Start over** - Either by restarting the transaction or using sap_login again (changes will be lost)
+5. **Start over** - Either by restarting the transaction, or, for an expired session, by calling `sap_login` again (it returns a new `session_id`; pass it as `session`), then close the expired session with `sap_session_close` (changes will be lost)
 
 ## Working with Modal Dialogs (Popups)
 
@@ -294,14 +294,14 @@ time. Give every sub-agent its own session and bind it (see below).
 
 ### Session Management Tools
 
-| Tool                                      | Purpose                                                         |
-| ----------------------------------------- | --------------------------------------------------------------- |
-| `sap_transaction(tcode, new_window=True)` | Open a new SAP session with a transaction, returns `session_id` |
-| `sap_session_list()`                      | List all active sessions with IDs and titles                    |
-| `sap_session_close(session_id)`           | Close a specific session by ID                                  |
-| `sap_session_bind(session_id, agent_id)`  | Bind a session to an agent for parallel workflows               |
-| `sap_session_release(session_id)`         | Unbind a session from an agent without closing it               |
-| `sap_session_reset_to_primary()`          | Close every session except the primary one (`s1`)               |
+| Tool                                      | Purpose                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `sap_transaction(tcode, new_window=True)` | Open a new SAP session with a transaction, returns `session_id`    |
+| `sap_session_list()`                      | List all active sessions with IDs and titles                       |
+| `sap_session_close(session_id)`           | Close a specific session by ID                                     |
+| `sap_session_bind(session_id, agent_id)`  | Bind a session to an agent for parallel workflows                  |
+| `sap_session_release(session_id)`         | Unbind a session from an agent without closing it                  |
+| `sap_session_reset_to_primary()`          | Close every other session (`/o` windows and separate logons alike) |
 
 `sap_session_detach` is registered but not supported (it always returns an error): use `sap_session_close`.
 
@@ -375,7 +375,7 @@ This helps debug cross-talk issues without blocking work.
 
 ### Important Notes
 
-- **Primary session "s1"** is created automatically on `sap_login()`
+- The first `sap_login()` registers the current tab (`s1`). Every further `sap_login()` opens a separate logon in its own browser context as the next session.
 - **Session limit:** Typically 6 sessions per SAP user (configured in SAP)
 - **Alternative:** Use `sap_transaction("BP", new_window=True)` to open a transaction directly in a new session. This **auto-registers** the new session and returns the `session_id` in the result.
 - **Cleanup:** Sessions are closed automatically when their browser tab closes, or use `sap_session_close(session_id)`

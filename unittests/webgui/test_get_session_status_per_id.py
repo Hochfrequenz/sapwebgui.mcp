@@ -195,6 +195,48 @@ class TestWebGuiGetSessionStatusPerID:
 
         assert result.status == "logged_off"
 
+    @staticmethod
+    def _assert_new_session_recovery_guidance(message: str) -> None:
+        """#104: a further sap_login opens a new session; the expired one is closed after it."""
+        assert "opens a new session" in message
+        assert "session_id" in message
+        assert message.index("sap_login") < message.index("sap_session_close")
+        assert "log in again" not in message
+        assert "reconnect" not in message
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize(
+        ("login_form", "content", "expected_status"),
+        [
+            ("login-form-handle", "", "logged_off"),
+            (None, "<html>Your session expired</html>", "timed_out"),
+        ],
+    )
+    async def test_expired_session_guidance_opens_a_new_session_then_closes_this_one(
+        self, login_form: Any, content: str, expected_status: str
+    ) -> None:
+        from unittest.mock import patch
+
+        backend = self._make_backend()
+        page = self._make_mock_page()
+        page.query_selector = AsyncMock(return_value=login_form)
+        page.content = AsyncMock(return_value=content)
+        registry = MagicMock()
+        registry.primary_session = "s1"
+        registry.get_page.return_value = page
+
+        async def fake_find(_self: Any, page: Any = None) -> Any:  # noqa: ARG001
+            return None
+
+        with (
+            patch.object(type(backend), "_get_registry", new=AsyncMock(return_value=registry)),
+            patch.object(type(backend), "_find_okcode_field", new=fake_find),
+        ):
+            result = await backend.get_session_status(session_id="s1")
+
+        assert result.status == expected_status
+        self._assert_new_session_recovery_guidance(result.message)
+
     @pytest.mark.anyio
     async def test_pre_init_with_explicit_id_does_not_fall_back(self) -> None:
         """Negative: ``session_id="s2"`` must NOT silently fall back to ``self._page``.

@@ -4,6 +4,7 @@ import os
 from collections.abc import Generator, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from dotenv import load_dotenv
@@ -58,6 +59,20 @@ def reset_settings() -> Generator[None, None, None]:
     yield
     sapwebguimcp.models.config._settings = None
     sapwebguimcp.models.config._sap_config = None
+
+
+@pytest.fixture
+def empty_login_registry() -> Generator[None, None, None]:
+    """Make ``sap_login_impl`` see a browser without any session, so it logs in on the current tab (#104).
+
+    Tests that call ``sap_login_impl`` with only ``get_backend`` patched would otherwise start a real browser
+    connection.
+    """
+    manager = MagicMock()
+    manager.registry.list_sessions.return_value = []
+    manager.ensure_default_tab = AsyncMock()
+    with patch("sapwebguimcp.tools.sap_login_impl.get_browser_manager", new=AsyncMock(return_value=manager)):
+        yield
 
 
 @pytest.fixture(autouse=True)

@@ -34,6 +34,7 @@ def _config(tls_skip_verify: bool) -> Config:
 
 
 @pytest.mark.anyio
+@pytest.mark.usefixtures("empty_login_registry")
 @pytest.mark.parametrize("flag", [True, False])
 async def test_sap_login_passes_tls_skip_verify_to_the_backend(flag: bool) -> None:
     backend = AsyncMock()

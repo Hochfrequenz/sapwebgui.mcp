@@ -1,8 +1,11 @@
 """Standalone implementation for sap_login, extracted for testability."""
 
+import asyncio
 from typing import Optional
 
 from sapwebguimcp.backend.manager import get_backend
+from sapwebguimcp.backend.webgui.backend import WebGuiBackend
+from sapwebguimcp.backend.webgui.browser import get_browser_manager
 from sapwebguimcp.models import LoginResult
 from sapwebguimcp.models.config import get_sap_config, get_settings
 
@@ -10,6 +13,22 @@ __all__ = ["sap_login_impl"]
 
 # WebGUI ICF service path appended to a system's host to form the login URL.
 _WEBGUI_PATH = "/sap/bc/gui/sap/its/webgui"
+
+
+# Serialises the "is there a session already?" check together with the login that follows it, so two concurrent
+# first logins cannot both pick the current tab. One lock per event loop, like the browser manager's init lock.
+_login_lock: asyncio.Lock | None = None
+_login_lock_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_login_lock() -> asyncio.Lock:
+    """Get the login lock for the running event loop."""
+    global _login_lock, _login_lock_loop  # noqa: PLW0603  # pylint: disable=global-statement
+    current_loop = asyncio.get_running_loop()
+    if _login_lock is None or _login_lock_loop is not current_loop:
+        _login_lock = asyncio.Lock()
+        _login_lock_loop = current_loop
+    return _login_lock
 
 
 def _webgui_url_from_host(host: str) -> str:
@@ -70,20 +89,48 @@ async def sap_login_impl(
             "Credentials not configured. Check user/password/client in ~/.config/sap-mcp/systems.json."
         )
 
-    backend = await get_backend(tool_name="sap_login")
-    result = await backend.login(
-        url=effective_url or "",
-        username=user,
-        password=password,
-        client=effective_client,
-        language=language,
-        session_id=session_id,
-        connection_name=system.connection_name,
-        tls_skip_verify=bool(system.tls_skip_verify),
-    )
+    browser_manager = await get_browser_manager()
+    async with _get_login_lock():
 
-    if result.success:
-        # Never start keepalive for attached (user-owned) sessions unless the user asks (issue #1009).
-        await backend.start_keepalive()
+        async def login_on(target: WebGuiBackend, tls_skip_verify: bool, keep_other_logons: bool) -> LoginResult:
+            return await target.login(
+                url=effective_url or "",
+                username=user,
+                password=password,
+                client=effective_client,
+                language=language,
+                session_id=session_id,
+                connection_name=system.connection_name,
+                tls_skip_verify=tls_skip_verify,
+                keep_other_logons=keep_other_logons,
+            )
 
-    return result
+        if not browser_manager.registry.list_sessions():
+            # First login: use the tab the browser already has. In CONNECT mode the default context can have none
+            # left, after the agent closed every session (s1 included); then a new tab is opened there.
+            await browser_manager.ensure_default_tab()
+            backend = await get_backend(tool_name="sap_login")
+            # The first login handles SAP's "already logged on" page as before #104.
+            result = await login_on(backend, bool(system.tls_skip_verify), False)
+            if result.success:
+                # Never start keepalive for attached (user-owned) sessions unless the user asks (issue #1009).
+                await backend.start_keepalive()
+            return result
+
+        # A session exists already: log in on a new, isolated tab so it is not taken over (issue #104).
+        page = await browser_manager.open_login_page(ignore_https_errors=bool(system.tls_skip_verify))
+        succeeded = False
+        try:
+            # login() gets tls_skip_verify=False here on purpose: it would switch on the browser-wide certificate
+            # bypass (Security.setIgnoreCertificateErrors) for every session, strict ones included; the new context
+            # above already carries the system's setting scoped to itself.
+            # keep_other_logons: on SAP's "already logged on" page, never pick an option that ends the other logons.
+            result = await login_on(WebGuiBackend(page), False, True)
+            if result.success:
+                backend = await get_backend(session=result.session_id, tool_name="sap_login")
+                await backend.start_keepalive()
+                succeeded = True
+            return result
+        finally:
+            if not succeeded:
+                await browser_manager.close_login_page(page)

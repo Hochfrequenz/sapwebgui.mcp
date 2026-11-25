@@ -180,6 +180,19 @@ _CERT_ERROR_GUIDANCE = (
     "or install the certificate authority in the operating system's trust store."
 )
 
+# A further (parallel) login stopped on SAP's "user already logged on" page (#104).
+_ALREADY_LOGGED_ON_NOT_CONTINUED = (
+    "SAP reports that user {user} is already logged on. This parallel login did not continue: the page's "
+    "option to keep the other logons could not be found or selected, and continuing could end the other "
+    "session. The existing session is unchanged; keep working in it (sap_session_list lists it)."
+)
+
+# A further sap_login opens a new session instead of logging in again inside this one (#104).
+_EXPIRED_SESSION_RECOVERY = (
+    "Call sap_login, which opens a new session and returns its session_id; use that session_id "
+    "from now on and close this session with sap_session_close."
+)
+
 # How long a key press waits for the Web GUI to start a server round trip, for it to finish, and for the
 # screen to render the response (#79).
 _KEY_ROUND_TRIP_START_S = 1.0
@@ -373,11 +386,18 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
         session_id: str | None = None,
         connection_name: str | None = None,  # ignored for WebGUI; SAP_URL is the system selector
         tls_skip_verify: bool = False,
+        keep_other_logons: bool = False,
     ) -> LoginResult:
         """Navigate to SAP WebGUI and log in.
 
         After successful login (any path), registers the page in the session
         registry and captures SAP identity for log correlation.
+
+        Args:
+            keep_other_logons: Set for a further (parallel) login (#104). If SAP shows its "user already
+                logged on" page, the option that keeps the other logons is selected before "Continue" is
+                clicked; if it cannot be found or selected, the login fails without continuing, so it cannot
+                end the user's other session.
         """
         guidance_msg = (
             "RECOMMENDED: Call sap_get_capabilities() to review all available "
@@ -444,6 +464,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 page_content = await self._page.content()
                 pages = lang.universal().session_pages
                 if pages.already_logged_on.contains(page_content):
+                    if keep_other_logons and not await self._select_keep_other_logons():
+                        return LoginResult.failure(_ALREADY_LOGGED_ON_NOT_CONTINUED.format(user=username), url=url)
                     try:
                         await self._page.click(
                             ", ".join(f'button:has-text("{label}")' for label in pages.continue_button),
@@ -470,6 +492,28 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             if _CERT_ERROR_RE.search(str(e)):
                 return LoginResult.failure(f"Error during SAP login: {e}", url=url, guidance=_CERT_ERROR_GUIDANCE)
             return LoginResult.failure(f"Error during SAP login: {e}", url=url)
+
+    async def _select_keep_other_logons(self) -> bool:
+        """Select the "already logged on" page's option that keeps the user's other logons; never raises.
+
+        Returns ``True`` only if exactly one such option was found and is now selected.
+        """
+        try:
+            handle = await self._page.evaluate_handle(
+                load_js("find_keep_other_logons_option.js"),
+                script_arg({"keepOtherLogons": lang.universal().session_pages.keep_other_logons}),
+            )
+            option = handle.as_element()
+            if option is None:
+                logger.warning("Already-logged-on page: no option that keeps the other logons found")
+                return False
+            await option.check(timeout=5000)
+            return await option.is_checked()
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning(
+                "Already-logged-on page: could not select the option that keeps the other logons", exc_info=True
+            )
+            return False
 
     async def list_connections(self) -> list[Any]:
         """WebGUI backend has no SAP Logon entries."""
@@ -824,14 +868,14 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             if login_form:
                 return SessionStatus(
                     status="logged_off",
-                    message="Login page detected. Please use sap_login to log in again.",
+                    message=f"Login page detected. {_EXPIRED_SESSION_RECOVERY}",
                 )
 
             page_content = await page.content()
             if lang.universal().session_pages.timed_out.contains(page_content):
                 return SessionStatus(
                     status="timed_out",
-                    message="Session has timed out. Please use sap_login to reconnect.",
+                    message=f"Session has timed out. {_EXPIRED_SESSION_RECOVERY}",
                 )
 
             return SessionStatus(

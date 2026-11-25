@@ -12,6 +12,8 @@ _PATCH_GET_BACKEND = "sapwebguimcp.tools.sap_login_impl.get_backend"
 _PATCH_GET_SETTINGS = "sapwebguimcp.tools.sap_login_impl.get_settings"
 _PATCH_GET_SAP_CONFIG = "sapwebguimcp.tools.sap_login_impl.get_sap_config"
 
+pytestmark = pytest.mark.usefixtures("empty_login_registry")
+
 
 def _multi_system_config() -> Config:
     """Config with two systems sharing the same host but different clients."""
