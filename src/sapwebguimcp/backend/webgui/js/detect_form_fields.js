@@ -128,14 +128,33 @@
         return '';
     }
 
+    const SELECTOR_WRAPPERS = '[role="checkbox"], [role="radio"], .lsCheckBox, .lsRadioButton'; // lang-ok: CSS selector
+
+    /**
+     * Whether a checkbox/radio wrapper (not an <input>) is reported as a field: visible, with an id and a name.
+     * Shared by both loops so that a native input is only skipped when its wrapper really is reported.
+     */
+    function isReportableSelector(el) {
+        if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+            return false;
+        }
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            return false;
+        }
+        if (el.offsetParent === null) {
+            return false;
+        }
+        // Only named controls with an ID (an unnamed one cannot be addressed by sap_set_checkbox)
+        return Boolean(el.id) && getSelectorLabel(el) !== '';
+    }
+
     // Find all input elements
     document.querySelectorAll('input, select').forEach((el) => {
-        // An <input> inside a checkbox/radio wrapper (ARIA role or lsCheckBox/lsRadioButton class) is reported
-        // through the wrapper (second loop)
-        const wrapper = el.closest(
-            '[role="checkbox"], [role="radio"], .lsCheckBox, .lsRadioButton'
-        );
-        if (wrapper && wrapper !== el) {
+        // An <input> inside a reported checkbox/radio wrapper (ARIA role or lsCheckBox/lsRadioButton class) is
+        // reported through the wrapper (second loop); inside an unreported wrapper it stays a field of its own
+        const wrapper = el.closest(SELECTOR_WRAPPERS);
+        if (wrapper && wrapper !== el && isReportableSelector(wrapper)) {
             return;
         }
 
@@ -175,43 +194,34 @@
     });
 
     // Checkboxes and radio buttons that are no <input>: ARIA role elements and SAP lsCheckBox/lsRadioButton spans
-    const selectorControls = document.querySelectorAll(
-        '[role="checkbox"], [role="radio"], .lsCheckBox, .lsRadioButton'
-    );
-    selectorControls.forEach((el) => {
-        if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-            return; // handled by the first loop
-        }
-
-        const rect = el.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-            return;
-        }
-        if (el.offsetParent === null) {
+    document.querySelectorAll(SELECTOR_WRAPPERS).forEach((el) => {
+        if (!isReportableSelector(el)) {
             return;
         }
 
         const classes = Array.from(el.classList);
         const isRadio = el.getAttribute('role') === 'radio' || classes.includes('lsRadioButton'); // lang-ok: CSS class name
+        // Explicit wrapper state (aria / class) wins; a wrapper without it falls back to its native input
+        const nativeInput = el.querySelector('input[type="checkbox"], input[type="radio"]'); // lang-ok: CSS selector
+        let checked = getSelectorState(el);
+        if (checked === null && nativeInput) {
+            checked = nativeInput.checked;
+        }
         const isReadonly =
             el.getAttribute('aria-disabled') === 'true' ||
             el.getAttribute('aria-readonly') === 'true' ||
-            classes.some((token) => token.endsWith('--disabled') || token.endsWith('--readonly')); // lang-ok: CSS class modifiers
+            classes.some((token) => token.endsWith('--disabled') || token.endsWith('--readonly')) || // lang-ok: CSS class modifiers
+            (nativeInput !== null && (nativeInput.disabled || nativeInput.readOnly));
 
-        const field = {
-            id: el.id || '',
+        fields.push({
+            id: el.id,
             label: getSelectorLabel(el),
             field_type: isRadio ? 'radio' : 'checkbox',
             current_value: null,
-            checked: getSelectorState(el),
+            checked: checked,
             readonly: isReadonly,
             options: null,
-        };
-
-        // Only named controls with an ID (an unnamed one cannot be addressed by sap_set_checkbox)
-        if (field.id && field.label) {
-            fields.push(field);
-        }
+        });
     });
 
     return fields;

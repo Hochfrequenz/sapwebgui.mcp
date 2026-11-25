@@ -97,6 +97,40 @@ async def test_input_inside_a_class_only_checkbox_is_reported_once() -> None:
 
 
 @pytest.mark.anyio
+async def test_input_inside_an_unreportable_wrapper_is_kept() -> None:
+    """A wrapper without an id is not reported, so its native input must not be dropped."""
+    fields = await _by_id(
+        '<body><span class="lsCheckBox">Wrapped <input id="native" type="checkbox" checked></span></body>'
+    )
+    checkboxes = _selectors(fields.values())
+    assert [f.id for f in checkboxes] == ["native"]
+    assert checkboxes[0].field_type == SapFieldType.CHECKBOX
+    assert checkboxes[0].checked is True
+
+
+@pytest.mark.anyio
+async def test_wrapper_without_state_falls_back_to_its_native_input() -> None:
+    fields = await _by_id(
+        '<body><span id="w2" class="lsCheckBox">Zwei '
+        '<input type="checkbox" id="w2-input" checked disabled></span></body>'
+    )
+    checkboxes = _selectors(fields.values())
+    assert [f.id for f in checkboxes] == ["w2"]
+    assert checkboxes[0].field_type == SapFieldType.CHECKBOX
+    assert checkboxes[0].checked is True
+    assert checkboxes[0].readonly is True
+
+
+@pytest.mark.anyio
+async def test_explicit_wrapper_state_wins_over_the_native_input() -> None:
+    fields = await _by_id(
+        '<body><span id="w3" role="checkbox" aria-checked="false" aria-label="Drei">'
+        '<input type="checkbox" id="w3-input" checked></span></body>'
+    )
+    assert fields["w3"].checked is False
+
+
+@pytest.mark.anyio
 async def test_disabled_role_checkbox_is_readonly() -> None:
     fields = await _by_id(
         '<body><div id="d" role="checkbox" aria-label="Gesperrt" aria-checked="false" aria-disabled="true" '
