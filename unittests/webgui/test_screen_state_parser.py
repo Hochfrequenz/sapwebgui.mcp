@@ -177,6 +177,38 @@ class TestParseSelectionScreenState:
         state = parse_selection_screen_state(fake_snapshot)
         assert state.fields["Benutzer"] == "TESTUSER"
 
+    def test_empty_textbox_without_colon_parsed_as_empty_value(self) -> None:
+        """Playwright writes an empty textbox as ``- textbox "Label"`` (no colon, no value)."""
+        state = parse_selection_screen_state('- textbox "Benutzer"\n')
+        assert state.fields == {"Benutzer": ""}
+
+    def test_empty_textbox_with_colon_parsed_as_empty_value(self) -> None:
+        """``- textbox "Label":`` (colon, no value) is also an empty field."""
+        state = parse_selection_screen_state('- textbox "Benutzer":\n')
+        assert state.fields == {"Benutzer": ""}
+
+    def test_empty_textbox_with_flag_is_excluded_when_disabled(self) -> None:
+        """A disabled or readonly empty textbox cannot be filled and is excluded."""
+        snapshot = '- textbox "Benutzer" [disabled]\n- textbox "Datum" [readonly]\n'
+        state = parse_selection_screen_state(snapshot)
+        assert state.fields == {}
+
+    def test_flagged_textbox_with_value_is_excluded_when_disabled(self) -> None:
+        """``- textbox "L" [disabled]: x`` is recognised and excluded."""
+        state = parse_selection_screen_state('- textbox "Benutzer" [disabled]: TESTUSER\n')
+        assert state.fields == {}
+
+    def test_flagged_editable_textbox_keeps_value(self) -> None:
+        """A flag that is not disabled/readonly does not hide the field or its value."""
+        state = parse_selection_screen_state('- textbox "Benutzer" [active]: TESTUSER\n- textbox "Datum" [active]\n')
+        assert state.fields == {"Benutzer": "TESTUSER", "Datum": ""}
+
+    def test_ambiguous_empty_textboxes_detected(self) -> None:
+        """Two empty textboxes sharing a label are still flagged as ambiguous."""
+        state = parse_selection_screen_state('- textbox "Date"\n- textbox "Date"\n')
+        assert "Date" in state.ambiguous_labels
+        assert "Date" not in state.fields
+
     def test_ambiguous_radio_labels_excluded(self) -> None:
         """Ambiguous radio labels should be flagged and excluded from dict."""
         fake_snapshot = '- radio "Option" [checked]\n- radio "Option"\n'
