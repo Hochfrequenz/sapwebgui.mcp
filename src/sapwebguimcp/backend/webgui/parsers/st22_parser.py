@@ -14,8 +14,10 @@ ST22 structure (DE/EN):
   "Was ist geschehen?" / "What happened?", source code excerpts, call stacks.
 """
 
+import json
 import logging
 import re
+import unicodedata
 from collections.abc import Iterable
 
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
@@ -314,16 +316,94 @@ def parse_st22_dump_list(snapshot: AriaSnapshot, t: LanguagePack) -> list[ST22Du
 # =============================================================================
 
 
+_QUOTED_NAME = re.compile(r'"((?:[^"\\]|\\.)*)"')
+_NON_TEXT_NAME_PREFIXES = ("button", "textbox", "checkbox", "menuitem")
+
+
+def _decode_json_string(raw: str) -> str:
+    """Decode the JSON escapes (quote, backslash, newline, unicode) of a string body; ``raw`` if it is not valid."""
+    try:
+        decoded = json.loads(f'"{raw}"')
+    except ValueError:
+        return raw
+    return decoded if isinstance(decoded, str) else raw
+
+
+def _unwrap_single_quoted(entry: str) -> str:
+    """Undo the YAML single quoting of a whole entry key (a doubled quote is one quote); what follows is kept."""
+    if not entry.startswith("'"):
+        return entry
+    unwrapped: list[str] = []
+    index = 1
+    while index < len(entry):
+        char = entry[index]
+        if char == "'":
+            if entry[index + 1 : index + 2] == "'":  # '' is an escaped single quote
+                unwrapped.append("'")
+                index += 2
+                continue
+            return "".join(unwrapped) + entry[index + 1 :]
+        unwrapped.append(char)
+        index += 1
+    return "".join(unwrapped)  # no closing quote: keep what there is
+
+
+def _split_key_and_value(entry: str) -> tuple[str, str | None]:
+    """Split an entry at the first ``: `` (or a trailing ``:``) that is not inside a double-quoted name."""
+    in_quotes = False
+    index = 0
+    while index < len(entry):
+        char = entry[index]
+        if in_quotes and char == "\\":
+            index += 2
+            continue
+        if char == '"':
+            in_quotes = not in_quotes
+        elif char == ":" and not in_quotes:
+            if index == len(entry) - 1:
+                return entry[:index], None
+            if entry[index + 1] == " ":
+                return entry[:index], entry[index + 2 :].strip()
+        index += 1
+    return entry, None
+
+
+def _is_text(candidate: str) -> bool:
+    """Not blank, and not only icon-font glyphs (private-use characters, which the Web GUI chrome renders as icons)."""
+    return any(not char.isspace() and unicodedata.category(char) != "Co" for char in candidate)
+
+
+def _entry_texts(entry: str) -> Iterable[str]:
+    """The texts of one snapshot entry (the line after ``- ``): its quoted names, then its inline value."""
+    key, value = _split_key_and_value(_unwrap_single_quoted(entry))
+    if key.startswith("/"):  # a property such as ``/url``, not text
+        return
+    for match in _QUOTED_NAME.finditer(key):
+        name = _decode_json_string(match.group(1))
+        if _is_text(name) and not name.startswith(_NON_TEXT_NAME_PREFIXES):
+            yield name
+    if value is not None:
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = _decode_json_string(value[1:-1])
+        if _is_text(value):
+            yield value
+
+
 def _extract_text_content(snapshot: str) -> str:
-    """Extract readable text content from ARIA snapshot, stripping ARIA markup."""
+    """Extract the readable text of an ARIA snapshot (Playwright YAML) without loss, one text per entry.
+
+    Yields every accessible name (JSON-quoted, with escaped quotes and other JS escapes) and every inline value (text
+    nodes, inline element text, textbox values; unquoted or double-quoted), and undoes the single quoting of a whole
+    entry. Every text that is not blank is kept, single characters included; a text of only private-use characters is
+    an icon-font glyph of the Web GUI chrome and is left out, as is a quoted name whose text starts with "button",
+    "textbox", "checkbox" or "menuitem" (the accessible name of a control; its inline value is kept). The texts are
+    joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans several lines.
+    """
     text_parts: list[str] = []
-    # Match text content in quotes (from various ARIA elements like text:, heading, etc.)
-    text_pattern = re.compile(r'"([^"]{2,})"')
-    for match in text_pattern.finditer(snapshot):
-        text = match.group(1)
-        # Skip ARIA role names and short labels
-        if not text.startswith(("button", "textbox", "checkbox", "menuitem")):
-            text_parts.append(text)
+    for line in snapshot.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            text_parts.extend(_entry_texts(stripped[2:]))
     return "\n".join(text_parts)
 
 
@@ -347,11 +427,13 @@ def _extract_section(
     start_markers: Iterable[str],
     end_markers: Iterable[str],
     end_pattern: re.Pattern[str] | None = None,
+    first_only: bool = False,
 ) -> str:
     """Extract the sections under every heading in ``start_markers`` (screen order), best-effort.
 
     A heading is a whole line. A section ends at the next heading in ``start_markers`` or ``end_markers`` or at a
-    line that starts like ``end_pattern`` (the source code headings).
+    line that starts like ``end_pattern`` (the source code headings). With ``first_only`` only the first section is
+    read (the pages of a concatenated snapshot can overlap, so a heading can come twice).
     """
     starts = list(start_markers)
     boundaries = [*starts, *end_markers]
@@ -359,8 +441,12 @@ def _extract_section(
     collecting = False
     for line in text.split("\n"):
         if _is_heading(line, starts):
+            if first_only and collecting:
+                break
             collecting = True
         elif _is_heading(line, boundaries) or (end_pattern is not None and end_pattern.match(line.strip())):
+            if first_only and collecting:
+                break
             collecting = False
         elif collecting and line.strip():
             body.append(line.strip())
@@ -406,10 +492,15 @@ def _extract_program(text: str, t: LanguagePack) -> str:
     return ""
 
 
+def _labelled_line_pattern(t: LanguagePack) -> re.Pattern[str]:
+    """The labelled source line: "Source Code Line: 100"."""
+    return compiled(rf"{t.st22.source_line.alt}[:\s]+(\d+)")
+
+
 def _extract_line_number(text: str, t: LanguagePack) -> int | None:
-    """Extract source line number from dump detail text."""
+    """Extract source line number from dump detail text (the whole text; used when it has no termination section)."""
     patterns = [
-        compiled(rf"{t.st22.source_line.alt}[:\s]+(\d+)"),
+        _labelled_line_pattern(t),
         compiled(rf"{t.st22.line.alt}\s+(\d+)\s+"),
     ]
     for pattern in patterns:
@@ -417,6 +508,39 @@ def _extract_line_number(text: str, t: LanguagePack) -> int | None:
         if match:
             return int(match.group(1))
     return None
+
+
+def _detail_headings(t: LanguagePack) -> list[str]:
+    """Every heading that ends a section of the dump detail."""
+    headings = [
+        *(heading for texts in t.st22.section.values() for heading in texts),
+        *t.st22.other_headings,
+        *t.st22.call_stack_heading,
+        *t.st22.termination_heading,
+    ]
+    return list(dict.fromkeys(headings))  # the termination heading is also one of the other headings
+
+
+def _termination_include_pattern(t: LanguagePack) -> re.Pattern[str]:
+    """The termination point text: the line keyword, a standalone number, then the first quoted name (the include)."""
+    return compiled(rf'(?<!\S){t.st22.line.alt}\s+(\d+)(?!\w)[^"\d]*"([^"\s]+)"')
+
+
+def _termination_point(text: str, t: LanguagePack) -> tuple[str | None, int | None] | None:
+    """The include and the line of the termination point, read from the section on where the program terminated.
+
+    ``None`` if the text has no such section. Inside the section, the first "line N ... "INCLUDE"" wins (the termination
+    point precedes "begins in line 1 of the include"); without a quoted include only a labelled line counts.
+    """
+    if not any(_is_heading(line, t.st22.termination_heading) for line in text.split("\n")):
+        return None
+    # no end_pattern: a wrapped line that starts with "Source code" must not end the section
+    section = _extract_section(text, t.st22.termination_heading, _detail_headings(t))
+    match = _termination_include_pattern(t).search(section)
+    if match:
+        return match.group(2), int(match.group(1))
+    labelled = _labelled_line_pattern(t).search(section)
+    return None, int(labelled.group(1)) if labelled else None
 
 
 def _extract_call_stack(text: str, t: LanguagePack) -> list[str]:
@@ -442,6 +566,8 @@ def _extract_call_stack(text: str, t: LanguagePack) -> list[str]:
             if stack:
                 break  # Empty line after entries = end of stack
             continue
+        if stripped.isdigit():
+            continue  # A number cell (an index or line number of a per-cell stack) is neither an entry nor the end
         # Stack entries typically contain program names with uppercase + line numbers
         if re.search(r"[A-Z_/]{3,}", stripped):
             stack.append(stripped)
@@ -464,15 +590,16 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     Returns:
         ST22DumpDetail with extracted data and raw_text fallback
     """
-    # Extract readable text
-    raw_text = _extract_text_content(snapshot)
+    # Extract readable text; every extraction reads the whole text, only raw_text is truncated
+    text = _extract_text_content(snapshot)
+    raw_text = text
     if len(raw_text) > _MAX_RAW_TEXT_LENGTH:
         raw_text = raw_text[:_MAX_RAW_TEXT_LENGTH] + "\n... [truncated]"
 
     # Best-effort section extraction
     sections = t.st22.section
     what_happened = _extract_section(
-        raw_text,
+        text,
         sections[DumpSection.WHAT_HAPPENED],
         [
             *sections[DumpSection.HOW_TO_CORRECT],
@@ -484,7 +611,7 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     )
 
     how_to_correct = _extract_section(
-        raw_text,
+        text,
         sections[DumpSection.HOW_TO_CORRECT],
         [
             *sections[DumpSection.ERROR_ANALYSIS],
@@ -494,14 +621,27 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
         end_pattern=t.st22.source_code_start.pattern,
     )
 
+    # Without a termination section the whole text is searched for a line (as before)
+    point = _termination_point(text, t)
+    include, line = point if point is not None else (None, _extract_line_number(text, t))
+
+    # The pages of the concatenated snapshot can overlap, so only the first short text section counts
+    short_text = _extract_section(
+        text,
+        t.st22.col_short_text,
+        _detail_headings(t),
+        end_pattern=t.st22.source_code_start.pattern,
+        first_only=True,
+    ).replace("\n", " ")
+
     return ST22DumpDetail(
-        error_type=_extract_error_type(raw_text, t),
-        short_text="",  # Populated from list data by caller
+        error_type=_extract_error_type(text, t),
+        short_text=short_text,  # empty if the text has no such section; the caller falls back on the list
         what_happened=what_happened,
         how_to_correct=how_to_correct,
-        program=_extract_program(raw_text, t),
-        include=None,
-        line=_extract_line_number(raw_text, t),
-        call_stack=_extract_call_stack(raw_text, t),
+        program=_extract_program(text, t),
+        include=include,
+        line=line,
+        call_stack=_extract_call_stack(text, t),
         raw_text=raw_text,
     )

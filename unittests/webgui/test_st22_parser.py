@@ -4,12 +4,14 @@ Unit tests for ST22 (Short Dump Analysis) parser.
 Tests parsing of YAML accessibility snapshots from ST22 screens.
 """
 
+import json
 from pathlib import Path
 
 import pytest
 
 from sapwebguimcp import lang
 from sapwebguimcp.backend.webgui.parsers.st22_parser import (
+    _MAX_RAW_TEXT_LENGTH,
     is_no_dumps_message,
     parse_st22_dump_detail,
     parse_st22_dump_list,
@@ -300,11 +302,104 @@ class TestParseDumpDetail:
 
     def test_parse_detail_raw_text_truncated(self) -> None:
         """raw_text should be truncated if content is very large."""
-        # Create a large snapshot
-        large_content = '- text: "' + "x" * 500 + '"\n' * 100
+        # Create a large snapshot: 100 text lines of 500 characters each, well above the limit
+        large_content = ('- text: "' + "x" * 500 + '"\n') * 100
         detail = parse_st22_dump_detail(large_content, T)
 
-        assert len(detail.raw_text) <= 12000  # ~10KB with margin
+        marker = "\n... [truncated]"
+        assert detail.raw_text.endswith("[truncated]")
+        assert len(detail.raw_text) == _MAX_RAW_TEXT_LENGTH + len(marker)
+
+    def test_sections_and_call_stack_are_found_behind_the_raw_text_limit(self) -> None:
+        """Only raw_text is truncated; the call stack and the sections are read from the whole text."""
+        filler = "".join(f'  - text: "{"x" * 100} {i}"\n' for i in range(150))
+        snapshot = (
+            "- document:\n"
+            + filler
+            + """  - text: "Was ist geschehen?"
+  - text: "Der Abbruch geschah hinter der Grenze."
+  - text: "Was können Sie tun?"
+  - text: "Programm korrigieren."
+  - text: "Active Calls"
+  - text: "ZTEST_PROGRAM line 42"
+  - text: "SAPMSYST line 100"
+  - text: ""
+  - text: "End of call stack"
+"""
+        )
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.raw_text.endswith("[truncated]")
+        assert "Active Calls" not in detail.raw_text  # the heading lies behind the truncation point
+        assert detail.what_happened == "Der Abbruch geschah hinter der Grenze."
+        assert detail.how_to_correct == "Programm korrigieren."
+        assert detail.call_stack == ["ZTEST_PROGRAM line 42", "SAPMSYST line 100"]
+
+    def test_raw_text_keeps_escaped_quotes_of_a_name(self) -> None:
+        """A name with escaped quotes (JSON string in the YAML) is decoded, not cut at the first quote."""
+        snapshot = '- document:\n  - generic "des Includes \\"ZCL_DEMO\\"."'
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert 'des Includes "ZCL_DEMO".' in detail.raw_text.split("\n")
+
+    def test_raw_text_keeps_an_unquoted_text_node(self) -> None:
+        """An unquoted inline value of a text node is kept."""
+        snapshot = """- document:
+  - text: Im Quelltext befindet sich die Abbruchstelle in Zeile 36
+  - text: des Includes "ZCL_DEMO"."""
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "Im Quelltext befindet sich die Abbruchstelle in Zeile 36" in lines
+        assert 'des Includes "ZCL_DEMO".' in lines
+
+    def test_raw_text_keeps_a_quoted_text_node(self) -> None:
+        """A double-quoted inline value is decoded."""
+        snapshot = '- document:\n  - text: "\\"ZCL_DEMO\\""'
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert '"ZCL_DEMO"' in detail.raw_text.split("\n")
+
+    def test_raw_text_keeps_inline_element_text(self) -> None:
+        """The inline text of an element (paragraph, generic with a ref) is kept."""
+        snapshot = "- document:\n  - paragraph: Kurztext\n  - generic [ref=e3]: Zeile 36"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "Kurztext" in lines
+        assert "Zeile 36" in lines
+
+    def test_raw_text_undoes_a_single_quoted_entry(self) -> None:
+        """A whole entry wrapped in single quotes (because its name contains ': ') is unwrapped."""
+        snapshot = "- document:\n  - 'generic \"Zugriff über ''NULL'': Objektreferenz\"'"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert "Zugriff über 'NULL': Objektreferenz" in detail.raw_text.split("\n")
+
+    def test_a_single_character_text_is_kept(self) -> None:
+        """A one-character text (the line number of a label split from its value) is kept, not dropped as noise."""
+        snapshot = "\n".join(
+            [
+                "- text: Information on Where Terminated",
+                "- text: Source Code Line:",
+                '- text: "5"',  # Playwright quotes a value that is a number
+                "- text: Source Code Extract",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.line == 5
+        assert "5" in detail.raw_text.split("\n")
+
+    def test_an_icon_glyph_is_not_text(self) -> None:
+        """A text of only private-use characters is an icon-font glyph of the Web GUI chrome, not dump text."""
+        snapshot = "- text: \n- text: \U000f0001\n- text: Kurztext"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "" not in lines
+        assert "\U000f0001" not in lines
+        assert "Kurztext" in lines
 
     def test_parse_detail_call_stack(self) -> None:
         """Extract call stack entries."""
@@ -318,3 +413,168 @@ class TestParseDumpDetail:
 """
         detail = parse_st22_dump_detail(snapshot, T)
         assert len(detail.call_stack) >= 2
+
+    def test_a_number_cell_does_not_end_the_call_stack(self) -> None:
+        """A call stack rendered as one text per cell: a cell that is only a number is neither an entry nor the end."""
+        snapshot = """- document:
+  - text: Active Calls
+  - text: ZPROG_MAIN line 1
+  - text: "2"
+  - text: SAPMSYST line 100
+  - text: "15"
+  - text: SAPLZMOD line 200
+"""
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.call_stack == ["ZPROG_MAIN line 1", "SAPMSYST line 100", "SAPLZMOD line 200"]
+
+
+def _snapshot(lines: list[str]) -> str:
+    """A Playwright ARIA snapshot of one text node per line (a value that starts with a quote is YAML-quoted)."""
+    return "\n".join(f"- text: {json.dumps(line)}" if line.startswith('"') else f"- text: {line}" for line in lines)
+
+
+_DETAIL_DE_LINES = [
+    "Kurztext",
+    "Zugriff über 'NULL' Objektreferenz nicht möglich.",
+    "Was ist passiert?",
+    "Die Laufzeitumgebung hat einen Fehler festgestellt.",
+    "Was können Sie tun?",
+    "Programm nach der Fehleranalyse korrigieren.",
+    "Fehleranalyse",
+    "Fehler in Zeile 7 der Methode",
+    "Systemumgebung",
+    "SAP-Release..... 816",
+    "Informationen zur Abbruchstelle",
+    "Der Abbruch trat im ABAP-Programm bzw. Include",
+    '"ZCL_DEMO======================CP"',
+    'auf, und zwar in "ZIF_DEMO~DISPLAY". Das Hauptprogramm war "ZDEMO_MAIN1".',
+    "Im Quelltext befindet sich die Abbruchstelle in Zeile 36",
+    'des Includes "ZCL_DEMO======================CM00C".',
+    "Quelltext",
+    'beginnt in Zeile 1 des Includes "ZCL_DEMO======================CM00C".',
+    "Quelltextauszug",
+    "Zeile 40 >>>>> lv_x = lo_ref->get( ).",
+    "Aktive Aufrufe/Ereignisse",
+    "4 METHOD ZCL_DEMO======================CP ZCL_DEMO======================CM",
+]
+_DETAIL_DE = _snapshot(_DETAIL_DE_LINES)
+
+_INCLUDE_CM00C = "ZCL_DEMO======================CM00C"
+
+
+class TestTerminationPoint:
+    """The include and the line of the termination point come from the section on where the program terminated."""
+
+    def test_include_and_line_come_from_the_termination_section(self) -> None:
+        detail = parse_st22_dump_detail(_DETAIL_DE, T)
+
+        assert (detail.include, detail.line) == (_INCLUDE_CM00C, 36)
+
+    def test_english_termination_text(self) -> None:
+        snapshot = _snapshot(
+            [
+                "Information on Where Terminated",
+                "In the source code you have the termination point in line 36",
+                'of the (Include) program "ZCL_X=========CM00C".',
+                "Active Calls/Events",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert (detail.include, detail.line) == ("ZCL_X=========CM00C", 36)
+
+    def test_italian_termination_text(self) -> None:
+        snapshot = _snapshot(
+            [
+                "Informazioni punto di interr.",
+                (
+                    "Nel testo sorgente il punto di interruzione si trova alla riga 36 "
+                    'dell\'include "ZCL_X=========CM00C".'
+                ),
+                "Chiamate/eventi attivi",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("IT"))
+
+        assert (detail.include, detail.line) == ("ZCL_X=========CM00C", 36)
+
+    def test_italian_pack_names_the_termination_heading(self) -> None:
+        assert "Informazioni punto di interr." in lang.pack_for("IT").st22.termination_heading
+
+    def test_a_line_of_another_section_is_not_the_line(self) -> None:
+        """Without the termination point text, neither line 7 (error analysis) nor line 40 (source extract) counts."""
+        dropped = {
+            "Im Quelltext befindet sich die Abbruchstelle in Zeile 36",
+            'des Includes "ZCL_DEMO======================CM00C".',
+            'beginnt in Zeile 1 des Includes "ZCL_DEMO======================CM00C".',
+        }
+        snapshot = _snapshot([line for line in _DETAIL_DE_LINES if line not in dropped])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert (detail.include, detail.line) == (None, None)
+
+    def test_a_labelled_line_inside_the_termination_section(self) -> None:
+        snapshot = _snapshot(
+            ["Information on Where Terminated", "Source Code Line: 100", "Source Code Extract", "Line 5 of the extract"]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.line == 100
+        assert detail.include is None
+
+    def test_the_fallback_inside_the_section_takes_only_the_labelled_line(self) -> None:
+        snapshot = _snapshot(["Informationen zur Abbruchstelle", "Der Abbruch trat in Zeile 5 auf", "Quelltextauszug"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.line is None
+        assert detail.include is None
+
+    def test_termination_point_beyond_the_raw_text_limit(self) -> None:
+        position = _DETAIL_DE_LINES.index("Fehleranalyse") + 1
+        notes = [f"Hinweis Nummer {number} mit etwas Text" for number in range(500)]
+        snapshot = _snapshot([*_DETAIL_DE_LINES[:position], *notes, *_DETAIL_DE_LINES[position:]])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert (detail.include, detail.line) == (_INCLUDE_CM00C, 36)
+        assert "[truncated]" in detail.raw_text
+
+
+class TestShortText:
+    """The short text of the detail comes from the dump's own short text section."""
+
+    def test_short_text_comes_from_its_section(self) -> None:
+        detail = parse_st22_dump_detail(_DETAIL_DE, T)
+
+        assert detail.short_text == "Zugriff über 'NULL' Objektreferenz nicht möglich."
+
+    def test_short_text_over_two_lines_is_joined_by_a_space(self) -> None:
+        snapshot = _snapshot(["Short Text", "first part", "second part", "What happened?", "Something went wrong."])
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.short_text == "first part second part"
+
+    def test_a_short_text_repeated_on_an_overlapping_page_is_read_once(self) -> None:
+        position = _DETAIL_DE_LINES.index("Was ist passiert?")
+        snapshot = _snapshot([*_DETAIL_DE_LINES, *_DETAIL_DE_LINES[:position]])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "Zugriff über 'NULL' Objektreferenz nicht möglich."
+
+    def test_without_a_short_text_section_the_short_text_is_empty(self) -> None:
+        snapshot = _snapshot(_DETAIL_DE_LINES[2:])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == ""
+
+    def test_the_short_text_ends_at_the_source_code_heading(self) -> None:
+        snapshot = _snapshot(["Kurztext", "Ein Fehler.", "Quelltext des Programms ZDEMO", "Zeile 1"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "Ein Fehler."
+
+    def test_a_repeated_short_text_heading_ends_the_first_section(self) -> None:
+        snapshot = _snapshot(["Kurztext", "erster Teil", "Kurztext", "zweiter Teil", "Was ist passiert?", "etwas"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "erster Teil"
