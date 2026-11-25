@@ -1,0 +1,310 @@
+- 'main "Class Builder: Klasse CX_ROOT anzeigen"':
+  - banner:
+    - button "Zurück (F3)"
+    - button "Seite und Transaktion neu laden"
+    - 'heading "Class Builder: Klasse CX_ROOT anzeigen" [level=1]'
+    - button "Systeminformationen schließen"
+    - toolbar:
+      - button "ABC (100)"
+      - separator
+    - toolbar:
+      - button "Menü"
+      - combobox "Bitte Transaktionscode eingeben"
+      - button "Anzeigen <-> Ändern"
+      - button "Aktiv <-> Inaktiv"
+      - button "Anderes Objekt..."
+      - button "Erweitern"
+      - button "Prüfen"
+      - button "Aktivieren"
+      - button "In der Testumgebung"
+      - button "Verwendung Klasse / Interface"
+      - button "Mehr"
+      - button "Suchen (Strg+F)"
+      - button "Drucken (Strg+P)"
+      - button "Beenden"
+  - text: Klasse/Interface
+  - textbox "Klasse/Interface": CX_ROOT
+  - text: realisiert / Aktiv
+  - tablist:
+    - tab "Eigenschaften"
+    - tab "Interfaces" [selected]
+    - tab "Friends"
+    - tab "Attribute"
+    - tab "Texte"
+    - tab "Methoden"
+    - tab "Ereignisse"
+    - tab "Typen"
+    - tab "Aliasse"
+  - tabpanel "Interfaces":
+    - heading "Interfaces" [level=2]
+    - button "Eigenschaften"
+    - button "Beziehung einfügen" [disabled]
+    - button "Beziehung löschen" [disabled]
+    - checkbox "Filter":  Filter
+    - table:
+      - rowgroup
+      - rowgroup
+      - grid:
+        - row "Interface Um die Spalte auszuwählen, drücken Sie die Leertaste. Abstrakt Um die Spalte auszuwählen, drücken Sie die Leertaste. Final Um die Spalte auszuwählen, drücken Sie die Leertaste. Nur modelliert Um die Spalte auszuwählen, drücken Sie die Leertaste. Beschreibung Um die Spalte auszuwählen, drücken Sie die Leertaste.":
+          - columnheader "Interface Um die Spalte auszuwählen, drücken Sie die Leertaste.": Interface
+          - columnheader "Abstrakt Um die Spalte auszuwählen, drücken Sie die Leertaste.": Abstrakt
+          - columnheader "Final Um die Spalte auszuwählen, drücken Sie die Leertaste.": Final
+          - columnheader "Nur modelliert Um die Spalte auszuwählen, drücken Sie die Leertaste.": Nur modelliert
+          - columnheader "Beschreibung Um die Spalte auszuwählen, drücken Sie die Leertaste.": Beschreibung
+        - button "Konfiguration": 
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+        - row "Interface Beschreibung":
+          - gridcell "Interface":
+            - textbox "Interface"
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell:
+            - checkbox [disabled]
+          - gridcell "Beschreibung":
+            - textbox "Beschreibung"
+      - rowgroup
+      - rowgroup
+    - text: 
+  - menu:
+    - rowgroup:
+      - menuitemradio "ABC (100)" [checked]:
+        - cell ""
+        - cell
+        - cell "System"
+        - cell "ABC (100)"
+        - cell
+      - menuitemradio "100":
+        - cell
+        - cell
+        - cell "Mandant"
+        - cell "100"
+        - cell
+      - menuitemradio "TESTUSER":
+        - cell
+        - cell
+        - cell "Benutzer"
+        - cell "TESTUSER"
+        - cell
+      - menuitemradio "SAPLSEOD/2000":
+        - cell
+        - cell
+        - cell "Dynpro"
+        - cell "SAPLSEOD/2000"
+        - cell
+      - menuitemradio "SE24":
+        - cell
+        - cell
+        - cell "Transaktion"
+        - cell "SE24"
+        - cell
+      - row "E2E-Zeit 233 ms":
+        - cell
+        - cell
+        - cell "E2E-Zeit"
+        - cell "233 ms"
+        - cell
+      - row "WebGUI-Zeit 161 ms":
+        - cell
+        - cell
+        - cell "WebGUI-Zeit"
+        - cell "161 ms"
+        - cell

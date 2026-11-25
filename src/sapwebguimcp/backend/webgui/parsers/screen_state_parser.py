@@ -37,8 +37,13 @@ _RADIO_RE = re.compile(
     r"((?:\s+\[[^\]]+\])*)"  # optional [checked] etc.
 )
 
-# Matches: textbox "LABEL": VALUE
-_TEXTBOX_RE = re.compile(r'-\s+textbox\s+"([^"]+)":\s*(.*)')  # - textbox "LABEL": VALUE
+# Matches: textbox "LABEL" optionally [flags], optionally followed by ": VALUE".
+# Playwright writes an empty textbox without colon and value (``- textbox "LABEL"``).
+_TEXTBOX_RE = re.compile(
+    r'-\s+textbox\s+"([^"]+)"'  # - textbox "LABEL"
+    r"((?:\s+\[[^\]]+\])*)"  # optional [disabled] [readonly] etc.
+    r"(?::\s*(.*))?"  # optional ": VALUE"; absent or empty means an empty field
+)
 
 
 @dataclass
@@ -75,12 +80,12 @@ def _parse_line(line: str, acc: _ParseAccumulator) -> None:
 
     tb_match = _TEXTBOX_RE.search(line)
     if tb_match:
-        label, value = tb_match.group(1), tb_match.group(2).strip()
+        label, flags, value = tb_match.group(1), tb_match.group(2), (tb_match.group(3) or "").strip()
         # Strip YAML-artifact quotes: Playwright's ARIA snapshot serializer
         # quotes values containing YAML special characters (e.g. * → "*").
         if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
             value = value[1:-1]
-        if "[disabled]" not in line and "[readonly]" not in line:
+        if "[disabled]" not in flags and "[readonly]" not in flags:
             acc.fields[label] = value
             acc.field_labels.append(label)
 

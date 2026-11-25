@@ -766,7 +766,11 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
     @mcp.tool(
         description=(
-            "Read data from an ALV grid or table on the current screen\n\n"
+            "Read data from an ALV grid or table on the current screen. "
+            "total_rows is the grid's row count as the Web GUI reports it; truncated is true when rows of the "
+            "requested range were not read (the Web GUI renders only part of a long grid, or max_rows was reached). "
+            "For an ALV grid, focus it and page down (sap_press_key PageDown) to load more rows, then call "
+            "sap_read_table again with start_row = the previous end_row + 1.\n\n"
             "**Session parameter:**\n"
             '- session=None (default): Uses primary session ("s1")\n'
             '- session="s2": Targets specific session (for parallel agents)'
@@ -786,7 +790,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
 
         Args:
             start_row: First row to read (1-indexed, default: 1)
-            end_row: Last row to read (None = up to max_rows visible rows)
+            end_row: Last row to read (None = up to max_rows rows)
             max_rows: Maximum rows to return (default: 100, prevents huge responses)
             session: Session ID (e.g., "s1", "s2"). None uses primary session.
             agent_id: Agent identifier for binding check. Optional.
@@ -794,6 +798,11 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
         Returns:
             TableData with column headers and row values.
             Empty columns are excluded to reduce response size.
+            total_rows is the row count of the grid as the Web GUI reports it and may exceed the rows returned.
+            truncated is True when rows of the requested range exist but were not read: the Web GUI renders only
+            part of a long ALV grid or table control, or the read stopped at max_rows. For an ALV grid, focus it
+            and page down (sap_press_key PageDown) to load more rows, then call sap_read_table again with
+            start_row = the previous end_row + 1; a table control only holds the rows of its window.
         """
         try:
             backend = await get_backend(session=session, agent_id=agent_id, tool_name="sap_read_table")

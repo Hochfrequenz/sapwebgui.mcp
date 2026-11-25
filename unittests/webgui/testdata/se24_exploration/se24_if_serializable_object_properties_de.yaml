@@ -1,0 +1,144 @@
+- 'main "Class Builder: Interface IF_SERIALIZABLE_OBJECT anzeigen"':
+  - banner:
+    - button "Zurück (F3)"
+    - button "Seite und Transaktion neu laden"
+    - 'heading "Class Builder: Interface IF_SERIALIZABLE_OBJECT anzeigen" [level=1]'
+    - button "Systeminformationen schließen"
+    - toolbar:
+      - button "ABC (100)"
+      - separator
+    - toolbar:
+      - button "Menü"
+      - combobox "Bitte Transaktionscode eingeben"
+      - button "Anzeigen <-> Ändern"
+      - button "Aktiv <-> Inaktiv"
+      - button "Anderes Objekt"
+      - button "Erweitern"
+      - button "Prüfen"
+      - button "Aktivieren"
+      - button "Verwendung Klasse / Interface"
+      - button "Objektliste anzeigen"
+      - button "Mehr"
+      - button "Drucken (Strg+P)"
+      - button "Beenden"
+  - text: Interface
+  - textbox "Interface": IF_SERIALIZABLE_OBJECT
+  - text: realisiert / Aktiv
+  - tablist:
+    - tab "Eigenschaften" [selected]
+    - tab "Interfaces"
+    - tab "Attribute"
+    - tab "Methoden"
+    - tab "Ereignisse"
+    - tab "Typen"
+    - tab "Aliasse"
+  - tabpanel "Eigenschaften":
+    - heading "Eigenschaften" [level=2]
+    - text: Beschreibung
+    - textbox "Beschreibung": Serialisierbares Objekt
+    - group "Allgemeine Daten":
+      - heading "Allgemeine Daten" [level=3]
+      - text: Paket
+      - textbox "Paket": SABP_CORE
+      - text: Originalsprache
+      - textbox "Originalsprache": DE
+      - text: Angelegt von
+      - textbox "Angelegt von": SAP
+      - textbox "Erstellungsdatum": 2001/09/21
+      - text: Letzte Änderung
+      - textbox "Letzte Änderung": SAP
+      - textbox "Änderungsdatum": 2013/05/31
+      - text: ABAP-Sprachversion
+      - textbox "ABAP-Sprachversion" [disabled]: Standard-ABAP
+    - group "Vorwärtsdeklarationen":
+      - heading "Vorwärtsdeklarationen" [level=3]
+      - button "Vorwärtsdeklar. löschen" [disabled]
+      - table:
+        - rowgroup
+        - rowgroup
+        - grid:
+          - row "Typgruppe/Objekttyp":
+            - columnheader "Typgruppe/Objekttyp"
+            - columnheader
+            - columnheader
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+          - row "Typgruppe/Objekttyp Leer Leer":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+            - gridcell "Leer"
+            - gridcell "Leer"
+        - rowgroup
+        - rowgroup
+  - menu:
+    - rowgroup:
+      - menuitemradio "ABC (100)" [checked]:
+        - cell ""
+        - cell
+        - cell "System"
+        - cell "ABC (100)"
+        - cell
+      - menuitemradio "100":
+        - cell
+        - cell
+        - cell "Mandant"
+        - cell "100"
+        - cell
+      - menuitemradio "TESTUSER":
+        - cell
+        - cell
+        - cell "Benutzer"
+        - cell "TESTUSER"
+        - cell
+      - menuitemradio "SAPLSEOD/2001":
+        - cell
+        - cell
+        - cell "Dynpro"
+        - cell "SAPLSEOD/2001"
+        - cell
+      - menuitemradio "SE24":
+        - cell
+        - cell
+        - cell "Transaktion"
+        - cell "SE24"
+        - cell
+      - row "E2E-Zeit 369 ms":
+        - cell
+        - cell
+        - cell "E2E-Zeit"
+        - cell "369 ms"
+        - cell
+      - row "WebGUI-Zeit 150 ms":
+        - cell
+        - cell
+        - cell "WebGUI-Zeit"
+        - cell "150 ms"
+        - cell

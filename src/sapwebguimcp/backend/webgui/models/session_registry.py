@@ -30,6 +30,7 @@ class SessionRegistry:
         self._pages_with_listeners: set["Page"] = set()  # Track pages with close listeners
         self._bindings: dict[str, str] = {}  # session_id -> agent_id
         self._languages: dict[str, str] = {}  # session_id -> SAP logon language key (#1044)
+        self._date_formats: dict[str, str] = {}  # session_id -> the user's date format as a strptime pattern (#42)
 
     @property
     def primary_session(self) -> str:
@@ -86,6 +87,18 @@ class SessionRegistry:
         """Logon language of *session_id*, or ``None`` when unknown."""
         return self._languages.get(session_id)
 
+    def set_date_format(self, session_id: str, date_format: str) -> None:
+        """Record *session_id*'s user date format (a ``strptime`` pattern)."""
+        self._date_formats[session_id] = date_format
+
+    def date_format_of(self, session_id: str) -> str | None:
+        """User date format of *session_id*, or ``None`` when not derived yet."""
+        return self._date_formats.get(session_id)
+
+    def clear_date_format(self, session_id: str) -> None:
+        """Forget *session_id*'s user date format (a re-login may be another user)."""
+        self._date_formats.pop(session_id, None)
+
     def session_id_of(self, page: "Page") -> str | None:
         """Session id of a registered page, or ``None``."""
         return self._page_to_session.get(page)
@@ -101,6 +114,7 @@ class SessionRegistry:
             self._page_to_session.pop(page, None)
             self._bindings.pop(session_id, None)  # Clear binding
             self._languages.pop(session_id, None)
+            self._date_formats.pop(session_id, None)
             logger.info("Unregistered session", extra={"session": session_id})
 
     def get_page(self, session_id: str | None) -> "Page":
@@ -128,6 +142,7 @@ class SessionRegistry:
             self._page_to_session.pop(page, None)
             self._bindings.pop(sid, None)  # Clear binding
             self._languages.pop(sid, None)
+            self._date_formats.pop(sid, None)
             raise ValueError(
                 f"Session '{sid}' expired (tab closed). "
                 "Use sap_transaction(tcode, new_window=True) to create a new session."
@@ -262,6 +277,7 @@ class SessionRegistry:
             self._sessions.pop(session_id, None)
             self._bindings.pop(session_id, None)  # Clear binding
             self._languages.pop(session_id, None)
+            self._date_formats.pop(session_id, None)
             logger.info("Session auto-unregistered (page closed)", extra={"session": session_id})
 
     async def setup_context_listeners(self, context: "BrowserContext") -> None:

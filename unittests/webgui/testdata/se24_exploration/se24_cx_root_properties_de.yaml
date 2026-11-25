@@ -1,0 +1,155 @@
+- 'main "Class Builder: Klasse CX_ROOT anzeigen"':
+  - banner:
+    - button "Zurück (F3)"
+    - button "Seite und Transaktion neu laden"
+    - 'heading "Class Builder: Klasse CX_ROOT anzeigen" [level=1]'
+    - button "Systeminformationen schließen"
+    - toolbar:
+      - button "ABC (100)"
+      - separator
+    - toolbar:
+      - button "Menü"
+      - combobox "Bitte Transaktionscode eingeben"
+      - button "Anzeigen <-> Ändern"
+      - button "Aktiv <-> Inaktiv"
+      - button "Anderes Objekt..."
+      - button "Erweitern"
+      - button "Prüfen"
+      - button "Aktivieren"
+      - button "In der Testumgebung"
+      - button "Verwendung Klasse / Interface"
+      - button "Mehr"
+      - button "Suchen (Strg+F)"
+      - button "Drucken (Strg+P)"
+      - button "Beenden"
+  - text: Klasse/Interface
+  - textbox "Klasse/Interface": CX_ROOT
+  - text: realisiert / Aktiv
+  - tablist:
+    - tab "Eigenschaften" [selected]
+    - tab "Interfaces"
+    - tab "Friends"
+    - tab "Attribute"
+    - tab "Texte"
+    - tab "Methoden"
+    - tab "Ereignisse"
+    - tab "Typen"
+    - tab "Aliasse"
+  - tabpanel "Eigenschaften":
+    - heading "Eigenschaften" [level=2]
+    - button "Oberklasse" [disabled]
+    - button "Vererb. aufheben" [disabled]
+    - button "Vererbung ändern" [disabled]
+    - text: Beschreibung
+    - textbox "Beschreibung": Abstrakte Oberklasse aller globalen Exceptions
+    - text: Instanzgenerierung
+    - textbox "Instanzgenerierung" [disabled]: Abstrakt
+    - checkbox "Final" [disabled]
+    - group "Allgemeine Daten":
+      - heading "Allgemeine Daten" [level=3]
+      - text: Nachrichtenklasse
+      - textbox "Nachrichtenklasse"
+      - text: Programmstatus
+      - textbox "Programmstatus" [disabled]: Unklassifiziert
+      - text: Kategorie
+      - textbox "Kategorie" [disabled]: Ausnahmeklasse
+      - text: Paket
+      - textbox "Paket": S_ABAP_EXCEPTIONS
+      - text: Originalsprache
+      - textbox "Originalsprache": DE
+      - text: Angelegt
+      - textbox "Angelegt": SAP
+      - textbox "Erstellungsdatum": 1999/12/02
+      - text: Letzte Änderung
+      - textbox "Letzte Änderung": SAP
+      - textbox "Änderungsdatum": 2024/01/05
+      - text: ABAP-Sprachversion
+      - textbox "ABAP-Sprachversion" [disabled]: Standard-ABAP
+      - checkbox "Festpunktarithmetik" [checked] [disabled]:  Festpunktarithmetik
+      - checkbox "Shared-Memory-fähig" [disabled]
+      - checkbox "Konstruktor generiert" [checked] [disabled]:  Konstruktor generiert
+    - group "Vorwärtsdeklarationen":
+      - heading "Vorwärtsdeklarationen" [level=3]
+      - button "Vorwärtsdeklar. löschen" [disabled]
+      - table:
+        - rowgroup
+        - rowgroup
+        - grid:
+          - row "Typgruppe/Objekttyp":
+            - columnheader "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+          - row "Typgruppe/Objekttyp":
+            - gridcell "Typgruppe/Objekttyp":
+              - textbox "Typgruppe/Objekttyp"
+        - rowgroup
+        - rowgroup
+  - menu:
+    - rowgroup:
+      - menuitemradio "ABC (100)" [checked]:
+        - cell ""
+        - cell
+        - cell "System"
+        - cell "ABC (100)"
+        - cell
+      - menuitemradio "100":
+        - cell
+        - cell
+        - cell "Mandant"
+        - cell "100"
+        - cell
+      - menuitemradio "TESTUSER":
+        - cell
+        - cell
+        - cell "Benutzer"
+        - cell "TESTUSER"
+        - cell
+      - menuitemradio "SAPLSEOD/2000":
+        - cell
+        - cell
+        - cell "Dynpro"
+        - cell "SAPLSEOD/2000"
+        - cell
+      - menuitemradio "SE24":
+        - cell
+        - cell
+        - cell "Transaktion"
+        - cell "SE24"
+        - cell
+      - row "E2E-Zeit 220 ms":
+        - cell
+        - cell
+        - cell "E2E-Zeit"
+        - cell "220 ms"
+        - cell
+      - row "WebGUI-Zeit 146 ms":
+        - cell
+        - cell
+        - cell "WebGUI-Zeit"
+        - cell "146 ms"
+        - cell

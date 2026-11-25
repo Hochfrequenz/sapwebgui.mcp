@@ -1,0 +1,71 @@
+{
+  "success": true,
+  "error": null,
+  "popup": null,
+  "active_window": null,
+  "headers": [
+    "",
+    "Interface Um die Spalte auszuwählen, drücken Sie d",
+    "Abstrakt Um die Spalte auszuwählen, drücken Sie di",
+    "Final Um die Spalte auszuwählen, drücken Sie die L",
+    "Nur modelliert Um die Spalte auszuwählen, drücken ",
+    "Beschreibung Um die Spalte auszuwählen, drücken Si"
+  ],
+  "rows": [
+    {
+      "row": 1,
+      "data": {
+        "Interface Um die Spalte auszuwählen, drücken Sie d": "IF_MESSAGE",
+        "Beschreibung Um die Spalte auszuwählen, drücken Si": "Teil der Schnittstelle zum Zugriff auf Nachrichtentexte"
+      },
+      "cells": {
+        "Interface Um die Spalte auszuwählen, drücken Sie d": {
+          "selector": "#M0\\:46\\:1\\:2B260\\:1\\[1\\,1\\]",
+          "clickable": true,
+          "hotspot": false
+        },
+        "Beschreibung Um die Spalte auszuwählen, drücken Si": {
+          "selector": "#M0\\:46\\:1\\:2B260\\:1\\[1\\,5\\]",
+          "clickable": true,
+          "hotspot": false
+        }
+      }
+    },
+    {
+      "row": 2,
+      "data": {
+        "Interface Um die Spalte auszuwählen, drücken Sie d": "IF_SERIALIZABLE_OBJECT",
+        "Beschreibung Um die Spalte auszuwählen, drücken Si": "Serialisierbares Objekt"
+      },
+      "cells": {
+        "Interface Um die Spalte auszuwählen, drücken Sie d": {
+          "selector": "#M0\\:46\\:1\\:2B260\\:1\\[2\\,1\\]",
+          "clickable": true,
+          "hotspot": false
+        },
+        "Beschreibung Um die Spalte auszuwählen, drücken Si": {
+          "selector": "#M0\\:46\\:1\\:2B260\\:1\\[2\\,5\\]",
+          "clickable": true,
+          "hotspot": false
+        }
+      }
+    }
+  ],
+  "total_rows": 2,
+  "start_row": 1,
+  "end_row": 2,
+  "truncated": false,
+  "alv": {
+    "table_id": "M0:46:1:2B260:1",
+    "selection_mode": "SINGLE",
+    "hotspot_columns": [],
+    "column_map": {
+      "": 0,
+      "Interface Um die Spalte auszuwählen, drücken Sie d": 1,
+      "Abstrakt Um die Spalte auszuwählen, drücken Sie di": 2,
+      "Final Um die Spalte auszuwählen, drücken Sie die L": 3,
+      "Nur modelliert Um die Spalte auszuwählen, drücken ": 4,
+      "Beschreibung Um die Spalte auszuwählen, drücken Si": 5
+    }
+  }
+}

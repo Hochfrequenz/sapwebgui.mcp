@@ -5,6 +5,8 @@ Extracts class/interface metadata from SE24 display screens, handling:
 - Class/interface name and type from heading
 - Methods with parameters
 - Attributes (constants, instance/static variables)
+- Header data of the properties tab (description, package, superclass, abstract, final)
+- Implemented interfaces from the interfaces grid
 - German and English label support
 """
 
@@ -13,10 +15,12 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sapwebguimcp.backend.webgui.parsers.aria_fields import checkbox_checked, textbox_value
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
 from sapwebguimcp.lang import alt_of
 from sapwebguimcp.lang.schema import LanguagePack, Visibility
 from sapwebguimcp.lang.text import compiled
+from sapwebguimcp.models import TableData
 from sapwebguimcp.models.se24_models import (
     SE24Attribute,
     SE24Entry,
@@ -33,6 +37,10 @@ __all__ = [
     "parse_se24_snapshot",
     "parse_se24_methods_snapshot",
     "parse_se24_attributes_snapshot",
+    "parse_se24_properties_snapshot",
+    "parse_se24_interfaces_table",
+    "count_se24_grid_rows",
+    "SE24Properties",
     "SE24TabSnapshots",
 ]
 
@@ -268,12 +276,93 @@ def parse_se24_attributes_snapshot(snapshot: AriaSnapshot, t: LanguagePack) -> l
 
 
 @dataclass
+class SE24Properties:
+    """Header data of the properties tab: what the methods and attributes tabs do not carry."""
+
+    description: str = ""
+    package: str = ""
+    superclass: str | None = None
+    is_abstract: bool = False
+    is_final: bool = False
+
+
+def parse_se24_properties_snapshot(snapshot: AriaSnapshot, t: LanguagePack) -> SE24Properties:
+    """
+    Parse the properties tab: description, package, superclass, instantiation (abstract) and the final flag.
+
+    An interface has no superclass, instantiation or final field; a root class has no superclass text box.
+    """
+    text = str(snapshot)
+    instantiation = textbox_value(text, t.se24.instantiation_field) or ""
+    return SE24Properties(
+        description=textbox_value(text, t.se24.description_field) or "",
+        package=textbox_value(text, t.se24.package_field) or "",
+        superclass=textbox_value(text, t.se24.superclass_field) or None,
+        is_abstract=t.se24.abstract.equals(instantiation),
+        is_final=checkbox_checked(text, t.se24.final_checkbox),
+    )
+
+
+_INTERFACE_NAME = re.compile(r"^(?:/[A-Z0-9_]+/)?[A-Z][A-Z0-9_]*$")
+"""An interface name; a placeholder cell of an empty grid row (``-``, blanks) is not one."""
+
+
+def parse_se24_interfaces_table(table: TableData, t: LanguagePack) -> list[str]:
+    """
+    Parse the implemented interfaces from a table read of the interfaces grid.
+
+    The interface column is the first column with a title; a grid whose first column is not titled like the
+    interface column (the methods grid after a tab that did not switch) yields nothing.
+    """
+    if table.success is False:
+        return []
+    column = next((header for header in table.headers if header.strip()), None)
+    if column is None or not t.se24.interface_column.contains(column):
+        return []
+    interfaces: list[str] = []
+    for row in table.rows:
+        value = row.data.get(column, "").strip()
+        if _INTERFACE_NAME.match(value) and value not in interfaces:
+            interfaces.append(value)
+    return interfaces
+
+
+_GRID_ROW_LINE = re.compile(r"^(?P<indent>\s*)- '?row\b")
+
+
+def count_se24_grid_rows(snapshot: AriaSnapshot) -> int:
+    """Number of data rows of the grid in a tab snapshot: rows with a grid cell, header rows not counted."""
+    count = 0
+    row_indent = -1
+    has_cell = False
+    is_header = False
+
+    def close_row() -> int:
+        return 1 if row_indent >= 0 and has_cell and not is_header else 0
+
+    for line in str(snapshot).splitlines():
+        match = _GRID_ROW_LINE.match(line)
+        indent = len(line) - len(line.lstrip())
+        if match or (line.strip() and indent <= row_indent):
+            count += close_row()
+            row_indent, has_cell, is_header = (indent, False, False) if match else (-1, False, False)
+            continue
+        if row_indent >= 0:
+            stripped = line.lstrip()
+            has_cell = has_cell or stripped.startswith(("- gridcell", "- 'gridcell"))
+            is_header = is_header or stripped.startswith(("- columnheader", "- 'columnheader"))
+    return count + close_row()
+
+
+@dataclass
 class SE24TabSnapshots:
-    """Container for SE24 tab snapshots."""
+    """Container for SE24 tab snapshots and table reads."""
 
     methods_tab: AriaSnapshot | None = None
     attributes_tab: AriaSnapshot | None = None
     interfaces_tab: AriaSnapshot | None = None
+    properties_tab: AriaSnapshot | None = None
+    interfaces_table: TableData | None = None
 
 
 def parse_se24_snapshot(
@@ -325,10 +414,18 @@ def parse_se24_snapshot(
     tabs = tab_snapshots or SE24TabSnapshots()
     methods = parse_se24_methods_snapshot(tabs.methods_tab, t) if tabs.methods_tab else []
     attributes = parse_se24_attributes_snapshot(tabs.attributes_tab, t) if tabs.attributes_tab else []
+    properties = parse_se24_properties_snapshot(tabs.properties_tab, t) if tabs.properties_tab else SE24Properties()
+    interfaces = parse_se24_interfaces_table(tabs.interfaces_table, t) if tabs.interfaces_table else []
 
     return SE24Entry(
         class_name=found_name,
         object_type=object_type,
+        description=properties.description,
+        package=properties.package,
+        superclass=properties.superclass,
+        is_abstract=properties.is_abstract,
+        is_final=properties.is_final,
+        interfaces=interfaces,
         methods=methods,
         attributes=attributes,
         retrieved_at=now,
