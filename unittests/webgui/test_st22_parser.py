@@ -484,3 +484,37 @@ class TestTerminationPoint:
 
         assert (detail.include, detail.line) == (_INCLUDE_CM00C, 36)
         assert "[truncated]" in detail.raw_text
+
+
+class TestShortText:
+    """The short text of the detail comes from the dump's own short text section."""
+
+    def test_short_text_comes_from_its_section(self) -> None:
+        detail = parse_st22_dump_detail(_DETAIL_DE, T)
+
+        assert detail.short_text == "Zugriff über 'NULL' Objektreferenz nicht möglich."
+
+    def test_short_text_over_two_lines_is_joined_by_a_space(self) -> None:
+        snapshot = _snapshot(["Short Text", "first part", "second part", "What happened?", "Something went wrong."])
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.short_text == "first part second part"
+
+    def test_a_short_text_repeated_on_an_overlapping_page_is_read_once(self) -> None:
+        position = _DETAIL_DE_LINES.index("Was ist passiert?")
+        snapshot = _snapshot([*_DETAIL_DE_LINES, *_DETAIL_DE_LINES[:position]])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "Zugriff über 'NULL' Objektreferenz nicht möglich."
+
+    def test_without_a_short_text_section_the_short_text_is_empty(self) -> None:
+        snapshot = _snapshot(_DETAIL_DE_LINES[2:])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == ""
+
+    def test_the_short_text_ends_at_the_source_code_heading(self) -> None:
+        snapshot = _snapshot(["Kurztext", "Ein Fehler.", "Quelltext des Programms ZDEMO", "Zeile 1"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "Ein Fehler."

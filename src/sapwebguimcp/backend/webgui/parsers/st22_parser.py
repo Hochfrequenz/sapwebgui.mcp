@@ -419,11 +419,13 @@ def _extract_section(
     start_markers: Iterable[str],
     end_markers: Iterable[str],
     end_pattern: re.Pattern[str] | None = None,
+    first_only: bool = False,
 ) -> str:
     """Extract the sections under every heading in ``start_markers`` (screen order), best-effort.
 
     A heading is a whole line. A section ends at the next heading in ``start_markers`` or ``end_markers`` or at a
-    line that starts like ``end_pattern`` (the source code headings).
+    line that starts like ``end_pattern`` (the source code headings). With ``first_only`` only the first section is
+    read (the pages of a concatenated snapshot can overlap, so a heading can come twice).
     """
     starts = list(start_markers)
     boundaries = [*starts, *end_markers]
@@ -431,8 +433,12 @@ def _extract_section(
     collecting = False
     for line in text.split("\n"):
         if _is_heading(line, starts):
+            if first_only and collecting:
+                break
             collecting = True
         elif _is_heading(line, boundaries) or (end_pattern is not None and end_pattern.match(line.strip())):
+            if first_only and collecting:
+                break
             collecting = False
         elif collecting and line.strip():
             body.append(line.strip())
@@ -609,9 +615,18 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     point = _termination_point(text, t)
     include, line = point if point is not None else (None, _extract_line_number(text, t))
 
+    # The pages of the concatenated snapshot can overlap, so only the first short text section counts
+    short_text = _extract_section(
+        text,
+        t.st22.col_short_text,
+        _detail_headings(t),
+        end_pattern=t.st22.source_code_start.pattern,
+        first_only=True,
+    ).replace("\n", " ")
+
     return ST22DumpDetail(
         error_type=_extract_error_type(text, t),
-        short_text="",  # Populated from list data by caller
+        short_text=short_text,  # empty if the text has no such section; the caller falls back on the list
         what_happened=what_happened,
         how_to_correct=how_to_correct,
         program=_extract_program(text, t),

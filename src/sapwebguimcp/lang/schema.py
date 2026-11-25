@@ -420,6 +420,7 @@ class St22Section:
     col_program: Text
     col_error_type: Text
     col_short_text: Text
+    """Column header of the short text in the dump list; also the heading of the short text in the dump detail."""
     call_stack_heading: Text
     termination_heading: Text
     """Heading of the text on where the program terminated, which names the include and line in full (#96)."""
