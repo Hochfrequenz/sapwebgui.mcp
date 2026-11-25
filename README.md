@@ -1,4 +1,4 @@
-Looking for a maintainer. This project may not receive updates. For SAP GUI for Windows, use [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp).
+For SAP GUI for Windows, use [sapgui.mcp](https://github.com/Hochfrequenz/sapgui.mcp).
 
 # SAP Web GUI MCP Server
 
