@@ -32,16 +32,20 @@ November 2026 and are kept in sync by hand. The procedure is in Hochfrequenz/sap
 same text is in Hochfrequenz/sapgui.mcp#1178). Read it before:
 
 - **opening a pull request.** Every pull request body needs a `## Counterpart in sapgui.mcp`
-  section with a `Counterpart:` line. Decide by the classes in that issue whether the change has a
-  counterpart in sapgui.mcp, and create the issue that issue calls for (search for an existing one
-  first) and link it. Only changes to this repository's own CI, release or tooling get
-  `Counterpart: none: <reason>`. Inside a bugspecht sprint, or wherever no issue can be created,
-  write `Counterpart: pending: ...` instead; the next sync run creates it.
+  section with a `Counterpart:` line. Unless the change is only this repository's own CI, release
+  or tooling (`Counterpart: none: <reason>`), create a sync issue in sapgui.mcp and link it. Do not
+  check whether sapgui.mcp has the change, can have it, or has the problem: its maintainer triages
+  the issue. Inside a bugspecht sprint, or wherever no issue can be created, write
+  `Counterpart: pending: ...` instead; the next sync run creates it.
+- **triaging a `cross-repo-sync` issue in this repository.** Decide it as that issue's "Triage"
+  section says: it applies, or close it as not planned with `not-reproducible`,
+  `not-on-this-backend` or `removed-on-purpose` and a comment saying how it was checked.
 - **a request to sync the two repositories**, for example "sync sapgui.mcp and sapwebgui.mcp",
-  possibly with "and start working on the issues". That is the sync run of that issue.
+  possibly with "and start working on the issues". That is the sync run of that issue. It decides
+  only for this repository; in sapgui.mcp it only creates issues.
 
-An item already decided in a closed `not-on-this-backend` or `removed-on-purpose` issue is not
-decided again.
+An item already decided in a closed `not-reproducible`, `not-on-this-backend` or
+`removed-on-purpose` issue is not decided again.
 
 ## Public Repository — No Internal Data
 
