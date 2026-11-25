@@ -287,7 +287,7 @@ async def test_sm37_prefilled_date_gives_the_user_date_format(sap_mcp_client: Cl
     value, and the lookup with explicit dates must then succeed. The assertions do not depend
     on labels, so the test works in every logon language.
     """
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, datetime
 
     login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
     assert login.success, f"Login failed: {login.error}"
@@ -308,16 +308,13 @@ async def test_sm37_prefilled_date_gives_the_user_date_format(sap_mcp_client: Cl
     assert derived, f"No SM37 field holds a date derive_date_format can read; fields with a value: {seen}"
     assert len(set(derived.values())) == 1, f"Pre-filled dates disagree on the user's date format: {derived}"
 
-    now = datetime.now(UTC)
+    # Today only: a wider range for all users can make the job list too slow to load. On most days the
+    # day is above 12, so typing it with day and month swapped would give an invalid date.
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     result = await call_tool_typed(
         sap_mcp_client,
         "sap_sm37_lookup",
-        {
-            "job_name": "*",
-            "username": "*",
-            "from_date": (now - timedelta(days=7)).strftime("%Y-%m-%d"),
-            "to_date": now.strftime("%Y-%m-%d"),
-        },
+        {"job_name": "*", "username": "*", "from_date": today, "to_date": today},
         SM37JobListResult,
     )
-    assert result.success, f"sap_sm37_lookup with the last 7 days failed: {result.error}"
+    assert result.success, f"sap_sm37_lookup with today's date failed: {result.error}"
