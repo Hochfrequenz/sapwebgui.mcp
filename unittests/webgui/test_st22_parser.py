@@ -414,6 +414,20 @@ class TestParseDumpDetail:
         detail = parse_st22_dump_detail(snapshot, T)
         assert len(detail.call_stack) >= 2
 
+    def test_a_number_cell_does_not_end_the_call_stack(self) -> None:
+        """A call stack rendered as one text per cell: a cell that is only a number is neither an entry nor the end."""
+        snapshot = """- document:
+  - text: Active Calls
+  - text: ZPROG_MAIN line 1
+  - text: "2"
+  - text: SAPMSYST line 100
+  - text: "15"
+  - text: SAPLZMOD line 200
+"""
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.call_stack == ["ZPROG_MAIN line 1", "SAPMSYST line 100", "SAPLZMOD line 200"]
+
 
 def _snapshot(lines: list[str]) -> str:
     """A Playwright ARIA snapshot of one text node per line (a value that starts with a quote is YAML-quoted)."""

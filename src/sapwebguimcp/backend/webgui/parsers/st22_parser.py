@@ -395,9 +395,9 @@ def _extract_text_content(snapshot: str) -> str:
     Yields every accessible name (JSON-quoted, with escaped quotes and other JS escapes) and every inline value (text
     nodes, inline element text, textbox values; unquoted or double-quoted), and undoes the single quoting of a whole
     entry. Every text that is not blank is kept, single characters included; a text of only private-use characters is
-    an icon-font glyph of the Web GUI chrome and is left out, as is the name of a button, textbox, checkbox or menu
-    item. The texts are joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans
-    several lines.
+    an icon-font glyph of the Web GUI chrome and is left out, as is a quoted name whose text starts with "button",
+    "textbox", "checkbox" or "menuitem" (the accessible name of a control; its inline value is kept). The texts are
+    joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans several lines.
     """
     text_parts: list[str] = []
     for line in snapshot.split("\n"):
@@ -566,6 +566,8 @@ def _extract_call_stack(text: str, t: LanguagePack) -> list[str]:
             if stack:
                 break  # Empty line after entries = end of stack
             continue
+        if stripped.isdigit():
+            continue  # A number cell (an index or line number of a per-cell stack) is neither an entry nor the end
         # Stack entries typically contain program names with uppercase + line numbers
         if re.search(r"[A-Z_/]{3,}", stripped):
             stack.append(stripped)
