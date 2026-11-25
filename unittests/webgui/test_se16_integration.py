@@ -952,3 +952,34 @@ async def test_sap_get_screen_info_from_se16(sap_mcp_client: ClientSession) -> N
     # Should contain basic screen info
     assert result.title, "Screen info should contain title"
     assert result.url, "Screen info should contain url"
+
+
+@pytest.mark.anyio
+async def test_read_table_reports_the_grid_total_and_truncation(sap_mcp_client: ClientSession) -> None:
+    """
+    sap_read_table reports the row count of the grid, not of the rows the Web GUI rendered (#100).
+
+    A freshly executed SE16N result grid holds only part of its rows in the DOM; the count the Web GUI reports for
+    the grid is the number of hits. No data is changed.
+    """
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success, f"Login failed: {login.error}"
+
+    query = await call_tool_typed(sap_mcp_client, "sap_se16_query", {"table": "TSTC", "max_hits": 300}, SE16Result)
+    assert query.success, f"Query failed: {query.error}"
+    assert query.total_hits == 300
+
+    # Back to the selection screen and execute again: a fresh grid renders only part of its rows
+    back = await call_tool_typed(sap_mcp_client, "sap_press_key", {"key": "F3"}, KeyboardResult)
+    assert back.success, f"F3 failed: {back.error}"
+    await sap_mcp_client.call_tool("browser_wait", {"timeout": 3000})
+    execute = await call_tool_typed(sap_mcp_client, "sap_press_key", {"key": "F8"}, KeyboardResult)
+    assert execute.success, f"F8 failed: {execute.error}"
+    await sap_mcp_client.call_tool("browser_wait", {"timeout": 4000})
+
+    table = await call_tool_typed(sap_mcp_client, "sap_read_table", {"start_row": 1, "max_rows": 500}, TableData)
+
+    assert table.success, f"Reading the grid failed: {table.error}"
+    assert len(table.rows) >= 1
+    assert table.total_rows == 300, f"The grid holds 300 rows, got total_rows={table.total_rows}"
+    assert table.truncated == (len(table.rows) < 300)
