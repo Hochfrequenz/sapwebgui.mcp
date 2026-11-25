@@ -1,7 +1,7 @@
 """Unit tests for Pydantic result models."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from sapwebguimcp.models import (
     CapabilitiesResult,
@@ -10,6 +10,8 @@ from sapwebguimcp.models import (
     KeepaliveResult,
     KeyboardResult,
     LoginResult,
+    SE16FileSummary,
+    SE16Result,
     ScreenInfo,
     SessionStatus,
     TableData,
@@ -473,3 +475,13 @@ class TestSessionModels:
         assert result.success is True
         assert result.session_id == "s2"
         assert result.remaining_sessions == 1
+
+
+class TestSE16TotalHitsDescription:
+    """total_hits is capped at max_hits by SE16N; the schema must say so (#106)."""
+
+    @pytest.mark.parametrize("model", [SE16Result, SE16FileSummary])
+    def test_total_hits_description_mentions_cap(self, model: type[BaseModel]) -> None:
+        description = model.model_fields["total_hits"].description
+        assert description is not None
+        assert "capped at max_hits when truncated is true" in description
