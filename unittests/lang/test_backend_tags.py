@@ -64,8 +64,6 @@ KNOWN_UNUSED = {
     "spro.column_hits",
     "spro.column_parent",
     "spro.column_area",
-    # #97: sap_se24_lookup selects this tab from the next commit on; remove the entry there
-    "se24.properties_tab",
 }
 
 EN = lang.pack_for("EN")
