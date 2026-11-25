@@ -632,6 +632,7 @@ async def test_se16_query_filters_on_a_field_below_the_visible_selection_rows(sa
     )
 
     assert result.success, f"Filter on a field below the visible rows failed: {result.error}"
+    assert result.rows, "Expected business partners whose last name starts with M"
     assert "NAME_LAST" in result.columns, result.columns
     for row in result.rows:
         assert str(row.data["NAME_LAST"]).upper().startswith("M"), f"Filter not applied: {row.data['NAME_LAST']}"
@@ -651,6 +652,7 @@ async def test_se16_query_filters_on_fields_of_different_selection_pages(sap_mcp
     )
 
     assert result.success, f"Filters on two selection pages failed: {result.error}"
+    assert result.rows, "Expected persons whose last name starts with M"
     for row in result.rows:
         assert str(row.data["TYPE"]) == "1", f"TYPE filter not applied: {row.data['TYPE']}"
         assert str(row.data["NAME_LAST"]).upper().startswith("M"), f"Filter not applied: {row.data['NAME_LAST']}"
@@ -672,7 +674,8 @@ async def test_se16_query_unknown_field_on_a_wide_table_fails_without_scroll_hin
     )
 
     assert not result.success
-    assert "Offered fields" in (result.error or ""), result.error
+    # The whole grid was read: the offered list is complete, not "(first part of the grid)"
+    assert "Offered fields:" in (result.error or ""), result.error
     assert "does not scroll" not in (result.error or ""), result.error
 
 
