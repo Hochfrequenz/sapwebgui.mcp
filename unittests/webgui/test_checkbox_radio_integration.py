@@ -11,6 +11,9 @@ These tests use SE09 (checkboxes) and SE11 (radio buttons) as test screens.
 State verification uses browser_snapshot + parse_selection_screen_state
 (ARIA snapshot) rather than sap_get_form_fields (JS DOM), because SAP
 checkbox/radio controls are reliably represented in ARIA snapshots.
+
+The tests at the end of the file additionally check that sap_get_form_fields reports the same
+checked state (#101).
 """
 
 import pytest

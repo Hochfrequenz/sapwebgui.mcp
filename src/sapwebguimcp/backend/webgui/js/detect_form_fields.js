@@ -130,8 +130,11 @@
 
     // Find all input elements
     document.querySelectorAll('input, select').forEach((el) => {
-        // An <input> inside a role=checkbox/radio wrapper is reported through the wrapper (second loop)
-        const wrapper = el.closest('[role="checkbox"], [role="radio"]');
+        // An <input> inside a checkbox/radio wrapper (ARIA role or lsCheckBox/lsRadioButton class) is reported
+        // through the wrapper (second loop)
+        const wrapper = el.closest(
+            '[role="checkbox"], [role="radio"], .lsCheckBox, .lsRadioButton'
+        );
         if (wrapper && wrapper !== el) {
             return;
         }

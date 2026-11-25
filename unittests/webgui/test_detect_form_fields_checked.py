@@ -84,6 +84,19 @@ async def test_input_inside_a_role_checkbox_is_reported_once() -> None:
 
 
 @pytest.mark.anyio
+async def test_input_inside_a_class_only_checkbox_is_reported_once() -> None:
+    """SAP_BASIS 750 markup has the lsCheckBox wrapper without ARIA attributes."""
+    fields = await _by_id(
+        '<body><span id="k" class="lsCheckBox lsCheckBox--checked">Klasse '
+        '<input type="checkbox" id="k-input" checked></span></body>'
+    )
+    checkboxes = _selectors(fields.values())
+    assert [f.id for f in checkboxes] == ["k"]
+    assert checkboxes[0].field_type == SapFieldType.CHECKBOX
+    assert checkboxes[0].checked is True
+
+
+@pytest.mark.anyio
 async def test_disabled_role_checkbox_is_readonly() -> None:
     fields = await _by_id(
         '<body><div id="d" role="checkbox" aria-label="Gesperrt" aria-checked="false" aria-disabled="true" '
@@ -120,6 +133,17 @@ async def test_unnamed_grid_checkboxes_are_not_reported() -> None:
         fields = await _by_label(snapshot)
         for field in _selectors(fields.values()):
             assert field.label, f"{snapshot}: unnamed selector control {field.id!r} was reported"
+
+    # SE11 table-control checkboxes: all 28 checkboxes of this snapshot are unnamed grid cells with ids ending in "_c"
+    se11 = await _on_snapshot("se11_t000_fields_de.html", _form_fields)
+    se11_ids = [f.id for f in _selectors(se11)]
+    assert not [i for i in se11_ids if i.endswith("_c")], f"unnamed grid checkboxes were reported: {se11_ids}"
+
+    # SM37 ABAP-list checkboxes (role=checkbox, aria-disabled, no name) must not show up
+    sm37 = await _on_snapshot("sm37_results_de.html", _form_fields)
+    sm37_ids = [f.id for f in _selectors(sm37)]
+    assert "M0:46:::5:0" not in sm37_ids
+    assert "M0:46:::5:14" not in sm37_ids
 
 
 @pytest.mark.anyio
