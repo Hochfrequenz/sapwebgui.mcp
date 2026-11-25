@@ -478,10 +478,15 @@ def _extract_program(text: str, t: LanguagePack) -> str:
     return ""
 
 
+def _labelled_line_pattern(t: LanguagePack) -> re.Pattern[str]:
+    """The labelled source line: "Source Code Line: 100"."""
+    return compiled(rf"{t.st22.source_line.alt}[:\s]+(\d+)")
+
+
 def _extract_line_number(text: str, t: LanguagePack) -> int | None:
-    """Extract source line number from dump detail text."""
+    """Extract source line number from dump detail text (the whole text; used when it has no termination section)."""
     patterns = [
-        compiled(rf"{t.st22.source_line.alt}[:\s]+(\d+)"),
+        _labelled_line_pattern(t),
         compiled(rf"{t.st22.line.alt}\s+(\d+)\s+"),
     ]
     for pattern in patterns:
@@ -489,6 +494,39 @@ def _extract_line_number(text: str, t: LanguagePack) -> int | None:
         if match:
             return int(match.group(1))
     return None
+
+
+def _detail_headings(t: LanguagePack) -> list[str]:
+    """Every heading that ends a section of the dump detail."""
+    headings = [
+        *(heading for texts in t.st22.section.values() for heading in texts),
+        *t.st22.other_headings,
+        *t.st22.call_stack_heading,
+        *t.st22.termination_heading,
+    ]
+    return list(dict.fromkeys(headings))  # the termination heading is also one of the other headings
+
+
+def _termination_include_pattern(t: LanguagePack) -> re.Pattern[str]:
+    """The termination point text: the line keyword, a standalone number, then the first quoted name (the include)."""
+    return compiled(rf'(?<!\S){t.st22.line.alt}\s+(\d+)(?!\w)[^"\d]*"([^"\s]+)"')
+
+
+def _termination_point(text: str, t: LanguagePack) -> tuple[str | None, int | None] | None:
+    """The include and the line of the termination point, read from the section on where the program terminated.
+
+    ``None`` if the text has no such section. Inside the section, the first "line N ... "INCLUDE"" wins (the termination
+    point precedes "begins in line 1 of the include"); without a quoted include only a labelled line counts.
+    """
+    if not any(_is_heading(line, t.st22.termination_heading) for line in text.split("\n")):
+        return None
+    # no end_pattern: a wrapped line that starts with "Source code" must not end the section
+    section = _extract_section(text, t.st22.termination_heading, _detail_headings(t))
+    match = _termination_include_pattern(t).search(section)
+    if match:
+        return match.group(2), int(match.group(1))
+    labelled = _labelled_line_pattern(t).search(section)
+    return None, int(labelled.group(1)) if labelled else None
 
 
 def _extract_call_stack(text: str, t: LanguagePack) -> list[str]:
@@ -567,14 +605,18 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
         end_pattern=t.st22.source_code_start.pattern,
     )
 
+    # Without a termination section the whole text is searched for a line (as before)
+    point = _termination_point(text, t)
+    include, line = point if point is not None else (None, _extract_line_number(text, t))
+
     return ST22DumpDetail(
         error_type=_extract_error_type(text, t),
         short_text="",  # Populated from list data by caller
         what_happened=what_happened,
         how_to_correct=how_to_correct,
         program=_extract_program(text, t),
-        include=None,
-        line=_extract_line_number(text, t),
+        include=include,
+        line=line,
         call_stack=_extract_call_stack(text, t),
         raw_text=raw_text,
     )

@@ -4,6 +4,7 @@ Unit tests for ST22 (Short Dump Analysis) parser.
 Tests parsing of YAML accessibility snapshots from ST22 screens.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -387,3 +388,99 @@ class TestParseDumpDetail:
 """
         detail = parse_st22_dump_detail(snapshot, T)
         assert len(detail.call_stack) >= 2
+
+
+def _snapshot(lines: list[str]) -> str:
+    """A Playwright ARIA snapshot of one text node per line (a value that starts with a quote is YAML-quoted)."""
+    return "\n".join(f"- text: {json.dumps(line)}" if line.startswith('"') else f"- text: {line}" for line in lines)
+
+
+_DETAIL_DE_LINES = [
+    "Kurztext",
+    "Zugriff über 'NULL' Objektreferenz nicht möglich.",
+    "Was ist passiert?",
+    "Die Laufzeitumgebung hat einen Fehler festgestellt.",
+    "Was können Sie tun?",
+    "Programm nach der Fehleranalyse korrigieren.",
+    "Fehleranalyse",
+    "Fehler in Zeile 7 der Methode",
+    "Systemumgebung",
+    "SAP-Release..... 816",
+    "Informationen zur Abbruchstelle",
+    "Der Abbruch trat im ABAP-Programm bzw. Include",
+    '"ZCL_DEMO======================CP"',
+    'auf, und zwar in "ZIF_DEMO~DISPLAY". Das Hauptprogramm war "ZDEMO_MAIN1".',
+    "Im Quelltext befindet sich die Abbruchstelle in Zeile 36",
+    'des Includes "ZCL_DEMO======================CM00C".',
+    "Quelltext",
+    'beginnt in Zeile 1 des Includes "ZCL_DEMO======================CM00C".',
+    "Quelltextauszug",
+    "Zeile 40 >>>>> lv_x = lo_ref->get( ).",
+    "Aktive Aufrufe/Ereignisse",
+    "4 METHOD ZCL_DEMO======================CP ZCL_DEMO======================CM",
+]
+_DETAIL_DE = _snapshot(_DETAIL_DE_LINES)
+
+_INCLUDE_CM00C = "ZCL_DEMO======================CM00C"
+
+
+class TestTerminationPoint:
+    """The include and the line of the termination point come from the section on where the program terminated."""
+
+    def test_include_and_line_come_from_the_termination_section(self) -> None:
+        detail = parse_st22_dump_detail(_DETAIL_DE, T)
+
+        assert (detail.include, detail.line) == (_INCLUDE_CM00C, 36)
+
+    def test_english_termination_text(self) -> None:
+        snapshot = _snapshot(
+            [
+                "Information on Where Terminated",
+                "In the source code you have the termination point in line 36",
+                'of the (Include) program "ZCL_X=========CM00C".',
+                "Active Calls/Events",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert (detail.include, detail.line) == ("ZCL_X=========CM00C", 36)
+
+    def test_italian_pack_names_the_termination_heading(self) -> None:
+        assert "Informazioni punto di interr." in lang.pack_for("IT").st22.termination_heading
+
+    def test_a_line_of_another_section_is_not_the_line(self) -> None:
+        """Without the termination point text, neither line 7 (error analysis) nor line 40 (source extract) counts."""
+        dropped = {
+            "Im Quelltext befindet sich die Abbruchstelle in Zeile 36",
+            'des Includes "ZCL_DEMO======================CM00C".',
+            'beginnt in Zeile 1 des Includes "ZCL_DEMO======================CM00C".',
+        }
+        snapshot = _snapshot([line for line in _DETAIL_DE_LINES if line not in dropped])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert (detail.include, detail.line) == (None, None)
+
+    def test_a_labelled_line_inside_the_termination_section(self) -> None:
+        snapshot = _snapshot(
+            ["Information on Where Terminated", "Source Code Line: 100", "Source Code Extract", "Line 5 of the extract"]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.line == 100
+        assert detail.include is None
+
+    def test_the_fallback_inside_the_section_takes_only_the_labelled_line(self) -> None:
+        snapshot = _snapshot(["Informationen zur Abbruchstelle", "Der Abbruch trat in Zeile 5 auf", "Quelltextauszug"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.line is None
+        assert detail.include is None
+
+    def test_termination_point_beyond_the_raw_text_limit(self) -> None:
+        position = _DETAIL_DE_LINES.index("Fehleranalyse") + 1
+        notes = [f"Hinweis Nummer {number} mit etwas Text" for number in range(500)]
+        snapshot = _snapshot([*_DETAIL_DE_LINES[:position], *notes, *_DETAIL_DE_LINES[position:]])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert (detail.include, detail.line) == (_INCLUDE_CM00C, 36)
+        assert "[truncated]" in detail.raw_text
