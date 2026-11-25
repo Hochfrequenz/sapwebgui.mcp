@@ -161,6 +161,13 @@ EN = LanguagePack(
         attributes_tab=Text(("Attributes",)),
         interfaces_tab=Text(("Interfaces",)),
         source_button=Text(("Source Code", "Sourcecode")),
+        properties_tab=Text(("Properties",)),
+        description_field=Text(("Description",)),
+        package_field=Text(("Package",)),
+        superclass_field=Text(("Superclass",)),
+        instantiation_field=Text(("Instantiation",)),
+        final_checkbox=Text(("Final",)),
+        interface_column=Text(("Interface",)),
     ),
     se37=Se37Section(
         initial_screen=Text(("Function Builder: Initial Screen",)),

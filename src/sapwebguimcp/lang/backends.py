@@ -128,6 +128,13 @@ _TAGS: dict[str, Backend] = {
     "se24.attributes_tab": Backend.BOTH,
     "se24.interfaces_tab": Backend.BOTH,
     "se24.source_button": Backend.BOTH,
+    "se24.properties_tab": Backend.BOTH,
+    "se24.description_field": Backend.BOTH,
+    "se24.package_field": Backend.BOTH,
+    "se24.superclass_field": Backend.BOTH,
+    "se24.instantiation_field": Backend.BOTH,
+    "se24.final_checkbox": Backend.BOTH,
+    "se24.interface_column": Backend.BOTH,
     # se37
     "se37.initial_screen": Backend.BOTH,
     "se37.display_title": Backend.BOTH,
