@@ -100,7 +100,7 @@ class _FakeContext:
         self.pages: list[_FakePage] = []
         self.registrations: list[tuple[str, Callable[..., Any]]] = []
         self.close = AsyncMock()
-        self.new_page_error: Exception | None = None
+        self.new_page_error: BaseException | None = None
 
     def on(self, event: str, handler: Callable[..., Any]) -> None:
         self.registrations.append((event, handler))
@@ -138,12 +138,15 @@ async def _drain_tasks(manager: browser_module.BrowserManager) -> None:
 
 
 @pytest.mark.anyio
-async def test_open_login_page_creates_an_isolated_context() -> None:
+@pytest.mark.parametrize("ignore_https_errors", [False, True])
+async def test_open_login_page_creates_an_isolated_context(ignore_https_errors: bool) -> None:
     manager, browser, context = _manager_with_context()
 
-    page = await manager.open_login_page()
+    page = await manager.open_login_page(ignore_https_errors=ignore_https_errors)
 
-    browser.new_context.assert_awaited_once_with(viewport={"width": 1280, "height": 800}, ignore_https_errors=True)
+    browser.new_context.assert_awaited_once_with(
+        viewport={"width": 1280, "height": 800}, ignore_https_errors=ignore_https_errors
+    )
     assert page is context.pages[0]
     assert context in manager._login_contexts
 
@@ -152,7 +155,7 @@ async def test_open_login_page_creates_an_isolated_context() -> None:
 async def test_login_page_gets_only_one_close_listener() -> None:
     manager, _, context = _manager_with_context()
 
-    page = await manager.open_login_page()
+    page = await manager.open_login_page(ignore_https_errors=False)
 
     assert isinstance(page, _FakePage)
     assert len(page.close_handlers()) == 1
@@ -164,7 +167,7 @@ async def test_login_page_gets_only_one_close_listener() -> None:
 @pytest.mark.anyio
 async def test_login_context_closes_only_after_its_last_page() -> None:
     manager, _, context = _manager_with_context()
-    first = await manager.open_login_page()
+    first = await manager.open_login_page(ignore_https_errors=False)
     second = context.emit_page()
     assert isinstance(first, _FakePage)
 
@@ -185,8 +188,22 @@ async def test_open_login_page_closes_the_context_when_the_tab_cannot_open() -> 
     context.new_page_error = RuntimeError("boom")
 
     with pytest.raises(RuntimeError, match="boom"):
-        await manager.open_login_page()
+        await manager.open_login_page(ignore_https_errors=False)
 
+    context.close.assert_awaited_once()
+    assert not manager._login_contexts
+
+
+@pytest.mark.anyio
+async def test_open_login_page_closes_the_context_when_cancelled_while_opening_the_tab() -> None:
+    manager, _, context = _manager_with_context()
+    cancelled = asyncio.CancelledError()
+    context.new_page_error = cancelled
+
+    with pytest.raises(asyncio.CancelledError) as excinfo:
+        await manager.open_login_page(ignore_https_errors=False)
+
+    assert excinfo.value is cancelled
     context.close.assert_awaited_once()
     assert not manager._login_contexts
 
@@ -197,13 +214,13 @@ async def test_open_login_page_without_browser_raises() -> None:
     manager._browser = None
 
     with pytest.raises(RuntimeError, match="Browser not connected"):
-        await manager.open_login_page()
+        await manager.open_login_page(ignore_https_errors=False)
 
 
 @pytest.mark.anyio
 async def test_reconnect_clears_login_contexts(monkeypatch: pytest.MonkeyPatch) -> None:
     manager, _, _ = _manager_with_context()
-    await manager.open_login_page()
+    await manager.open_login_page(ignore_https_errors=False)
     assert manager._login_contexts
     monkeypatch.setattr(browser_module.BrowserManager, "initialize", AsyncMock())
 
@@ -217,7 +234,7 @@ async def test_reconnect_clears_login_contexts(monkeypatch: pytest.MonkeyPatch) 
 async def test_failing_context_close_is_logged_not_raised(caplog: pytest.LogCaptureFixture) -> None:
     manager, _, context = _manager_with_context()
     context.close.side_effect = RuntimeError("close failed")
-    page = await manager.open_login_page()
+    page = await manager.open_login_page(ignore_https_errors=False)
     assert isinstance(page, _FakePage)
 
     with caplog.at_level(logging.WARNING, logger=browser_module.__name__):
@@ -226,13 +243,16 @@ async def test_failing_context_close_is_logged_not_raised(caplog: pytest.LogCapt
 
     context.close.assert_awaited_once()
     assert not manager._login_contexts
-    assert any(record.levelno == logging.WARNING for record in caplog.records)
+    assert any(
+        record.levelno == logging.WARNING and "Could not close login browser context" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 @pytest.mark.anyio
 async def test_close_login_page_falls_back_to_closing_the_context() -> None:
     manager, _, context = _manager_with_context()
-    page = await manager.open_login_page()
+    page = await manager.open_login_page(ignore_https_errors=False)
     assert isinstance(page, _FakePage)
     page.close.side_effect = RuntimeError("tab is gone")
 
@@ -247,7 +267,7 @@ async def test_close_closes_login_contexts() -> None:
     manager, _, context = _manager_with_context()
     manager._settings = SapGuiSettings(_env_file=None, browser_mode=BrowserMode.CONNECT)  # type: ignore[call-arg]
     manager._playwright = None
-    await manager.open_login_page()
+    await manager.open_login_page(ignore_https_errors=False)
 
     await manager.close()
 

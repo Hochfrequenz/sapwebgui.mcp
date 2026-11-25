@@ -13,7 +13,7 @@ from sapwebguimcp.tools.sap_login_impl import sap_login_impl
 _MODULE = "sapwebguimcp.tools.sap_login_impl"
 
 
-def _make_sap_config() -> Config:
+def _make_sap_config(tls_skip_verify: bool = False) -> Config:
     return Config(
         default_system="sysA",
         systems={
@@ -24,6 +24,7 @@ def _make_sap_config() -> Config:
                 user="testuser",
                 password=SecretStr("testpass"),
                 language="DE",
+                tls_skip_verify=tls_skip_verify,
             ),
         },
     )
@@ -46,7 +47,13 @@ def _make_backend(login_result: LoginResult | None = None) -> AsyncMock:
 class _Patched:
     """Patches everything ``sap_login_impl`` reaches for and exposes the doubles."""
 
-    def __init__(self, manager: MagicMock, current_backend: AsyncMock, new_backend: AsyncMock | None = None) -> None:
+    def __init__(
+        self,
+        manager: MagicMock,
+        current_backend: AsyncMock,
+        new_backend: AsyncMock | None = None,
+        tls_skip_verify: bool = False,
+    ) -> None:
         self.manager = manager
         self.current_backend = current_backend
         self.new_backend = new_backend or _make_backend(LoginResult(success=True, session_id="s2"))
@@ -62,7 +69,7 @@ class _Patched:
         self.web_gui_backend = MagicMock(return_value=self.new_backend)
         self._patches = [
             patch(f"{_MODULE}.get_settings", return_value=settings),
-            patch(f"{_MODULE}.get_sap_config", return_value=_make_sap_config()),
+            patch(f"{_MODULE}.get_sap_config", return_value=_make_sap_config(tls_skip_verify)),
             patch(f"{_MODULE}.get_backend", new=self.get_backend),
             patch(f"{_MODULE}.get_browser_manager", new=AsyncMock(return_value=manager)),
             patch(f"{_MODULE}.WebGuiBackend", new=self.web_gui_backend),
@@ -102,11 +109,23 @@ async def test_login_with_an_existing_session_opens_a_new_one() -> None:
     assert result.success
     assert result.session_id == "s2"
     page = manager.open_login_page.return_value
-    manager.open_login_page.assert_awaited_once()
+    manager.open_login_page.assert_awaited_once_with(ignore_https_errors=False)
     p.web_gui_backend.assert_called_once_with(page)
     p.new_backend.login.assert_awaited_once()
     current.login.assert_not_awaited()
     manager.close_login_page.assert_not_awaited()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tls_skip_verify", [False, True])
+async def test_parallel_login_checks_certificates_unless_the_system_skips_tls_verification(
+    tls_skip_verify: bool,
+) -> None:
+    manager = _make_manager(["s1"])
+    with _Patched(manager, _make_backend(), tls_skip_verify=tls_skip_verify):
+        await sap_login_impl()
+
+    manager.open_login_page.assert_awaited_once_with(ignore_https_errors=tls_skip_verify)
 
 
 @pytest.mark.anyio

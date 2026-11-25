@@ -114,7 +114,7 @@ async def sap_login_impl(
             return result
 
         # A session exists already: log in on a new, isolated tab so it is not taken over (issue #104).
-        page = await browser_manager.open_login_page()
+        page = await browser_manager.open_login_page(ignore_https_errors=bool(system.tls_skip_verify))
         succeeded = False
         try:
             result = await login_on(WebGuiBackend(page))

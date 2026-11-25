@@ -425,11 +425,15 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
         self._cert_errors_ignored = True
         logger.info("Browser set to ignore certificate errors (tls_skip_verify)")
 
-    async def open_login_page(self) -> Page:
+    async def open_login_page(self, *, ignore_https_errors: bool) -> Page:
         """Open a page in a new, isolated browser context (own cookies and storage) for an additional login.
 
         The context is closed again when its last page closes (see ``close_login_page``). Initializes the
         manager first when needed.
+
+        Args:
+            ignore_https_errors: Accept invalid TLS certificates in the new context. Pass the system's
+                ``tls_skip_verify`` so a further login checks certificates exactly like the first one.
 
         Raises:
             RuntimeError: If the browser is not connected.
@@ -441,14 +445,15 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
 
         context = await self._browser.new_context(
             viewport={"width": 1280, "height": 800},
-            ignore_https_errors=True,  # SAP systems often use self-signed certificates
+            ignore_https_errors=ignore_https_errors,
         )
         self._login_contexts.add(context)
         # Registered before new_page() so that the first page arrives through it, too.
         context.on("page", self._watch_login_page)
         try:
             page = await context.new_page()
-        except Exception:
+        except BaseException:
+            # BaseException, so a cancelled login does not leak the context either.
             await self._close_login_context(context)
             raise
         self._watch_login_page(page)
