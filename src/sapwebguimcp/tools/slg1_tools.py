@@ -92,7 +92,7 @@ async def _slg1_lookup(  # pylint: disable=too-many-arguments,too-many-positiona
     unfilled: list[str] = []
     for name, labels, value in fields:
         if not await _fill_by_label(backend, labels, value):
-            logger.warning("SLG1 field not found labels=%r", list(labels))
+            logger.warning("SLG1 field not filled labels=%r", list(labels))
             unfilled.append(name)
     if unfilled:
         # F8 with a field left at its default would run SAP's default selection and return unrelated logs

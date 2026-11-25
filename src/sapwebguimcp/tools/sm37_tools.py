@@ -67,12 +67,13 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
     statuses: list[str] | None,
     from_date: str | None,
     to_date: str | None,
-) -> list[str]:
+) -> tuple[list[str], str | None]:
     """Fill the SM37 selection screen fields.
 
     Returns:
-        The names of the requested filters that could not be applied, a subset of
-        ``job_name, username, status, from_date, to_date`` in that order; empty if every requested filter was applied.
+        A pair ``(unapplied, cause)``. ``unapplied`` holds the names of the requested filters that could not be
+        applied, a subset of ``job_name, username, status, from_date, to_date`` in that order; empty if every requested
+        filter was applied. ``cause`` is the error of the screen-state call when it failed, else None.
         A filter counts as applied if at least one label of its control (the one of the screen's language) was found
         and set. ``username`` is only reported when a user was requested and ``status`` only when statuses were
         requested, then if any of the six status checkboxes (to check or to uncheck) could not be set. If the screen
@@ -86,7 +87,8 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
     effective_statuses = set(statuses) if statuses else set(_STATUS_PARAMS)
     fields: dict[str, str] = dict.fromkeys(t.sm37.job_name, job_name)
     if username is not None:
-        fields.update(dict.fromkeys(t.sm37.user_name, username))
+        # SAP user names are upper case and ensure_screen_state verifies the typed value with an exact comparison
+        fields.update(dict.fromkeys(t.sm37.user_name, username.upper()))
 
     target = SelectionScreenState(
         checkboxes={
@@ -98,7 +100,9 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
     )
     state_result = await ensure_screen_state(backend, target)
     errors: list[str] = []
+    cause: str | None = None
     if not state_result.success:
+        cause = state_result.error
         errors.append(f"Failed to set selection screen state: {state_result.error}")  # lang-ok: our own message
         unapplied.append("job_name")
         if username is not None:
@@ -111,7 +115,8 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
             unapplied.append("job_name")
         if username is not None and not _is_applied(t.sm37.user_name, not_applied):
             unapplied.append("username")
-        # Without a requested status no filter was asked for; the boxes are only set to keep SAP's defaults visible.
+        # Without a requested status all boxes are checked; a missing box is not reported because no status filter
+        # was requested.
         if statuses and not all(_is_applied(t.sm37.status[status], not_applied) for status in _STATUS_PARAMS.values()):
             unapplied.append("status")
         errors.extend(state_result.warnings)
@@ -135,7 +140,7 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
         else:
             unapplied.append(name)
 
-    return unapplied
+    return unapplied, cause
 
 
 def _is_job_log_screen(snapshot: str, t: LanguagePack) -> bool:
@@ -221,13 +226,16 @@ async def _execute_sm37_lookup(  # pylint: disable=too-many-arguments,too-many-p
 
     await backend.wait_for_ready()
 
-    unapplied = await _fill_selection_screen(backend, t, job_name, username, statuses, from_date, to_date)
+    unapplied, cause = await _fill_selection_screen(backend, t, job_name, username, statuses, from_date, to_date)
     if unapplied:
         # Pressing F8 now would run SAP's default selection and return jobs that do not match the request.
         logger.warning("SM37 filters not applied filters=%r", unapplied)
-        names = ", ".join(unapplied)
+        message = "Could not apply the filter(s) on the SM37 selection screen: "  # lang-ok: our own message
+        message += ", ".join(unapplied)
+        if cause:
+            message += f" ({cause})"
         return SM37JobListResult.failure(
-            error=f"Could not apply the filter(s) on the SM37 selection screen: {names}",  # lang-ok: our own message
+            error=message,
             jobs=[],
             job_count=0,
             filters_applied={},

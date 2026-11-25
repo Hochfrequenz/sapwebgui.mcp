@@ -51,13 +51,29 @@ def _for_labels(labels: Iterable[str], result: Any) -> dict[str, Any]:
 
 @pytest.mark.anyio
 async def test_slg1_fails_before_f8_when_a_field_cannot_be_filled() -> None:
-    backend = _backend({label: SimpleNamespace(not_found=[label], errors=[]) for label in t.slg1.log_subobject})
+    backend = _backend({label: FillFormResult(not_found=[label]) for label in t.slg1.log_subobject})
 
     result = await _slg1_lookup(backend, t, "OBJ", subobject="SUB", external_id="EXT")
 
     assert result.success is False
     assert result.error == _PREFIX + "subobject"
     assert result.logs == []
+    backend.press_key.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_slg1_names_every_unfilled_field_in_parameter_order() -> None:
+    not_filled = {
+        **{label: FillFormResult(not_found=[label]) for label in t.slg1.log_subobject},
+        **{label: FillFormResult(not_found=[label]) for label in t.slg1.to_datetime},
+    }
+    backend = _backend(not_filled)
+
+    result = await _slg1_lookup(backend, t, "OBJ", subobject="SUB", to_date="2026-01-31")
+
+    assert result.success is False
+    assert result.error is not None
+    assert result.error.endswith(": subobject, to_date")
     backend.press_key.assert_not_awaited()
 
 
@@ -119,9 +135,10 @@ async def _sm37(
     username: str | None = "ME",
     statuses: list[str] | None = None,
     from_date: str | None = None,
+    to_date: str | None = None,
 ) -> Any:
     with patch("sapwebguimcp.tools.sm37_tools.ensure_screen_state", state):
-        return await _execute_sm37_lookup(backend, t, "JOB*", username, statuses, from_date, None, False)
+        return await _execute_sm37_lookup(backend, t, "JOB*", username, statuses, from_date, to_date, False)
 
 
 @pytest.mark.anyio
@@ -191,11 +208,43 @@ async def test_sm37_date_field_missing_fails() -> None:
 
 
 @pytest.mark.anyio
+async def test_sm37_to_date_field_missing_fails() -> None:
+    backend = _sm37_backend()
+    backend.fill_field = AsyncMock(side_effect=ValueError)
+
+    result = await _sm37(backend, _screen_state([]), to_date="2026-01-31")
+
+    assert result.success is False
+    assert result.error is not None
+    assert result.error.endswith(": to_date")
+    backend.press_key.assert_not_awaited()
+
+
+@pytest.mark.anyio
 async def test_sm37_screen_state_failure_fails_before_f8() -> None:
     backend = _sm37_backend()
 
     result = await _sm37(backend, _screen_state([], success=False, error="Ambiguous labels"))
 
     assert result.success is False
-    assert result.error == _SM37_PREFIX + "job_name, username"
+    assert result.error == _SM37_PREFIX + "job_name, username (Ambiguous labels)"
     backend.press_key.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_sm37_user_name_is_handed_over_upper_case() -> None:
+    """SAP user names are upper case and ensure_screen_state verifies with an exact comparison."""
+    targets: list[Any] = []
+
+    async def record(_backend: Any, target: Any) -> Any:
+        targets.append(target)
+        return SimpleNamespace(success=True, error=None, warnings=[], not_applied=[])
+
+    backend = _sm37_backend()
+
+    result = await _sm37(backend, record, username="jdoe")
+
+    assert result.success is True
+    assert result.filters_applied["username"] == "jdoe"
+    (target,) = targets
+    assert all(target.fields[label] == "JDOE" for label in t.sm37.user_name)
