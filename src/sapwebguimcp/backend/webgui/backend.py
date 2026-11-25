@@ -178,6 +178,12 @@ _CERT_ERROR_GUIDANCE = (
     "or install the certificate authority in the operating system's trust store."
 )
 
+# A further sap_login opens a new session instead of logging in again inside this one (#104).
+_EXPIRED_SESSION_RECOVERY = (
+    "Call sap_login, which opens a new session and returns its session_id; use that session_id "
+    "from now on and close this session with sap_session_close."
+)
+
 # How long a key press waits for the Web GUI to start a server round trip, for it to finish, and for the
 # screen to render the response (#79).
 _KEY_ROUND_TRIP_START_S = 1.0
@@ -807,14 +813,14 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             if login_form:
                 return SessionStatus(
                     status="logged_off",
-                    message="Login page detected. Please use sap_login to log in again.",
+                    message=f"Login page detected. {_EXPIRED_SESSION_RECOVERY}",
                 )
 
             page_content = await page.content()
             if lang.universal().session_pages.timed_out.contains(page_content):
                 return SessionStatus(
                     status="timed_out",
-                    message="Session has timed out. Please use sap_login to reconnect.",
+                    message=f"Session has timed out. {_EXPIRED_SESSION_RECOVERY}",
                 )
 
             return SessionStatus(

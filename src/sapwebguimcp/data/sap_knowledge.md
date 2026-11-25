@@ -60,7 +60,7 @@ So if you search say for a report in se38 which starts with "Z" and contains "en
 2. **Look for popups** - A popup may be waiting for your response - check if it's an error, confirmation, or help dialog
 3. **Try F3 (Back)** - Often helps to back out and retry
 4. **Reset to Easy Access first** - If inputs seem stuck or fields aren't being picked up, use `sap_transaction("YOUR_TCODE", reset_first=True)`. This navigates to SAP Easy Access (`/n`) first, clearing all residual state (popups, error messages, field values) before opening the transaction. This is the most reliable way to recover from state bleeding.
-5. **Start over** - Either by restarting the transaction, or by closing an expired session with `sap_session_close` and calling `sap_login` again (changes will be lost)
+5. **Start over** - Either by restarting the transaction, or, for an expired session, by calling `sap_login` again (it returns a new `session_id`; pass it as `session`), then close the expired session with `sap_session_close` (changes will be lost)
 
 ## Working with Modal Dialogs (Popups)
 

@@ -685,7 +685,15 @@ class TestParallelLoginContractTexts:
         assert "does not open a parallel session" not in login
         assert "further sap_login()" in (tools["sap_session_list"].description or "")
 
+    def test_sap_login_description_recovers_an_expired_session_before_closing_it(self) -> None:
+        tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+        login = tools["sap_login"].description or ""
+        assert "then close the expired session with sap_session_close" in login
+        assert "close it with sap_session_close and call sap_login again" not in login
+
     def test_knowledge_doc_states_the_parallel_login_contract(self) -> None:
         knowledge = resources.files("sapwebguimcp.data").joinpath("sap_knowledge.md").read_text(encoding="utf-8")
         assert "Every further `sap_login()`" in knowledge
         assert "using sap_login again" not in knowledge
+        assert "by closing an expired session with `sap_session_close` and calling `sap_login` again" not in knowledge
+        assert "then close the expired session with `sap_session_close`" in knowledge
