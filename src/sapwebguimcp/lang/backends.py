@@ -48,6 +48,9 @@ _TAGS: dict[str, Backend] = {
     "common.user": Backend.BOTH,
     "common.program": Backend.BOTH,
     # popup
+    "popup.type_error": Backend.WEBGUI,
+    "popup.type_info": Backend.WEBGUI,
+    "popup.type_confirm": Backend.WEBGUI,
     "popup.inactive_objects": Backend.WEBGUI,
     "popup.original_language_title": Backend.WEBGUI,
     "popup.maintain_in_original": Backend.WEBGUI,

@@ -120,6 +120,9 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "common.row_select_hint": Manual("WebGUI framework text: ARIA hint of a selectable table row"),
         "common.user": DataElement("XUBNAME", "medium"),
         "common.program": DataElement("PROGNAME", "short"),
+        "popup.type_error": Manual("keyword list classifying popups by title or text"),
+        "popup.type_info": Manual("keyword list classifying popups by title or text"),
+        "popup.type_confirm": Manual("keyword list classifying popups by title or text"),
         "popup.inactive_objects": Manual("popup title seen live; no matching text in D021T, T100 or RSMPTEXTS"),
         "popup.original_language_title": Manual(
             "GUI title of screen SAPLSETX 0100 (title bar, not a D021T text); the T100 messages about the"

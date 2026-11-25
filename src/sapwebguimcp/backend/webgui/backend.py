@@ -27,7 +27,7 @@ from sapwebguimcp.lang import UnsupportedLanguageError, alt_of, english_first, l
 from sapwebguimcp.lang.text import compiled
 from sapwebguimcp.middleware.logging import set_sap_identity
 from sapwebguimcp.models.alv_models import AlvCellInfo, AlvMetadata, TableCellClickResult
-from sapwebguimcp.models.base import CheckActivateResult, PopupButton, PopupInfo
+from sapwebguimcp.models.base import CheckActivateResult, PopupButton, PopupInfo, PopupType
 from sapwebguimcp.models.middleware import SapIdentity
 from sapwebguimcp.models.sap_results import (
     ButtonInfo,
@@ -197,6 +197,19 @@ def _logon_dropdown_text(language: str) -> str:
         return pack_for(language).logon_dropdown
     except UnsupportedLanguageError:
         return language
+
+
+def _classify_popup(title: str, message: str) -> PopupType:
+    """Popup type from keywords in its title and text (any case), in every language."""
+    popup = lang.universal().popup
+    combined = f"{message} {title}"
+    if popup.type_error.contains(combined):
+        return PopupType.ERROR
+    if popup.type_info.contains(combined):
+        return PopupType.INFO
+    if popup.type_confirm.contains(combined):
+        return PopupType.CONFIRM
+    return PopupType.UNKNOWN
 
 
 class WebGuiBackend:  # pylint: disable=too-many-public-methods
@@ -1605,8 +1618,12 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             for btn in result.get("buttons", [])
         ]
 
+        title = (result.get("title") or "").strip() or None
+        message = result.get("message")
         return PopupInfo(
-            message=result.get("message"),
+            popup_type=_classify_popup(title or "", message or ""),
+            title=title,
+            message=message,
             buttons=buttons,
             close_button_id=result.get("close_button_id"),
         )

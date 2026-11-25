@@ -60,6 +60,9 @@ DE = LanguagePack(
         program=Text(("Programm",)),
     ),
     popup=PopupSection(
+        type_error=Text(("Fehler",)),
+        type_info=Text(("Information", "Hinweis")),
+        type_confirm=Text(("Bestätigung", "Ja", "Nein"), word=True),
         inactive_objects=Text(("Inaktive Objekte",), fold=False),
         original_language_title=Text(
             ("Abweichende Original- und Anmeldesprache", "Originalsprache und Anmeldesprache"), fold=False

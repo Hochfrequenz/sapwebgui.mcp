@@ -35,6 +35,27 @@
         if (popup) break;
     }
 
+    // Header title of the popup, reported separately from the message: it classifies the popup
+    // (error, information, confirmation). Only searched inside the popup, never the whole document.
+    let popupTitle = null;
+    const titleSelectors = [
+        '.lsPWNewHeaderTextOverflow span',
+        '.lsPWNewHeaderTextOverflow',
+        "[class*='header-title-txt']",
+        "[id$='-header-title-txt']",
+        "[class*='HeaderTextOverflow']",
+        "[class*='header-title']",
+    ];
+    if (popup) {
+        for (const sel of titleSelectors) {
+            const text = popup.querySelector(sel)?.textContent?.trim();
+            if (text) {
+                popupTitle = text;
+                break;
+            }
+        }
+    }
+
     // Extract message text from popup
     // SAP popups store the message in different places depending on type:
     // - Header title (lsPWNewHeaderTextOverflow) for confirmation dialogs
@@ -157,6 +178,7 @@
     }
 
     return {
+        title: popupTitle,
         message: message,
         buttons: buttons,
         close_button_id: closeButtonId,

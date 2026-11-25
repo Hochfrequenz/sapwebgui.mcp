@@ -94,6 +94,16 @@ class PopupSection:
     """Popup titles, texts and buttons, matched in every registered language."""
 
     MERGE: ClassVar[MergeMode] = "all"
+    type_error: Text
+    """Keyword in a popup's title or message that classifies it as an error (substring)."""
+    type_info: Text
+    """Keyword in a popup's title or message that classifies it as information (substring, checked after
+    ``type_error``)."""
+    type_confirm: Text
+    """Keyword in a popup's title or message that classifies it as a confirmation (whole word, checked last).
+
+    Matched as whole words only (unlike on the desktop, where short variants such as ``Ja`` and ``No`` also
+    match inside other words), because a Web GUI popup is often a bare title."""
     inactive_objects: Text
     """Title of the "Inactive Objects" popup during activation. ``fold=False``: the WebGUI checks it
     case-sensitively in the ARIA snapshot; the desktop lower-cases both sides itself."""

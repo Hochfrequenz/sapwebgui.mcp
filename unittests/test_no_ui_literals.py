@@ -63,6 +63,9 @@ BASELINE = Path(__file__).with_name("lang_baseline.json")
 MIN_VALUE_LENGTH = 5
 GENERIC_WORDS = frozenset(
     {
+        "popup.type_error",
+        "popup.type_info",
+        "popup.type_confirm",
         "status_type.error",
         "status_type.warning",
         "status_type.success",
