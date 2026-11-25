@@ -118,6 +118,8 @@ IT = LanguagePack(
     session_pages=SessionPagesSection(
         already_logged_on=Text(("già effettuato il logon",)),
         continue_button=Text(("Continuare", "Proseguire")),
+        # SAP standard option text of the multiple-logon page; not verified live (no capture of the page yet).
+        keep_other_logons=Text(("senza terminare gli altri logon", "senza chiudere gli altri logon")),
         timed_out=Text(("sessione è scaduta", "Timeout sessione", "eseguito il logoff")),
         settings_menu=Text(("Impostazioni",), fold=False),
         settings_stem=Text(("Impostazion",)),

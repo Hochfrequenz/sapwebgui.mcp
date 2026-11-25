@@ -71,6 +71,7 @@ _TAGS: dict[str, Backend] = {
     # session_pages
     "session_pages.already_logged_on": Backend.WEBGUI,
     "session_pages.continue_button": Backend.WEBGUI,
+    "session_pages.keep_other_logons": Backend.WEBGUI,
     "session_pages.timed_out": Backend.WEBGUI,
     "session_pages.settings_menu": Backend.WEBGUI,
     "session_pages.settings_stem": Backend.BOTH,

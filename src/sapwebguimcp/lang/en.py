@@ -77,6 +77,8 @@ EN = LanguagePack(
     session_pages=SessionPagesSection(
         already_logged_on=Text(("already logged",)),
         continue_button=Text(("Continue",)),
+        # SAP standard option text of the multiple-logon page; not verified live (no capture of the page yet).
+        keep_other_logons=Text(("without ending any other logon", "without ending the other logon")),
         timed_out=Text(("session timeout", "session expired", "logged off")),
         settings_menu=Text(("Settings",), fold=False),
         settings_stem=Text(("Setting",)),

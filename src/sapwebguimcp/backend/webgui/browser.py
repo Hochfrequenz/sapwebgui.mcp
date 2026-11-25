@@ -515,6 +515,33 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
         # Don't close playwright, just reconnect
         await self.initialize()
 
+    async def ensure_default_tab(self) -> None:
+        """Open a tab in the default context if it has none left; for the first ``sap_login`` (#104).
+
+        In CONNECT mode, ``get_page()`` treats a default context without tabs as a stale CDP connection. After
+        the agent closed every session (``s1`` in the default context, the further ones in their own login
+        contexts), that state is legitimate, and the reconnect would not change it. Other callers keep the
+        stale-connection handling of ``get_page()``. If opening the tab fails, this logs and returns, and
+        ``get_page()`` reconnects as before.
+        """
+        if not self._initialized:
+            await self.initialize()
+        context = self._context
+        if context is None:
+            return
+        cached = self._pages.get(self._default_page_name)
+        if cached is not None and not cached.is_closed():
+            return
+        if any(not page.is_closed() for page in context.pages):
+            return
+        try:
+            page = await context.new_page()
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("Could not open a tab in the default browser context", exc_info=True)
+            return
+        self._pages[self._default_page_name] = page
+        logger.info("Opened a new tab in the default browser context", extra={"page": self._default_page_name})
+
     async def get_page(self, name: Optional[str] = None) -> Page:
         """
         Get or create a named page.

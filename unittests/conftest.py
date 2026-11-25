@@ -70,6 +70,7 @@ def empty_login_registry() -> Generator[None, None, None]:
     """
     manager = MagicMock()
     manager.registry.list_sessions.return_value = []
+    manager.ensure_default_tab = AsyncMock()
     with patch("sapwebguimcp.tools.sap_login_impl.get_browser_manager", new=AsyncMock(return_value=manager)):
         yield
 

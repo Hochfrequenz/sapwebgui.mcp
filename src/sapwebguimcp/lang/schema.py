@@ -149,6 +149,9 @@ class SessionPagesSection:
     """Fragment of the WebGUI "user already logged on" page (substring)."""
     continue_button: Text
     """Button that continues past the "already logged on" page (Playwright ``has-text``)."""
+    keep_other_logons: Text
+    """Label fragment of the "already logged on" page's option that continues *without* ending the user's other
+    logons (substring of the radio button's label). A parallel login selects it before it clicks Continue."""
     timed_out: Text
     """Fragments of a WebGUI timeout or logoff page (substring)."""
     settings_menu: Text

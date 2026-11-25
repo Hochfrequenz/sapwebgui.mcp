@@ -35,6 +35,7 @@ def _make_manager(sessions: list[str]) -> MagicMock:
     manager.registry.list_sessions = MagicMock(side_effect=lambda: list(sessions))
     manager.open_login_page = AsyncMock(return_value=MagicMock(name="login_page"))
     manager.close_login_page = AsyncMock()
+    manager.ensure_default_tab = AsyncMock()
     return manager
 
 
@@ -97,6 +98,7 @@ async def test_first_login_uses_the_current_tab() -> None:
     p.get_backend.assert_awaited_once_with(tool_name="sap_login")
     current.login.assert_awaited_once()
     current.start_keepalive.assert_awaited_once()
+    manager.ensure_default_tab.assert_awaited_once()
 
 
 @pytest.mark.anyio
@@ -114,6 +116,7 @@ async def test_login_with_an_existing_session_opens_a_new_one() -> None:
     p.new_backend.login.assert_awaited_once()
     current.login.assert_not_awaited()
     manager.close_login_page.assert_not_awaited()
+    manager.ensure_default_tab.assert_not_awaited()
 
 
 @pytest.mark.anyio
@@ -218,3 +221,23 @@ async def test_concurrent_first_logins_do_not_share_the_tab() -> None:
 
     assert current.login.await_count == 1
     assert manager.open_login_page.await_count == 1
+
+
+@pytest.mark.anyio
+async def test_parallel_login_keeps_the_other_logons_on_the_already_logged_on_page() -> None:
+    """A further login must not end the first one through SAP's multiple-logon page."""
+    manager = _make_manager(["s1"])
+    with _Patched(manager, _make_backend()) as p:
+        await sap_login_impl()
+
+    assert p.new_backend.login.await_args.kwargs["keep_other_logons"] is True
+
+
+@pytest.mark.anyio
+async def test_first_login_handles_the_already_logged_on_page_as_before() -> None:
+    manager = _make_manager([])
+    current = _make_backend()
+    with _Patched(manager, current):
+        await sap_login_impl()
+
+    assert current.login.await_args.kwargs["keep_other_logons"] is False

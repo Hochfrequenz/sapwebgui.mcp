@@ -137,6 +137,10 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "status_type.check_error": Manual("fragment of several syntax check messages"),
         "session_pages.already_logged_on": Manual("WebGUI logon page (ICF), not in SAP's text tables"),
         "session_pages.continue_button": Manual("WebGUI logon page (ICF), not in SAP's text tables"),
+        "session_pages.keep_other_logons": Manual(
+            "SAP standard option text of the WebGUI multiple-logon page (ICF), not in SAP's text tables;"
+            " not verified live, no system has shown the page yet"
+        ),
         "session_pages.timed_out": Manual("WebGUI timeout and logoff pages (ICF), not in SAP's text tables"),
         "session_pages.settings_menu": Manual("WebGUI framework tooltip of the settings menu"),
         "session_pages.settings_stem": Manual("stem of the WebGUI settings menu tooltip"),
