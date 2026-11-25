@@ -100,7 +100,7 @@ class PopupSection:
     """Keyword in a popup's title or message that classifies it as information (substring, checked after
     ``type_error``)."""
     type_confirm: Text
-    """Keyword in a popup's title or message that classifies it as a confirmation (substring, checked last).
+    """Keyword in a popup's title or message that classifies it as a confirmation (whole word, checked last).
 
     Matched as whole words only (unlike on the desktop, where short variants such as ``Ja`` and ``No`` also
     match inside other words), because a Web GUI popup is often a bare title."""
