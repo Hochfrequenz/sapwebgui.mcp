@@ -196,7 +196,10 @@ async def _edit_check_activate_method(
                     f"Auto-reverted source but re-activation failed: {'; '.join(revert_result.messages)}"
                 )
         else:
-            result.messages.append("WARNING: Auto-revert failed! Manual intervention needed.")
+            result.messages.append(
+                "WARNING: Auto-revert failed! The server may hold the new source as an inactive version; "
+                "re-apply backup_source with another edit call."
+            )
 
         return SE24EditResult.failure(
             error=f"Check/activate failed: {'; '.join(result.messages)}",
@@ -230,8 +233,9 @@ def register_se24_edit_tools(mcp: FastMCP) -> None:
             "**Important:** Only for EXISTING classes and methods. To create new ones, use abapGit.\n\n"
             "**Workflow:** Read current class with sap_se24_lookup first to see methods, "
             "then call this tool with the full new method source.\n\n"
-            "Afterwards the tool leaves the editor without saving (/n), which releases the edit lock; "
-            "check_messages carries a WARNING if that failed."
+            "When it finishes or fails, the tool leaves the editor without saving (/n), "
+            "which releases the edit lock (not when the call is cancelled); "
+            "check_messages carries a WARNING if leaving failed."
         ),
         annotations=ToolAnnotations(
             destructive_hint=True,

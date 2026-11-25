@@ -68,6 +68,7 @@ async def test_leave_editor_reports_popup_that_stays_open() -> None:
     reason = await leave_editor(backend)
 
     assert isinstance(reason, str)
+    assert "Save changes?" in reason
     backend.enter_transaction.assert_not_awaited()
 
 
@@ -88,6 +89,20 @@ async def test_leave_editor_reports_popup_after_leaving() -> None:
     reason = await leave_editor(backend)
 
     assert reason is not None
+    assert "Save changes?" in reason
+    backend.dismiss_popup.assert_awaited_once_with(use_close_button=True)
+
+
+@pytest.mark.anyio
+async def test_leave_editor_reports_popup_after_leaving_that_cannot_be_closed() -> None:
+    backend = _backend(
+        popups=[None, _popup("Save changes?", close_button_id="close-x")],
+        dismiss=ClosePopupResult(success=True, popup_closed=False),
+    )
+
+    reason = await leave_editor(backend)
+
+    assert isinstance(reason, str)
     assert "Save changes?" in reason
     backend.dismiss_popup.assert_awaited_once_with(use_close_button=True)
 

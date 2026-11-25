@@ -151,7 +151,10 @@ async def _edit_check_activate(
                     f"Auto-reverted source but re-activation failed: {'; '.join(revert_result.messages)}"
                 )
         else:
-            result.messages.append("WARNING: Auto-revert failed! Manual intervention needed.")
+            result.messages.append(
+                "WARNING: Auto-revert failed! The server may hold the new source as an inactive version; "
+                "re-apply backup_source with another edit call."
+            )
 
         return SE38EditResult.failure(
             error=f"Check/activate failed: {'; '.join(result.messages)}",
@@ -183,8 +186,9 @@ def register_se38_edit_tools(mcp: FastMCP) -> None:
             "**Important:** Only for EXISTING reports. To create new reports, use abapGit.\n\n"
             "**Workflow:** Read current source with sap_read_se38_source first, "
             "modify it, then call this tool with the full new source.\n\n"
-            "Afterwards the tool leaves the editor without saving (/n), which releases the edit lock; "
-            "check_messages carries a WARNING if that failed."
+            "When it finishes or fails, the tool leaves the editor without saving (/n), "
+            "which releases the edit lock (not when the call is cancelled); "
+            "check_messages carries a WARNING if leaving failed."
         ),
         annotations=ToolAnnotations(
             destructive_hint=True,

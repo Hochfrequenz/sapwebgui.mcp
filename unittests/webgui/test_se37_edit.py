@@ -212,3 +212,44 @@ async def test_se37_edit_reports_when_leaving_the_editor_failed() -> None:
     assert result.success is True
     assert result.check_messages[0] == "ok"
     assert result.check_messages[-1].startswith("WARNING: could not leave the editor")
+
+
+@pytest.mark.anyio
+async def test_se37_edit_description_states_when_the_editor_is_left() -> None:
+    """The description says the editor is left on finish or failure, and not on cancellation."""
+    from fastmcp import FastMCP
+
+    from sapwebguimcp.tools.se37_edit_tools import register_se37_edit_tools
+
+    mcp = FastMCP("test")
+    register_se37_edit_tools(mcp)
+    tool = await mcp.get_tool("sap_se37_edit")
+    assert tool.description is not None
+    assert "When it finishes or fails, the tool leaves the editor without saving (/n)" in tool.description
+    assert "not when the call is cancelled" in tool.description
+
+
+@pytest.mark.anyio
+async def test_se37_edit_failed_revert_hint_points_at_backup_source() -> None:
+    """When the auto-revert cannot replace the source, the hint says how to recover."""
+    from sapwebguimcp.models.base import CheckActivateResult
+    from sapwebguimcp.tools.se37_edit_tools import _edit_check_activate_fm
+
+    backend = MagicMock()
+    backend.read_editor_source = AsyncMock(return_value="OLD")
+    backend.replace_editor_source = AsyncMock(side_effect=[True, False])
+    backend.check_and_activate = AsyncMock(
+        return_value=CheckActivateResult(
+            success=False, error="Check failed", messages=["Check: error"], activated=False
+        )
+    )
+    with (
+        patch("sapwebguimcp.tools.se37_edit_tools._navigate_to_fm_editor", AsyncMock(return_value=None)),
+        lang.use("DE"),
+    ):
+        t = lang.current("test")
+        result = await _edit_check_activate_fm(backend, "Z_TEST_FM", "NEW", t)
+    assert result.success is False
+    assert result.error is not None
+    assert "re-apply backup_source" in result.error
+    assert "Manual intervention" not in result.error
