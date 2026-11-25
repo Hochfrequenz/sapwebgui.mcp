@@ -17,6 +17,7 @@ ST22 structure (DE/EN):
 import json
 import logging
 import re
+import unicodedata
 from collections.abc import Iterable
 
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
@@ -367,6 +368,11 @@ def _split_key_and_value(entry: str) -> tuple[str, str | None]:
     return entry, None
 
 
+def _is_text(candidate: str) -> bool:
+    """Not blank, and not only icon-font glyphs (private-use characters, which the Web GUI chrome renders as icons)."""
+    return any(not char.isspace() and unicodedata.category(char) != "Co" for char in candidate)
+
+
 def _entry_texts(entry: str) -> Iterable[str]:
     """The texts of one snapshot entry (the line after ``- ``): its quoted names, then its inline value."""
     key, value = _split_key_and_value(_unwrap_single_quoted(entry))
@@ -374,12 +380,12 @@ def _entry_texts(entry: str) -> Iterable[str]:
         return
     for match in _QUOTED_NAME.finditer(key):
         name = _decode_json_string(match.group(1))
-        if len(name) >= 2 and not name.startswith(_NON_TEXT_NAME_PREFIXES):
+        if _is_text(name) and not name.startswith(_NON_TEXT_NAME_PREFIXES):
             yield name
     if value is not None:
         if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
             value = _decode_json_string(value[1:-1])
-        if len(value) >= 2:
+        if _is_text(value):
             yield value
 
 
@@ -388,7 +394,9 @@ def _extract_text_content(snapshot: str) -> str:
 
     Yields every accessible name (JSON-quoted, with escaped quotes and other JS escapes) and every inline value (text
     nodes, inline element text, textbox values; unquoted or double-quoted), and undoes the single quoting of a whole
-    entry. The texts are joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans
+    entry. Every text that is not blank is kept, single characters included; a text of only private-use characters is
+    an icon-font glyph of the Web GUI chrome and is left out, as is the name of a button, textbox, checkbox or menu
+    item. The texts are joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans
     several lines.
     """
     text_parts: list[str] = []

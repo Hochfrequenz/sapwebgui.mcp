@@ -376,6 +376,31 @@ class TestParseDumpDetail:
 
         assert "Zugriff über 'NULL': Objektreferenz" in detail.raw_text.split("\n")
 
+    def test_a_single_character_text_is_kept(self) -> None:
+        """A one-character text (the line number of a label split from its value) is kept, not dropped as noise."""
+        snapshot = "\n".join(
+            [
+                "- text: Information on Where Terminated",
+                "- text: Source Code Line:",
+                '- text: "5"',  # Playwright quotes a value that is a number
+                "- text: Source Code Extract",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("EN"))
+
+        assert detail.line == 5
+        assert "5" in detail.raw_text.split("\n")
+
+    def test_an_icon_glyph_is_not_text(self) -> None:
+        """A text of only private-use characters is an icon-font glyph of the Web GUI chrome, not dump text."""
+        snapshot = "- text: \n- text: \U000f0001\n- text: Kurztext"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "" not in lines
+        assert "\U000f0001" not in lines
+        assert "Kurztext" in lines
+
     def test_parse_detail_call_stack(self) -> None:
         """Extract call stack entries."""
         snapshot = """- document:
