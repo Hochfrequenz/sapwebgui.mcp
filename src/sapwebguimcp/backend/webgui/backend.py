@@ -1397,6 +1397,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 total_rows=table_data.get("totalRows", 0),
                 start_row=table_data.get("startRow", 1),
                 end_row=table_data.get("endRow"),
+                truncated=bool(table_data.get("truncated", False)),
                 alv=alv,
             )
 

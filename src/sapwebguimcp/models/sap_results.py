@@ -345,16 +345,18 @@ class TableData(ToolResult):
     total_rows: int = Field(
         default=0,
         ge=0,
-        description="Total rows found; for a table control (e.g. SE24 methods) only the visible window is read, so "
-        "compare with the rows returned (start_row to end_row)",
+        description="Row count of the grid or table as the Web GUI reports it; it may exceed the rows returned "
+        "(start_row to end_row) because the Web GUI renders only part of a long grid. Without a reported count, the "
+        "number of rows read",
     )
     start_row: int = Field(default=1, ge=1, description="First row returned (1-indexed)")
     end_row: int | None = Field(default=None, ge=1, description="Last row returned")
     truncated: bool = Field(
         default=False,
-        description="True if rows of the requested range are missing: a table control (e.g. SE24 methods) only holds "
-        "the rows in its window (enlarge the SAP GUI window or narrow the range), or a classic list was read up to "
-        "its row limit",
+        description="True if rows of the requested range exist but were not read: the Web GUI renders only part of a "
+        "long ALV grid or table control (for an ALV grid, focus it and page down with sap_press_key PageDown to load "
+        "more rows, then read again; a table control only holds the rows of its window; or narrow the range), or the "
+        "read stopped at max_rows",
     )
     alv: AlvMetadata | None = Field(
         default=None,
