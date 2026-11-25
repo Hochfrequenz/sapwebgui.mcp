@@ -31,6 +31,8 @@ from sapwebguimcp.tools.screen_state_helpers import ensure_screen_state
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from sapwebguimcp.backend.webgui.backend import WebGuiBackend
     from sapwebguimcp.lang import LanguagePack
 
@@ -52,6 +54,11 @@ _STATUS_PARAMS: dict[str, JobStatus] = {
 """The ``status`` values of the tool and the job status each one selects."""
 
 
+def _is_applied(labels: Iterable[str], not_applied: set[str]) -> bool:
+    """A control is applied if at least one of its labels (the one of the screen's language) was not reported."""
+    return any(label not in not_applied for label in labels)
+
+
 async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-branches,too-many-locals
     backend: "WebGuiBackend",
     t: LanguagePack,
@@ -61,11 +68,21 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
     from_date: str | None,
     to_date: str | None,
 ) -> list[str]:
-    """Fill the SM37 selection screen fields."""
-    errors: list[str] = []
+    """Fill the SM37 selection screen fields.
+
+    Returns:
+        The names of the requested filters that could not be applied, a subset of
+        ``job_name, username, status, from_date, to_date`` in that order; empty if every requested filter was applied.
+        A filter counts as applied if at least one label of its control (the one of the screen's language) was found
+        and set. ``username`` is only reported when a user was requested and ``status`` only when statuses were
+        requested, then if any of the six status checkboxes (to check or to uncheck) could not be set. If the screen
+        state could not be established at all, every filter handed to it is reported.
+    """
+    unapplied: list[str] = []
 
     # Build target for checkboxes + text fields in one declarative call. Every label of the session's view is a key:
-    # ensure_screen_state matches by label, a label that is not on the screen only gives a (harmless) warning.
+    # ensure_screen_state matches by label; a label that is not on the screen (the other language) is reported in
+    # ``not_applied``, which is only a failure when no label of a requested filter was applied.
     effective_statuses = set(statuses) if statuses else set(_STATUS_PARAMS)
     fields: dict[str, str] = dict.fromkeys(t.sm37.job_name, job_name)
     if username is not None:
@@ -80,38 +97,45 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
         fields=fields,
     )
     state_result = await ensure_screen_state(backend, target)
+    errors: list[str] = []
     if not state_result.success:
         errors.append(f"Failed to set selection screen state: {state_result.error}")  # lang-ok: our own message
-    errors.extend(state_result.warnings)
+        unapplied.append("job_name")
+        if username is not None:
+            unapplied.append("username")
+        if statuses:
+            unapplied.append("status")
+    else:
+        not_applied = set(state_result.not_applied)
+        if not _is_applied(t.sm37.job_name, not_applied):
+            unapplied.append("job_name")
+        if username is not None and not _is_applied(t.sm37.user_name, not_applied):
+            unapplied.append("username")
+        # Without a requested status no filter was asked for; the boxes are only set to keep SAP's defaults visible.
+        if statuses and not all(_is_applied(t.sm37.status[status], not_applied) for status in _STATUS_PARAMS.values()):
+            unapplied.append("status")
+        errors.extend(state_result.warnings)
+    if errors:
+        logger.warning("Selection screen state errors=%r", errors)
 
     # Date fields are filled manually (not via ensure_screen_state) because they
     # require the date format of the session's language.
     # The ARIA snapshot values use SAP's display format which may differ from the
     # input format, making snapshot-based verification unreliable for dates.
-    if from_date or to_date:
-        if from_date:
-            sap_from = format_sap_date_as(from_date, t.date_format)
-            for label in t.sm37.from_date:
-                try:
-                    await backend.fill_field(label, sap_from)
-                    break
-                except ValueError:
-                    continue
-            else:
-                errors.append("Could not set from_date: field not found")
+    for name, value, labels in (("from_date", from_date, t.sm37.from_date), ("to_date", to_date, t.sm37.to_date)):
+        if not value:
+            continue
+        sap_value = format_sap_date_as(value, t.date_format)
+        for label in labels:
+            try:
+                await backend.fill_field(label, sap_value)
+                break
+            except ValueError:
+                continue
+        else:
+            unapplied.append(name)
 
-        if to_date:
-            sap_to = format_sap_date_as(to_date, t.date_format)
-            for label in t.sm37.to_date:
-                try:
-                    await backend.fill_field(label, sap_to)
-                    break
-                except ValueError:
-                    continue
-            else:
-                errors.append("Could not set to_date: field not found")
-
-    return errors
+    return unapplied
 
 
 def _is_job_log_screen(snapshot: str, t: LanguagePack) -> bool:
@@ -197,9 +221,18 @@ async def _execute_sm37_lookup(  # pylint: disable=too-many-arguments,too-many-p
 
     await backend.wait_for_ready()
 
-    fill_errors = await _fill_selection_screen(backend, t, job_name, username, statuses, from_date, to_date)
-    if fill_errors:
-        logger.warning("Selection field errors errors=%r", fill_errors)
+    unapplied = await _fill_selection_screen(backend, t, job_name, username, statuses, from_date, to_date)
+    if unapplied:
+        # Pressing F8 now would run SAP's default selection and return jobs that do not match the request.
+        logger.warning("SM37 filters not applied filters=%r", unapplied)
+        names = ", ".join(unapplied)
+        return SM37JobListResult.failure(
+            error=f"Could not apply the filter(s) on the SM37 selection screen: {names}",  # lang-ok: our own message
+            jobs=[],
+            job_count=0,
+            filters_applied={},
+            retrieved_at=now,
+        )
 
     filters_applied: dict[str, str] = {"job_name": job_name}
     if username:

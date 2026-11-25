@@ -539,3 +539,24 @@ class TestEnsureScreenStateTransitions:
 
         assert diff.success is False
         assert any("Datenbankrelation" in m for m in diff.mismatches)
+
+
+class TestEnsureScreenStateNotApplied:
+    """``not_applied`` lists the labels of controls that were not found or could not be set (issue #98)."""
+
+    @pytest.mark.anyio
+    async def test_not_applied_lists_missing_and_failed_labels(self) -> None:
+        screen = '- checkbox "Present" [checked]:  Present\n- textbox "Stubborn": OLD\n'
+        backend = _mock_backend(screen, screen)
+        backend.fill_field = AsyncMock(side_effect=RuntimeError("refused"))
+        target = SelectionScreenState(
+            checkboxes={"Present": True, "Missing": True},
+            fields={"Stubborn": "NEW"},
+        )
+
+        diff = await ensure_screen_state(backend, target)
+
+        # The field keeps its old value, so the call fails on verification and the failure result carries not_applied.
+        # Before the fix the model has no such field: reading it through model_dump() raises KeyError.
+        assert diff.success is False
+        assert diff.model_dump()["not_applied"] == ["Missing", "Stubborn"]

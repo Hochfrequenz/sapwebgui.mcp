@@ -76,7 +76,7 @@ async def test_sm37_selection_screen_targets_the_labels_of_the_synthetic_languag
 
     async def _ensure(_backend: Any, target: Any) -> Any:
         state["target"] = target
-        return SimpleNamespace(success=True, error=None, warnings=[])
+        return SimpleNamespace(success=True, error=None, warnings=[], not_applied=[])
 
     with (
         _register_for_tests(synthetic_pack()),
