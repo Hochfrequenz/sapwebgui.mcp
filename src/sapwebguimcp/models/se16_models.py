@@ -31,7 +31,9 @@ class SE16Result(ToolResult):
     """
 
     table: str = Field(description="Table name that was queried")
-    total_hits: int = Field(description="Total rows matching query (from SAP 'Number of Hits')")
+    total_hits: int = Field(
+        description="Total rows matching query (from SAP 'Number of Hits'); capped at max_hits when truncated is true"
+    )
     returned_rows: int = Field(description="Number of rows actually returned")
     truncated: bool = Field(description="True if total_hits >= max_hits (more data may exist in table)")
     columns: list[str] = Field(description="Column names in order")
@@ -52,7 +54,7 @@ class SE16FileSummary(ToolResult):
 
     output_file: str = Field(description="Path to JSON file containing full SE16Result")
     table: str = Field(description="Table name that was queried")
-    total_hits: int = Field(description="Total rows matching query")
+    total_hits: int = Field(description="Total rows matching query; capped at max_hits when truncated is true")
     returned_rows: int = Field(description="Number of rows written to file")
     truncated: bool = Field(description="True if total_hits >= max_hits")
     columns: list[str] = Field(description="Column names in order")

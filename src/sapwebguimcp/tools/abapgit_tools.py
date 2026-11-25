@@ -994,9 +994,6 @@ async def _abapgit_pull_via_api(  # pylint: disable=too-many-arguments,too-many-
     """Pull changes using the Z_ABAPGIT_PULL_MCP transaction (abapGit ABAP API)."""
     label = _failure_label(repo, key)
     logger.info("Starting abapGit Pull via API", extra={"repo": label})
-    # Resolved outside the try: an unsupported session language must reach the caller, not become a failure result.
-    t = lang.current("sap_abapgit_pull")
-
     try:
         # Validate and prepare parameters
         params_result = _validate_and_prepare_params(repo, trkorr, username, pat, branch, key)
@@ -1004,6 +1001,9 @@ async def _abapgit_pull_via_api(  # pylint: disable=too-many-arguments,too-many-
             return params_result
         params = params_result
         label = params.label
+        # Resolved after validation: a malformed input is rejected without SAP text, so it needs no logon language.
+        # An unsupported session language must reach the caller, not become a failure result (re-raised below).
+        t = lang.current("sap_abapgit_pull")
 
         logger.info(
             "Calling transaction with params",
@@ -1028,6 +1028,8 @@ async def _abapgit_pull_via_api(  # pylint: disable=too-many-arguments,too-many-
         outcome = await _check_branch_outcome(backend, await _analyze_pull_result(backend, params.label, t), params)
         return _check_key_outcome(outcome, params)
 
+    except lang.UnsupportedLanguageError:
+        raise
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("abapGit pull via API", extra={"repo": label})
         return AbapGitActionResult.failure_result(action="pull", repo_name=label, error=str(e))
