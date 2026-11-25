@@ -702,10 +702,13 @@ class _ScrollScan:
         self.undecided = list(self.filters)
 
     async def process(self, backend: WebGuiBackend, rows: list[_GridRow]) -> bool:
-        """Decide the undecided fields found on this page and fill them, top row first.
+        """Decide the undecided fields found on this page, top row first, and fill at most one of them.
+
+        The Tab after a fill may shift the grid, which makes the locators of ``rows`` stale: after one fill the
+        caller reads the page again and the remaining fields are located on that fresh read.
 
         Returns:
-            True if a field was filled (the Tab after it may have shifted the grid).
+            True if a fill was attempted (the page must be read again before any other locator is used).
         """
         self.offered.extend(str(row.field_name) for row in rows if row.fillable)
         by_name = {str(row.field_name): row for row in rows}
@@ -713,16 +716,15 @@ class _ScrollScan:
             ((name, by_name[name.upper()]) for name in self.undecided if name.upper() in by_name),
             key=lambda item: item[1].row_index,
         )
-        filled = False
         for name, row in found:
             self.undecided.remove(name)
             if not row.fillable:
                 self.unapplied.add(name)
-            elif await _fill_filter_by_locator(backend, row.element_id, row.selector, self.filters[name], name):
-                filled = True
-            else:
+                continue
+            if not await _fill_filter_by_locator(backend, row.element_id, row.selector, self.filters[name], name):
                 self.other_errors.append(f"Found the selection row for {name} but filling it failed")
-        return filled
+            return True
+        return False
 
 
 async def _fill_se16n_filters_by_name_scrolling(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -751,13 +753,13 @@ async def _fill_se16n_filters_by_name_scrolling(  # pylint: disable=too-many-arg
         filled = await scan.process(backend, rows)
         if not scan.undecided:
             break
-        if has_padding:
-            reached_end = True
-            break
         step: _GridPage | str | None
         if filled:
-            # The Tab after a fill may have shifted the grid: read this page again before scrolling on.
+            # The Tab after a fill may have shifted the grid: read this page again before any other locator is used.
             step = await _read_selection_page(backend, read_js)
+        elif has_padding:
+            reached_end = True
+            break
         elif pages >= _SE16N_MAX_SELECTION_PAGES:
             result.hint = (
                 f"The SE16N selection grid of table {table} was not read to its end "  # lang-ok: our own message

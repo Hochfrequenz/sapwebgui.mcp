@@ -317,9 +317,18 @@ class TestScrollSelectionGrid:
         assert backend.press_key.await_count == 2
 
     async def test_fills_within_a_page_in_row_order(self) -> None:
-        backend = _scroll_backend([_grid((0, "A"), (1, "B"))])
+        backend = _scroll_backend([_grid((0, "A"), (1, "B")), _grid((0, "A"), (1, "B"))])  # read, re-read after A
         await _fill_se16n_filters_webgui(backend, "T", {"B": "2", "A": "1"}, None)
         assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low1"]', "2")]
+
+    async def test_a_second_field_of_the_same_page_is_located_on_a_fresh_read(self) -> None:
+        # Both fields are visible at first, but the Tab after filling A moved the grid by one row: B is now
+        # row 0. Filling B by the locator of the first read would write its value into C's row.
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), (2, "C")), _grid((0, "B"), (1, "C"), (2, "D"))])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "B": "2"}, None)
+        assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low0"]', "2")]
+        assert result.unapplied_fields == []
+        assert result.other_errors == []
 
     async def test_the_page_is_read_again_after_a_fill_before_scrolling(self) -> None:
         # Tab after the fill moved the grid by one row: C is now in row 1.
