@@ -1318,6 +1318,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                         label=raw.get("label", ""),
                         field_type=SapFieldType(raw.get("field_type", "text")),
                         current_value=raw.get("current_value"),
+                        checked=raw.get("checked") if isinstance(raw.get("checked"), bool) else None,
                         readonly=raw.get("readonly", False),
                         options=options,
                     )

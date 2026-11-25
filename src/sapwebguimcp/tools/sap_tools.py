@@ -716,7 +716,8 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
     @mcp.tool(
         description=(
             "Discover fillable form fields on the current SAP screen (or active popup dialog). "
-            "Returns field IDs, labels, types (text/dropdown/checkbox/radio), and current values. "
+            "Returns field IDs, labels, types (text/dropdown/checkbox/radio), current values "
+            "and the checked state of checkboxes and radio buttons. "
             "Automatically targets the active window — if a popup is open, shows popup fields. "
             "Use include_dropdown_options=True to also fetch available options for dropdown fields.\n\n"
             "**Session parameter:**\n"
@@ -748,6 +749,7 @@ def register_sap_tools(mcp: FastMCP) -> None:  # pylint: disable=too-many-statem
             - label: Visible label text
             - field_type: text, dropdown, checkbox, or radio
             - current_value: Current field value (if any)
+            - checked: True/False for checkbox and radio fields, None otherwise
             - readonly: Whether field is editable
             - options: Available options (dropdowns only, when include_dropdown_options=True)
         """
