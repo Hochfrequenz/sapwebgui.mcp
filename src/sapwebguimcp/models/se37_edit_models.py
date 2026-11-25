@@ -10,5 +10,10 @@ class SE37EditResult(ToolResult):
 
     function_module: str = Field(description="Name of the function module that was edited")
     backup_source: str = Field(description="Original source code before editing (for reference/undo)")
-    check_messages: list[str] = Field(default_factory=list, description="Messages from syntax check and activation")
+    check_messages: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Messages from syntax check and activation; may end with a WARNING entry if the editor could not be left"
+        ),
+    )
     activated: bool = Field(default=False, description="Whether the function module was successfully activated")

@@ -439,6 +439,10 @@ async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-
 # Maximum number of offered SE16N selection fields named in a filter failure message
 _SE16N_MAX_OFFERED_FIELDS = 50
 
+# Upper bound for the pages the Web GUI selection grid is scrolled through (SE11 allows 749 fields; in a
+# small-window worst case of 7 visible rows per page, 120 pages still cover them; the test system shows 16 rows)
+_SE16N_MAX_SELECTION_PAGES = 120
+
 
 @dataclass
 class _FilterFillResult:
@@ -447,7 +451,8 @@ class _FilterFillResult:
     unapplied_fields: list[str] = dataclass_field(default_factory=list)  # requested names (as given) not in the grid
     other_errors: list[str] = dataclass_field(default_factory=list)  # non-field problems, e.g. grid not found
     offered_fields: list[str] = dataclass_field(default_factory=list)  # technical names seen in grid, deduped, ordered
-    hint: str | None = None  # extra sentence for the failure message (Web GUI: the grid is only partly rendered)
+    hint: str | None = None  # extra sentence for the failure message (Web GUI: the grid was not read to its end)
+    offered_partial: bool = False  # the offered list stems from a grid that was not read to its end
 
 
 def _dedupe_keep_order(names: list[str]) -> list[str]:
@@ -478,7 +483,8 @@ def _filter_fill_failure(fill: _FilterFillResult, table: str, now: datetime) -> 
     error = f"Filter field(s) {names} not available as SE16N selection criteria for table {table}."
     offered = _format_offered_fields(fill.offered_fields)
     if offered:
-        error += f" Offered fields: {offered}."
+        label = "Offered fields (first part of the grid)" if fill.offered_partial else "Offered fields"
+        error += f" {label}: {offered}."
     error += (
         " A field can exist in the table without being an SE16N selection field; use sap-adt `run_query` if available."
     )
@@ -525,9 +531,11 @@ def _plan_se16n_filters(
       exactly as many rows as SE11 has fields; any other count means a field was left out,
       positions cannot be trusted, and nothing is filled.
 
-    The Web GUI renders only the first rows of the grid (about 30) and the grid is not scrolled, so a
-    field further down the table is not among ``rows``. When the grid has no empty padding row left
-    (``possibly_truncated``) or SE11 lists more fields than the grid shows, the failure says so (``hint``).
+    ``rows`` are the rows of the page of the grid that is shown; a field further down the table is not
+    among them. When the grid has no empty padding row left (``possibly_truncated``) or SE11 lists more
+    fields than the grid shows, the failure says so (``hint``). :func:`_fill_se16n_filters_webgui` scrolls
+    the grid when every row shows its technical name; it calls this function (which does not scroll) only
+    when the names are not readable.
     """
     plan = _FilterPlan()
     result = plan.result
@@ -612,13 +620,181 @@ def _parse_grid_rows(raw_rows: Any) -> list[_GridRow]:
     return rows
 
 
+_SE16N_GRID_CELL_SELECTOR = '[role="grid"] [lsdata*="GS_SELFIELDS-"]'
+
+_GridPage = tuple[list[_GridRow], bool]  # the rows of the page shown, and whether it ends in empty padding rows
+
+
+async def _focus_selection_grid(backend: WebGuiBackend, rows: list[_GridRow]) -> bool:
+    """Put the focus into the selection grid, so that PageDown scrolls it and not the page.
+
+    Clicks the From-Value input of the first fillable row of the page (id first, then selector, like
+    :func:`_fill_filter_by_locator`); when there is none or the clicks miss, any cell of the grid.
+
+    Returns:
+        True if a click hit an element.
+    """
+    row = next((candidate for candidate in rows if candidate.fillable), None)
+    if row is not None:
+        selectors = [f'[id="{row.element_id}"]'] if row.element_id else []
+        if row.selector:
+            selectors.append(row.selector)
+        for selector in selectors:
+            if await backend.click_element(selector):
+                return True
+    return bool(await backend.click_element(_SE16N_GRID_CELL_SELECTOR))
+
+
+async def _read_selection_page(backend: WebGuiBackend, read_js: str) -> _GridPage | str:
+    """Read the page of the selection grid that is shown now.
+
+    Returns:
+        ``(rows, has_padding)``, or an error text when the grid cannot be read or a row has no technical name.
+    """
+    grid = await backend.evaluate_javascript(read_js, {})
+    if not grid.get("success"):
+        return str(grid.get("error", "Could not read the SE16N selection grid"))
+    rows = _parse_grid_rows(grid.get("rows"))
+    if not rows or not all(row.field_name for row in rows):
+        return "SE16N selection rows could not be read again, so the filters could not be placed"
+    return rows, bool(grid.get("hasPaddingRows"))
+
+
+async def _scroll_selection_grid(backend: WebGuiBackend, read_js: str, rows: list[_GridRow]) -> _GridPage | str | None:
+    """Scroll the grid down by one page with PageDown.
+
+    The grid is read again when the page looks unchanged (it may not be rendered yet); a page that is still
+    the same means the end of the grid.
+
+    Returns:
+        The new page, an error text (focus or PageDown failed, or the page cannot be read), or None at the
+        end of the grid.
+    """
+    if not await _focus_selection_grid(backend, rows):
+        return "Could not focus the SE16N selection grid to scroll it, so no filter was applied"
+    key = await backend.press_key("PageDown")
+    if not key.success:
+        # An unchanged page would be taken for the end of the grid, so a failed key is an error of its own.
+        return f"Could not scroll the SE16N selection grid (PageDown failed: {key.error}), so no filter was applied"
+    await backend.wait(500)
+    page = await _read_selection_page(backend, read_js)
+    if isinstance(page, str) or [row.field_name for row in page[0]] != [row.field_name for row in rows]:
+        return page
+    await backend.wait(1000)
+    page = await _read_selection_page(backend, read_js)
+    if isinstance(page, str) or [row.field_name for row in page[0]] != [row.field_name for row in rows]:
+        return page
+    return None
+
+
+@dataclass
+class _ScrollScan:
+    """The requested filters and which of them the scan through the pages of the selection grid has decided."""
+
+    filters: dict[str, str]
+    undecided: list[str] = dataclass_field(init=False)  # requested names, filter order
+    # names that get no filter: the row has no input, or (added at the end of the scan) the name was never found
+    unapplied: set[str] = dataclass_field(default_factory=set)
+    offered: list[str] = dataclass_field(default_factory=list)  # fillable names seen; pages may overlap
+    other_errors: list[str] = dataclass_field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.undecided = list(self.filters)
+
+    async def process(self, backend: WebGuiBackend, rows: list[_GridRow]) -> bool:
+        """Decide the undecided fields found on this page, top row first, and fill at most one of them.
+
+        The Tab after a fill may shift the grid, which makes the locators of ``rows`` stale: after one fill the
+        caller reads the page again and the remaining fields are located on that fresh read.
+
+        Returns:
+            True if a fill was attempted (the page must be read again before any other locator is used).
+        """
+        self.offered.extend(str(row.field_name) for row in rows if row.fillable)
+        by_name = {str(row.field_name): row for row in rows}
+        found = sorted(
+            ((name, by_name[name.upper()]) for name in self.undecided if name.upper() in by_name),
+            key=lambda item: item[1].row_index,
+        )
+        for name, row in found:
+            self.undecided.remove(name)
+            if not row.fillable:
+                self.unapplied.add(name)
+                continue
+            if not await _fill_filter_by_locator(backend, row.element_id, row.selector, self.filters[name], name):
+                self.other_errors.append(f"Found the selection row for {name} but filling it failed")
+            return True
+        return False
+
+
+async def _fill_se16n_filters_by_name_scrolling(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    backend: WebGuiBackend,
+    read_js: str,
+    table: str,
+    filters: dict[str, str],
+    first_page: list[_GridRow],
+    first_has_padding: bool,
+) -> _FilterFillResult:
+    """Fill the filters by technical name, scrolling the selection grid page by page until all are decided.
+
+    The grid shows one page of rows (16 on a typical system; a wide table has hundreds of rows) and the row
+    index of a page is relative to it, so element ids are valid only for the page shown. A value typed into a
+    row stays when the grid scrolls on. The scan stops when every requested field is decided (filled, or found
+    without an input), at the end of the grid (padding rows, or a PageDown that shows the same page) or after
+    ``_SE16N_MAX_SELECTION_PAGES`` pages.
+    """
+    scan = _ScrollScan(filters)
+    result = _FilterFillResult()
+    rows, has_padding = first_page, first_has_padding
+    pages = 1  # pages reached by PageDown, the first one included
+    reached_end = False
+    failed = False
+    while True:
+        filled = await scan.process(backend, rows)
+        if not scan.undecided:
+            break
+        step: _GridPage | str | None
+        if filled:
+            # The Tab after a fill may have shifted the grid: read this page again before any other locator is used.
+            step = await _read_selection_page(backend, read_js)
+        elif has_padding:
+            reached_end = True
+            break
+        elif pages >= _SE16N_MAX_SELECTION_PAGES:
+            result.hint = (
+                f"The SE16N selection grid of table {table} was not read to its end "  # lang-ok: our own message
+                f"(stopped after {_SE16N_MAX_SELECTION_PAGES} pages)."
+            )
+            break
+        else:
+            step = await _scroll_selection_grid(backend, read_js, rows)
+            pages += 1
+            if step is None:
+                reached_end = True
+                break
+        if isinstance(step, str):
+            scan.other_errors.append(step)
+            failed = True
+            break
+        rows, has_padding = step
+    if not failed:  # after an error the remaining fields are not known to be missing
+        scan.unapplied.update(scan.undecided)
+    result.unapplied_fields = [name for name in filters if name in scan.unapplied]
+    result.other_errors = scan.other_errors
+    result.offered_fields = _dedupe_keep_order(scan.offered)
+    result.offered_partial = not reached_end
+    return result
+
+
 async def _fill_se16n_filters_webgui(
     backend: WebGuiBackend, table: str, filters: dict[str, str], field_order: dict[str, int] | None
 ) -> _FilterFillResult:
     """Fill the SE16N selection criteria on the Web GUI backend, placing each filter by field name.
 
-    Reads the grid rows (index, technical name, input element) from the DOM, plans which row each
-    filter goes into (:func:`_plan_se16n_filters`), then fills those inputs through the protocol's
+    Reads the grid rows (index, technical name, input element) from the DOM. When every row shows its
+    technical name, the grid is scrolled page by page until each filter is placed
+    (:func:`_fill_se16n_filters_by_name_scrolling`). Otherwise the filters are planned on the rows of the
+    first page (:func:`_plan_se16n_filters`). The inputs are filled through the protocol's
     ``fill_element_by_locator`` (click + type, which triggers the proper SAP events).
 
     Filters that cannot be placed, and fills that fail, are reported in the result; the caller must
@@ -629,13 +805,12 @@ async def _fill_se16n_filters_webgui(
     if not grid.get("success"):
         return _FilterFillResult(other_errors=[str(grid.get("error", "Could not read the SE16N selection grid"))])
 
-    plan = _plan_se16n_filters(
-        _parse_grid_rows(grid.get("rows")),
-        filters,
-        field_order,
-        table,
-        possibly_truncated=not grid.get("hasPaddingRows"),
-    )
+    rows = _parse_grid_rows(grid.get("rows"))
+    has_padding = bool(grid.get("hasPaddingRows"))
+    if rows and all(row.field_name for row in rows):
+        return await _fill_se16n_filters_by_name_scrolling(backend, read_js, table, filters, rows, has_padding)
+
+    plan = _plan_se16n_filters(rows, filters, field_order, table, possibly_truncated=not has_padding)
     result = plan.result
     for name, value, row in plan.targets:
         if not await _fill_filter_by_locator(backend, row.element_id, row.selector, value, name):
@@ -824,8 +999,10 @@ def register_se16_tools(mcp: FastMCP) -> None:
             "**Filters:** If a filter cannot be applied (e.g. the field is unknown or not offered by "
             "SE16N), the call fails before running the query; the error lists the SE16N selection "
             "fields when they could be read. On the WebGUI backend a filter goes into the row whose "
-            "technical name matches, and only the first ~30 rows of the selection grid are rendered, "
-            "so a field further down a wide table cannot be filtered (the error says so).\n\n"
+            "technical name matches; the selection grid is scrolled until that row is found, so a field "
+            "of a wide table can be filtered, too. A filter on a field the table does not offer makes the tool "
+            "read the whole selection grid, which takes longer on a wide table (roughly a second or two per "
+            "page of rows).\n\n"
             "**Performance:** ~7 rows/second due to pagination.\n"
             "- 100 rows: ~14 seconds\n"
             "- 500 rows: ~1.5 minutes\n"
@@ -850,8 +1027,8 @@ def register_se16_tools(mcp: FastMCP) -> None:
             ctx: FastMCP context (injected)
             table: Table name to query (e.g., "MARA", "T000", "TSTC")
             filters: Optional filter dict {field_name: value} - uses technical field names. A field that is
-                unknown or not offered by SE16N makes the call fail (both backends); on the WebGUI backend
-                fields beyond the first ~30 selection rows cannot be reached.
+                unknown or not offered by SE16N makes the call fail (both backends). On the WebGUI backend
+                the selection grid is scrolled until the row of the field is found.
             max_hits: Maximum rows to return (default 100)
             output_file: If provided, write full results to this JSON file within the
                 configured output directory (OUTPUT_DIR, default: current working
