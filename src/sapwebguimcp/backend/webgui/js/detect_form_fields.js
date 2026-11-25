@@ -85,8 +85,57 @@
         return 'text';
     }
 
+    /**
+     * State of a checkbox/radio that is not an <input>: aria-checked first, then the lsCheckBox--checked /
+     * lsRadioButton--unchecked class modifiers (also with a --disabled suffix). null when it cannot be told.
+     */
+    function getSelectorState(el) {
+        const aria = el.getAttribute('aria-checked');
+        if (aria === 'true') {
+            return true;
+        }
+        if (aria === 'false') {
+            return false;
+        }
+        if (aria !== null) {
+            return null; // 'mixed' or anything else
+        }
+        for (const token of Array.from(el.classList)) {
+            const match = /^ls(?:CheckBox|RadioButton)--(checked|unchecked)(?:--|$)/.exec(token);
+            if (match) {
+                return match[1] === 'checked';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Name of a checkbox/radio that is not an <input>. Deliberately no sibling-text guessing (see getLabel):
+     * unnamed controls (table and ABAP list checkboxes) cannot be addressed by name and are left out.
+     */
+    function getSelectorLabel(el) {
+        const candidates = [
+            el.getAttribute('aria-label'),
+            el.textContent,
+            el.getAttribute('title'),
+        ];
+        for (const candidate of candidates) {
+            const text = (candidate || '').trim();
+            if (text) {
+                return text.substring(0, 100);
+            }
+        }
+        return '';
+    }
+
     // Find all input elements
     document.querySelectorAll('input, select').forEach((el) => {
+        // An <input> inside a role=checkbox/radio wrapper is reported through the wrapper (second loop)
+        const wrapper = el.closest('[role="checkbox"], [role="radio"]');
+        if (wrapper && wrapper !== el) {
+            return;
+        }
+
         // Skip hidden and submit buttons
         if (el.type === 'hidden' || el.type === 'submit' || el.type === 'button') {
             return;
@@ -118,6 +167,46 @@
 
         // Only include fields with an ID (needed for targeting)
         if (field.id) {
+            fields.push(field);
+        }
+    });
+
+    // Checkboxes and radio buttons that are no <input>: ARIA role elements and SAP lsCheckBox/lsRadioButton spans
+    const selectorControls = document.querySelectorAll(
+        '[role="checkbox"], [role="radio"], .lsCheckBox, .lsRadioButton'
+    );
+    selectorControls.forEach((el) => {
+        if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+            return; // handled by the first loop
+        }
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            return;
+        }
+        if (el.offsetParent === null) {
+            return;
+        }
+
+        const classes = Array.from(el.classList);
+        const isRadio = el.getAttribute('role') === 'radio' || classes.includes('lsRadioButton');
+        const isReadonly =
+            el.getAttribute('aria-disabled') === 'true' ||
+            el.getAttribute('aria-readonly') === 'true' ||
+            classes.some((token) => token.endsWith('--disabled') || token.endsWith('--readonly'));
+
+        const field = {
+            id: el.id || '',
+            label: getSelectorLabel(el),
+            field_type: isRadio ? 'radio' : 'checkbox',
+            current_value: null,
+            checked: getSelectorState(el),
+            readonly: isReadonly,
+            options: null,
+        };
+
+        // Only named controls with an ID (an unnamed one cannot be addressed by sap_set_checkbox)
+        if (field.id && field.label) {
             fields.push(field);
         }
     });

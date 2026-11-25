@@ -19,7 +19,7 @@ from mcp import ClientSession
 from sapwebguimcp.backend.webgui.models.browser_results import SnapshotResult
 from sapwebguimcp.backend.webgui.parsers.screen_state_parser import parse_selection_screen_state
 from sapwebguimcp.models import LoginResult, TransactionResult
-from sapwebguimcp.models.sap_results import SetFieldResult
+from sapwebguimcp.models.sap_results import FormFieldsResult, SapFieldType, SetFieldResult
 
 from .conftest import call_tool_typed
 
@@ -350,3 +350,72 @@ async def test_multiple_checkbox_toggles_are_independent(sap_mcp_client: ClientS
             {"label": label, "checked": checkboxes[label]},
             SetFieldResult,
         )
+
+
+# =============================================================================
+# sap_get_form_fields reports checkboxes and radio buttons with their state (#101)
+# =============================================================================
+
+
+async def _form_field_states(client: ClientSession, field_type: SapFieldType) -> dict[str, bool | None]:
+    """``{label: checked}`` of every field of ``field_type`` that sap_get_form_fields reports."""
+    data = await call_tool_typed(client, "sap_get_form_fields", {}, FormFieldsResult)
+    assert data.success, f"sap_get_form_fields failed: {data.error}"
+    return {field.label: field.checked for field in data.fields if field.field_type == field_type}
+
+
+@pytest.mark.anyio
+async def test_form_fields_report_the_checked_state_of_checkboxes(sap_mcp_client: ClientSession) -> None:
+    """sap_get_form_fields lists the SE09 checkboxes and follows a toggle of one of them."""
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success
+
+    tx = await call_tool_typed(sap_mcp_client, "sap_transaction", {"tcode": "SE09"}, TransactionResult)
+    assert tx.success
+
+    aria = (await _get_screen_state(sap_mcp_client))["checkboxes"]
+    assert aria, "Expected checkboxes on SE09"
+    target_label, original = next(iter(aria.items()))
+
+    try:
+        for wanted in (not original, original):
+            result = await call_tool_typed(
+                sap_mcp_client,
+                "sap_set_checkbox",
+                {"label": target_label, "checked": wanted},
+                SetFieldResult,
+            )
+            assert result.success, f"set_checkbox failed: {result.error}"
+            states = await _form_field_states(sap_mcp_client, SapFieldType.CHECKBOX)
+            assert states.get(target_label) is wanted, f"'{target_label}' should be {wanted}, form fields: {states}"
+    finally:
+        await call_tool_typed(
+            sap_mcp_client,
+            "sap_set_checkbox",
+            {"label": target_label, "checked": original},
+            SetFieldResult,
+        )
+
+
+@pytest.mark.anyio
+async def test_form_fields_report_the_checked_state_of_radio_buttons(sap_mcp_client: ClientSession) -> None:
+    """sap_get_form_fields lists the SE11 radio buttons with exactly the selected one checked."""
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success
+
+    tx = await call_tool_typed(sap_mcp_client, "sap_transaction", {"tcode": "SE11"}, TransactionResult)
+    assert tx.success
+
+    aria = (await _get_screen_state(sap_mcp_client))["radios"]
+    unselected = [label for label, checked in aria.items() if not checked]
+    assert unselected, "Expected an unselected radio on SE11"
+    target_label = unselected[0]
+
+    result = await call_tool_typed(sap_mcp_client, "sap_set_radio_button", {"label": target_label}, SetFieldResult)
+    assert result.success, f"set_radio_button failed: {result.error}"
+
+    states = await _form_field_states(sap_mcp_client, SapFieldType.RADIO)
+    assert states.get(target_label) is True, f"'{target_label}' should be selected, form fields: {states}"
+    others = {label: checked for label, checked in states.items() if label != target_label}
+    assert others, f"Expected the other SE11 radio buttons too, form fields: {states}"
+    assert all(checked is False for checked in others.values()), f"Only '{target_label}' may be selected: {states}"
