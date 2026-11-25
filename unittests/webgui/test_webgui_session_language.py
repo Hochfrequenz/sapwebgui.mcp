@@ -77,6 +77,22 @@ async def test_new_window_session_inherits_the_origin_language() -> None:
 
 
 @pytest.mark.anyio
+async def test_post_login_setup_forgets_the_cached_date_format() -> None:
+    """A re-login on the same tab may be another user, so the date format is derived again (#42)."""
+    with use_language(None):
+        backend, registry = _make_backend("")
+        known = registry.register(backend._page)
+        registry.set_date_format(known, "%d.%m.%Y")
+        with (
+            patch.object(type(backend), "_get_registry", new=AsyncMock(return_value=registry)),
+            patch.object(type(backend), "_capture_sap_identity", new=AsyncMock()),
+        ):
+            await backend._post_login_setup("https://sap.example", "100", None, None)
+
+        assert registry.date_format_of(known) is None
+
+
+@pytest.mark.anyio
 async def test_post_login_setup_does_not_re_register_a_known_page() -> None:
     with use_language(None):
         backend, registry = _make_backend("de")
