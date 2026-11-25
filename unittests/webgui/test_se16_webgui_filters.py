@@ -280,7 +280,7 @@ def _scroll_backend(pages: Any, *, click: bool = True) -> MagicMock:
     backend.load_js.return_value = "(args) => ({})"
     backend.evaluate_javascript = AsyncMock(side_effect=pages)
     backend.click_element = AsyncMock(return_value=click)
-    backend.press_key = AsyncMock()
+    backend.press_key = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
     backend.wait = AsyncMock()
     backend.fill_element_by_locator = AsyncMock(return_value=True)
     return backend
@@ -430,12 +430,34 @@ class TestScrollSelectionGrid:
         assert result.other_errors == ["Selection criteria grid not found"]
         assert result.unapplied_fields == []
 
+    async def test_failed_page_down_is_an_error(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False)] * 3)
+        backend.press_key = AsyncMock(return_value=SimpleNamespace(success=False, error="boom"))
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.other_errors == [
+            "Could not scroll the SE16N selection grid (PageDown failed: boom), so no filter was applied"
+        ]
+        assert result.unapplied_fields == []
+        assert backend.evaluate_javascript.await_count == 1  # no re-read, so no "end of the grid" conclusion
+
+    async def test_unreadable_page_after_a_fill_is_an_error(self) -> None:
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), (1, "B"), padding=False),
+                {"success": False, "error": "Selection criteria grid not found"},  # re-read after filling A
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "ZZ": "x"}, None)
+        assert result.other_errors == ["Selection criteria grid not found"]
+        assert result.unapplied_fields == []
+        backend.press_key.assert_not_awaited()
+
     @pytest.mark.parametrize("second", [_grid(padding=False), _grid((0, None), padding=False)])
     async def test_a_page_without_names_after_scrolling_is_an_error(self, second: dict[str, Any]) -> None:
         backend = _scroll_backend([_grid((0, "A"), padding=False), second])
         result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
         assert len(result.other_errors) == 1
-        assert "could not be read after scrolling" in result.other_errors[0]
+        assert "could not be read again" in result.other_errors[0]
 
 
 class TestQueryStopsBeforeF8:

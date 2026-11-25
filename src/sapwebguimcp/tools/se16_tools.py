@@ -439,8 +439,8 @@ async def _collect_rows_with_pagination(  # pylint: disable=too-many-locals,too-
 # Maximum number of offered SE16N selection fields named in a filter failure message
 _SE16N_MAX_OFFERED_FIELDS = 50
 
-# Upper bound for the pages the Web GUI selection grid is scrolled through (SE11 allows 749 fields;
-# 120 pages cover them at 7 visible rows per page)
+# Upper bound for the pages the Web GUI selection grid is scrolled through (SE11 allows 749 fields; in a
+# small-window worst case of 7 visible rows per page, 120 pages still cover them; the test system shows 16 rows)
 _SE16N_MAX_SELECTION_PAGES = 120
 
 
@@ -656,7 +656,7 @@ async def _read_selection_page(backend: WebGuiBackend, read_js: str) -> _GridPag
         return str(grid.get("error", "Could not read the SE16N selection grid"))
     rows = _parse_grid_rows(grid.get("rows"))
     if not rows or not all(row.field_name for row in rows):
-        return "SE16N selection rows could not be read after scrolling, so no filter was applied"
+        return "SE16N selection rows could not be read again, so the filters could not be placed"
     return rows, bool(grid.get("hasPaddingRows"))
 
 
@@ -667,11 +667,15 @@ async def _scroll_selection_grid(backend: WebGuiBackend, read_js: str, rows: lis
     the same means the end of the grid.
 
     Returns:
-        The new page, an error text, or None at the end of the grid.
+        The new page, an error text (focus or PageDown failed, or the page cannot be read), or None at the
+        end of the grid.
     """
     if not await _focus_selection_grid(backend, rows):
         return "Could not focus the SE16N selection grid to scroll it, so no filter was applied"
-    await backend.press_key("PageDown")
+    key = await backend.press_key("PageDown")
+    if not key.success:
+        # An unchanged page would be taken for the end of the grid, so a failed key is an error of its own.
+        return f"Could not scroll the SE16N selection grid (PageDown failed: {key.error}), so no filter was applied"
     await backend.wait(500)
     page = await _read_selection_page(backend, read_js)
     if isinstance(page, str) or [row.field_name for row in page[0]] != [row.field_name for row in rows]:
@@ -689,7 +693,8 @@ class _ScrollScan:
 
     filters: dict[str, str]
     undecided: list[str] = dataclass_field(init=False)  # requested names, filter order
-    unapplied: set[str] = dataclass_field(default_factory=set)  # found, but the row has no input
+    # names that get no filter: the row has no input, or (added at the end of the scan) the name was never found
+    unapplied: set[str] = dataclass_field(default_factory=set)
     offered: list[str] = dataclass_field(default_factory=list)  # fillable names seen; pages may overlap
     other_errors: list[str] = dataclass_field(default_factory=list)
 
@@ -993,7 +998,9 @@ def register_se16_tools(mcp: FastMCP) -> None:
             "SE16N), the call fails before running the query; the error lists the SE16N selection "
             "fields when they could be read. On the WebGUI backend a filter goes into the row whose "
             "technical name matches; the selection grid is scrolled until that row is found, so a field "
-            "of a wide table can be filtered, too.\n\n"
+            "of a wide table can be filtered, too. A filter on a field the table does not offer makes the tool "
+            "read the whole selection grid, which takes longer on a wide table (roughly a second or two per "
+            "page of rows).\n\n"
             "**Performance:** ~7 rows/second due to pagination.\n"
             "- 100 rows: ~14 seconds\n"
             "- 500 rows: ~1.5 minutes\n"
