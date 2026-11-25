@@ -21,6 +21,7 @@ from sapwebguimcp.backend.manager import get_backend
 from sapwebguimcp.backend.webgui.parsers.se24_parser import (
     SE24TabSnapshots,
     count_se24_grid_rows,
+    parse_se24_interfaces_table,
     parse_se24_snapshot,
 )
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
@@ -106,23 +107,31 @@ async def _fill_and_display(backend: WebGuiBackend, class_name: str, t: Language
 
 
 async def _read_interfaces_table(
-    backend: WebGuiBackend, class_name: str, interfaces_snapshot: AriaSnapshot
+    backend: WebGuiBackend, class_name: str, interfaces_snapshot: AriaSnapshot, t: LanguagePack
 ) -> TableData | None:
     """Read the interfaces grid of the open interfaces tab. Returns None when the read fails.
 
     The ARIA snapshot of the grid names only the cells in view and carries no values of the text boxes, so the
-    interface names come from a table read. A window as full as the table read warns that rows may be cut off.
+    interface names come from a table read. A failed read is logged, not passed on as an empty table. When the
+    parsed interfaces fill the visible rows, the list may be cut off, and a warning says so.
     """
     try:
         table = await backend.read_table()
     except Exception:  # pylint: disable=broad-exception-caught
         logger.warning("Could not read the interfaces table", extra={"object": class_name}, exc_info=True)
         return None
+    if table.success is False:
+        logger.warning(
+            "Could not read the interfaces table",
+            extra={"object": class_name, "error": table.error},
+        )
+        return None
     visible_rows = count_se24_grid_rows(interfaces_snapshot)
-    if 0 < visible_rows <= len(table.rows):
+    interfaces_read = len(parse_se24_interfaces_table(table, t))
+    if 0 < visible_rows <= interfaces_read:
         logger.warning(
             "The interface table fills the visible rows, interface list may be cut off at the visible rows",
-            extra={"object": class_name, "rows_read": len(table.rows), "visible_rows": visible_rows},
+            extra={"object": class_name, "interfaces_read": interfaces_read, "visible_rows": visible_rows},
         )
     return table
 
@@ -159,7 +168,7 @@ async def _lookup_class_on_initial_screen(
     interfaces_raw = await _capture_tab_snapshot(backend, t.se24.interfaces_tab)
     interfaces_snapshot = AriaSnapshot(interfaces_raw) if interfaces_raw is not None else None
     interfaces_table = (
-        await _read_interfaces_table(backend, class_name, interfaces_snapshot) if interfaces_snapshot else None
+        await _read_interfaces_table(backend, class_name, interfaces_snapshot, t) if interfaces_snapshot else None
     )
     tab_snapshots = SE24TabSnapshots(
         methods_tab=AriaSnapshot(methods_raw) if methods_raw is not None else None,

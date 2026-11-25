@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from sapwebguimcp.lang.schema import LanguagePack
-from sapwebguimcp.models import TableData
+from sapwebguimcp.models import TableData, TableRow
 from sapwebguimcp.models.se24_models import SE24Entry
 from sapwebguimcp.tools import se24_tools
 
@@ -168,3 +168,39 @@ async def test_table_read_failure_keeps_the_entry(lang_de: LanguagePack, caplog:
     assert entry.interfaces == []
     assert entry.superclass == "CX_SY_ARITHMETIC_ERROR"
     assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_failed_table_read_warns_and_keeps_the_entry(
+    lang_de: LanguagePack, caplog: pytest.LogCaptureFixture
+) -> None:
+    backend = _backend()
+    backend.read_table.side_effect = None
+    backend.read_table.return_value = TableData.failure("boom")
+    with caplog.at_level(logging.WARNING, logger=TOOL_LOGGER):
+        entry = await _lookup(backend, lang_de)
+    assert entry.interfaces == []
+    assert entry.superclass == "CX_SY_ARITHMETIC_ERROR"
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Could not read the interfaces table" in r.getMessage() for r in warnings)
+    assert any(getattr(r, "object", None) == "CX_SY_ZERODIVIDE" for r in warnings)
+
+
+@pytest.mark.anyio
+async def test_methods_like_table_does_not_warn_about_cut_off(
+    lang_de: LanguagePack, caplog: pytest.LogCaptureFixture
+) -> None:
+    tabs = _tabs()
+    tabs["Interfaces"] = _grid_snapshot(2)
+    methods_table = TableData(
+        success=True,
+        headers=["", "Methode"],
+        rows=[TableRow(row=i, data={"": "", "Methode": f"METHOD_{i}"}) for i in range(1, 3)],
+    )
+    backend = _backend(tabs)
+    backend.read_table.side_effect = None
+    backend.read_table.return_value = methods_table
+    with caplog.at_level(logging.WARNING, logger=TOOL_LOGGER):
+        entry = await _lookup(backend, lang_de)
+    assert entry.interfaces == []
+    assert not any("cut off" in r.getMessage() for r in caplog.records)
