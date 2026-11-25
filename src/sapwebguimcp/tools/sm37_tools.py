@@ -28,6 +28,7 @@ from sapwebguimcp.lang.schema import JobStatus
 from sapwebguimcp.models.screen_state import SelectionScreenState
 from sapwebguimcp.models.sm37_models import SM37JobListResult, SM37JobLog
 from sapwebguimcp.tools.screen_state_helpers import ensure_screen_state
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -84,13 +85,14 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
         errors.append(f"Failed to set selection screen state: {state_result.error}")  # lang-ok: our own message
     errors.extend(state_result.warnings)
 
-    # Date fields are filled manually (not via ensure_screen_state) because they
-    # require the date format of the session's language.
+    # Date fields are filled manually (not via ensure_screen_state) because they require the date format of the SAP
+    # user (read off the pre-filled field, #42), which ensure_screen_state does not know.
     # The ARIA snapshot values use SAP's display format which may differ from the
     # input format, making snapshot-based verification unreliable for dates.
     if from_date or to_date:
+        date_format = await resolve_user_date_format(backend, [*t.sm37.from_date, *t.sm37.to_date], t.date_format)
         if from_date:
-            sap_from = format_sap_date_as(from_date, t.date_format)
+            sap_from = format_sap_date_as(from_date, date_format)
             for label in t.sm37.from_date:
                 try:
                     await backend.fill_field(label, sap_from)
@@ -101,7 +103,7 @@ async def _fill_selection_screen(  # pylint: disable=too-many-arguments,too-many
                 errors.append("Could not set from_date: field not found")
 
         if to_date:
-            sap_to = format_sap_date_as(to_date, t.date_format)
+            sap_to = format_sap_date_as(to_date, date_format)
             for label in t.sm37.to_date:
                 try:
                     await backend.fill_field(label, sap_to)
