@@ -116,6 +116,8 @@ async def assert_primary_session_left_transaction(client: ClientSession, edit_tc
     listing = await call_tool_typed(client, "sap_session_list", {}, SessionListResult)
     primary = [session for session in listing.sessions if session.is_primary]
     assert primary, f"No primary session in the session list: {listing.sessions}"
+    # An unreadable screen gives tcode None: that is no evidence that the editor was left.
+    assert primary[0].tcode is not None, "The transaction of the primary session could not be read"
     assert primary[0].tcode != edit_tcode.upper(), f"Primary session is still in {edit_tcode} after the edit"
 
 

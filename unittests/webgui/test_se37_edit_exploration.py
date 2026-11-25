@@ -201,18 +201,19 @@ async def test_se37_edit_round_trip(sap_mcp_client: ClientSession) -> None:
     assert edit_result.success, f"Edit failed: {edit_result.error}"
     assert edit_result.activated, "Function module was not activated"
     assert edit_result.backup_source, "No backup source returned"
-    await assert_primary_session_left_transaction(sap_mcp_client, "SE37")
+    try:
+        await assert_primary_session_left_transaction(sap_mcp_client, "SE37")
+    finally:
+        # Restore the original source even when the check above failed, so no change stays in SAP
+        original_source = edit_result.backup_source
+        restore_result = await call_tool_typed(
+            sap_mcp_client,
+            "sap_se37_edit",
+            {"function_module": "Z_TEST_MCP_EDIT", "new_source": original_source},
+            SE37EditResult,
+        )
 
-    # Restore original source
-    original_source = edit_result.backup_source
-    restore_result = await call_tool_typed(
-        sap_mcp_client,
-        "sap_se37_edit",
-        {"function_module": "Z_TEST_MCP_EDIT", "new_source": original_source},
-        SE37EditResult,
-    )
-
-    print(f"Restore result: success={restore_result.success}, activated={restore_result.activated}")
-    assert restore_result.success, f"Restore failed: {restore_result.error}"
-    assert restore_result.activated, "Restore was not activated"
+        print(f"Restore result: success={restore_result.success}, activated={restore_result.activated}")
+        assert restore_result.success, f"Restore failed: {restore_result.error}"
+        assert restore_result.activated, "Restore was not activated"
     await assert_primary_session_left_transaction(sap_mcp_client, "SE37")
