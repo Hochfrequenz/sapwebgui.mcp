@@ -42,7 +42,7 @@ def _backend(shown: str | None = "2026-10-07", calls: list[str] | None = None) -
 
 
 async def _ensure_ok(_backend: Any, _target: Any) -> Any:
-    return SimpleNamespace(success=True, error=None, warnings=[])
+    return SimpleNamespace(success=True, error=None, warnings=[], not_applied=[])
 
 
 @pytest.mark.anyio
@@ -51,8 +51,9 @@ async def test_sm37_types_the_dates_in_the_user_format_read_before_the_first_fil
     backend = _backend(calls=order)
     t = lang.view_for("DE")
     with patch("sapwebguimcp.tools.sm37_tools.ensure_screen_state", _ensure_ok):
-        errors = await _fill_selection_screen(backend, t, "*", None, None, "2026-10-01", "2026-10-08")
-    assert errors == []
+        unapplied, cause = await _fill_selection_screen(backend, t, "*", None, None, "2026-10-01", "2026-10-08")
+    assert unapplied == []
+    assert cause is None
     assert [call.args[1] for call in backend.fill_field.await_args_list] == ["2026-10-01", "2026-10-08"]
     assert order == ["read", "fill", "fill"]
     labels = backend.read_field_text.await_args.args[0]
@@ -74,7 +75,7 @@ async def test_sm37_without_dates_does_not_read_a_field() -> None:
 async def test_slg1_types_the_dates_in_the_user_format() -> None:
     backend = _backend()
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
-    backend.fill_form = AsyncMock(return_value=SimpleNamespace(not_found=[], errors=[]))
+    backend.fill_form = AsyncMock(return_value=SimpleNamespace(not_found=[], errors=[], success=True))
     backend.press_key = AsyncMock()
     backend.get_snapshot = AsyncMock(return_value="")
     t = lang.view_for("DE")
@@ -92,7 +93,7 @@ async def test_slg1_types_the_dates_in_the_user_format() -> None:
 async def test_slg1_without_dates_does_not_read_a_field() -> None:
     backend = _backend()
     backend.enter_transaction = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
-    backend.fill_form = AsyncMock(return_value=SimpleNamespace(not_found=[], errors=[]))
+    backend.fill_form = AsyncMock(return_value=SimpleNamespace(not_found=[], errors=[], success=True))
     backend.press_key = AsyncMock()
     backend.get_snapshot = AsyncMock(return_value="")
     t = lang.view_for("DE")

@@ -615,22 +615,68 @@ async def test_se16_query_client_field_is_not_offered_for_selection(sap_mcp_clie
     assert "renders only the first rows" not in (result.error or "")
 
 
+# --- #99: the selection grid shows only one page of rows and is scrolled to reach a field ---
+
+
 @pytest.mark.anyio
-async def test_se16_query_field_beyond_the_rendered_rows_explains_why(sap_mcp_client: ClientSession) -> None:
-    """SAP Web GUI renders only the first ~30 selection rows; a field further down says so (#924)."""
+async def test_se16_query_filters_on_a_field_below_the_visible_selection_rows(sap_mcp_client: ClientSession) -> None:
+    """NAME_LAST is on the third page of BUT000's selection grid; the grid is scrolled to reach it (#99)."""
     login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
     assert login.success, f"Login failed: {login.error}"
 
-    # MARA has far more than 30 fields; VOLUM is well below the rendered rows.
     result = await call_tool_typed(
         sap_mcp_client,
         "sap_se16_query",
-        {"table": "MARA", "filters": {"VOLUM": "1"}, "max_hits": 5},
+        {"table": "BUT000", "filters": {"NAME_LAST": "M*"}, "max_hits": 5},
+        SE16Result,
+    )
+
+    assert result.success, f"Filter on a field below the visible rows failed: {result.error}"
+    assert result.rows, "Expected business partners whose last name starts with M"
+    assert "NAME_LAST" in result.columns, result.columns
+    for row in result.rows:
+        assert str(row.data["NAME_LAST"]).upper().startswith("M"), f"Filter not applied: {row.data['NAME_LAST']}"
+
+
+@pytest.mark.anyio
+async def test_se16_query_filters_on_fields_of_different_selection_pages(sap_mcp_client: ClientSession) -> None:
+    """TYPE is on the first page, NAME_LAST on the third: both filters are applied to their own rows (#99)."""
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success, f"Login failed: {login.error}"
+
+    result = await call_tool_typed(
+        sap_mcp_client,
+        "sap_se16_query",
+        {"table": "BUT000", "filters": {"TYPE": "1", "NAME_LAST": "M*"}, "max_hits": 5},
+        SE16Result,
+    )
+
+    assert result.success, f"Filters on two selection pages failed: {result.error}"
+    assert result.rows, "Expected persons whose last name starts with M"
+    for row in result.rows:
+        assert str(row.data["TYPE"]) == "1", f"TYPE filter not applied: {row.data['TYPE']}"
+        assert str(row.data["NAME_LAST"]).upper().startswith("M"), f"Filter not applied: {row.data['NAME_LAST']}"
+
+
+@pytest.mark.anyio
+async def test_se16_query_unknown_field_on_a_wide_table_fails_without_scroll_hint(
+    sap_mcp_client: ClientSession,
+) -> None:
+    """A field BUT000 does not have is reported as not offered after the whole grid was read (#99)."""
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success, f"Login failed: {login.error}"
+
+    result = await call_tool_typed(
+        sap_mcp_client,
+        "sap_se16_query",
+        {"table": "BUT000", "filters": {"NO_SUCH_FIELD": "x"}, "max_hits": 5},
         SE16Result,
     )
 
     assert not result.success
-    assert "renders only the first rows of the grid" in (result.error or "")
+    # The whole grid was read: the offered list is complete, not "(first part of the grid)"
+    assert "Offered fields:" in (result.error or ""), result.error
+    assert "does not scroll" not in (result.error or ""), result.error
 
 
 @pytest.mark.anyio

@@ -200,7 +200,7 @@ def _backend(grid: dict[str, Any], fill: Any = True) -> MagicMock:
     return backend
 
 
-def _grid(*rows: tuple[int, str | None], padding: bool = True) -> dict[str, Any]:
+def _grid(*rows: tuple[int, str | None], padding: bool = True, unfillable: tuple[int, ...] = ()) -> dict[str, Any]:
     return {
         "success": True,
         "hasPaddingRows": padding,
@@ -209,9 +209,9 @@ def _grid(*rows: tuple[int, str | None], padding: bool = True) -> dict[str, Any]
                 "rowIndex": index,
                 "label": f"label {index}",
                 "fieldName": name,
-                "fillable": True,
-                "elementId": f"low{index}",
-                "selector": f"#low{index}",
+                "fillable": index not in unfillable,
+                "elementId": None if index in unfillable else f"low{index}",
+                "selector": None if index in unfillable else f"#low{index}",
             }
             for index, name in rows
         ],
@@ -232,11 +232,15 @@ class TestFillWebGui:
         assert result.unapplied_fields == ["B"]
         backend.fill_element_by_locator.assert_not_awaited()
 
-    async def test_a_grid_without_padding_rows_is_reported_as_possibly_truncated(self) -> None:
-        backend = _backend(_grid((0, "A"), padding=False))
-        result = await _fill_se16n_filters_webgui(backend, "T", {"Z": "x"}, None)
+    async def test_a_grid_whose_names_are_unreadable_keeps_the_truncation_hint_of_the_position_fallback(self) -> None:
+        # Without technical names the grid cannot be scrolled by name: the single-page plan runs unchanged.
+        backend = _backend(_grid((0, None), padding=False))
+        backend.press_key = AsyncMock()
+        result = await _fill_se16n_filters_webgui(backend, "T", {"Z": "x"}, {"A": 0})
         assert result.unapplied_fields == ["Z"]
         assert result.hint is not None
+        assert "does not scroll it" in result.hint
+        backend.press_key.assert_not_awaited()
 
     async def test_a_grid_with_padding_rows_has_no_truncation_hint(self) -> None:
         backend = _backend(_grid((0, "A")))
@@ -268,6 +272,201 @@ class TestFillWebGui:
         assert _parse_grid_rows(raw) == [
             _GridRow(row_index=3, label="L", field_name="TCODE", fillable=True, element_id="i", selector="#i")
         ]
+
+
+def _scroll_backend(pages: Any, *, click: bool = True) -> MagicMock:
+    """A backend whose grid yields ``pages`` (a list, or a function returning the next page) on every read."""
+    backend = MagicMock(spec=WebGuiBackend)
+    backend.load_js.return_value = "(args) => ({})"
+    backend.evaluate_javascript = AsyncMock(side_effect=pages)
+    backend.click_element = AsyncMock(return_value=click)
+    backend.press_key = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
+    backend.wait = AsyncMock()
+    backend.fill_element_by_locator = AsyncMock(return_value=True)
+    return backend
+
+
+def _fills(backend: MagicMock) -> list[tuple[str, str]]:
+    return [(call.args[0], call.args[1]) for call in backend.fill_element_by_locator.await_args_list]
+
+
+class TestScrollSelectionGrid:
+    """The selection grid shows one page of rows; a filter below it is placed by scrolling with PageDown."""
+
+    async def test_fills_a_field_on_the_second_page(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False), _grid((0, "C"), (1, "D"))])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"D": "x"}, None)
+        assert result.unapplied_fields == []
+        assert result.other_errors == []
+        backend.fill_element_by_locator.assert_awaited_once_with('[id="low1"]', "x")
+        backend.press_key.assert_awaited_once_with("PageDown")
+
+    async def test_fills_fields_on_different_pages(self) -> None:
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), (1, "B"), padding=False),
+                _grid((0, "A"), (1, "B"), padding=False),  # re-read after filling A
+                _grid((0, "C"), (1, "D"), padding=False),
+                _grid((0, "E"), (1, "F")),
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "F": "2"}, None)
+        assert result.unapplied_fields == []
+        assert result.other_errors == []
+        assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low1"]', "2")]
+        assert backend.press_key.await_count == 2
+
+    async def test_fills_within_a_page_in_row_order(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B")), _grid((0, "A"), (1, "B"))])  # read, re-read after A
+        await _fill_se16n_filters_webgui(backend, "T", {"B": "2", "A": "1"}, None)
+        assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low1"]', "2")]
+
+    async def test_a_second_field_of_the_same_page_is_located_on_a_fresh_read(self) -> None:
+        # Both fields are visible at first, but the Tab after filling A moved the grid by one row: B is now
+        # row 0. Filling B by the locator of the first read would write its value into C's row.
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), (2, "C")), _grid((0, "B"), (1, "C"), (2, "D"))])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "B": "2"}, None)
+        assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low0"]', "2")]
+        assert result.unapplied_fields == []
+        assert result.other_errors == []
+
+    async def test_the_page_is_read_again_after_a_fill_before_scrolling(self) -> None:
+        # Tab after the fill moved the grid by one row: C is now in row 1.
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), (1, "B"), padding=False),
+                _grid((0, "B"), (1, "C"), padding=False),
+                _grid((0, "D"), (1, "E")),
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "C": "2"}, None)
+        assert _fills(backend) == [('[id="low0"]', "1"), ('[id="low1"]', "2")]
+        backend.press_key.assert_not_awaited()
+        assert result.unapplied_fields == []
+
+    async def test_no_scrolling_when_all_fields_are_on_the_first_page(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False)])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"B": "x"}, None)
+        assert result.unapplied_fields == []
+        backend.press_key.assert_not_awaited()
+
+    async def test_unknown_field_scrolls_to_the_end_and_lists_all_offered_fields(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False), _grid((0, "C"), (1, "D"))])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.unapplied_fields == ["ZZ"]
+        assert result.offered_fields == ["A", "B", "C", "D"]
+        assert result.offered_partial is False
+        assert result.hint is None
+
+    async def test_a_shown_field_without_input_stops_the_scan(self) -> None:
+        backend = _scroll_backend([_grid((0, "MANDT"), (1, "MATNR"), padding=False, unfillable=(0,))])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"MANDT": "100"}, None)
+        assert result.unapplied_fields == ["MANDT"]
+        backend.press_key.assert_not_awaited()
+        assert result.offered_partial is True
+        assert result.hint is None
+        error = _filter_fill_failure(result, "T", datetime.now(UTC)).error or ""
+        assert "Offered fields (first part of the grid): MATNR" in error
+
+    async def test_unchanged_page_ends_the_scan(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False)] * 3)
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.unapplied_fields == ["ZZ"]
+        assert backend.press_key.await_count == 1
+        assert backend.evaluate_javascript.await_count == 3
+        assert result.offered_partial is False
+        assert result.hint is None
+
+    async def test_a_late_render_is_not_taken_for_the_end(self) -> None:
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), (1, "B"), padding=False),
+                _grid((0, "A"), (1, "B"), padding=False),  # the page did not render yet
+                _grid((0, "C"), (1, "D")),
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"D": "x"}, None)
+        assert _fills(backend) == [('[id="low1"]', "x")]
+        assert result.unapplied_fields == []
+
+    async def test_page_cap_stops_and_says_so(self) -> None:
+        reads = iter(range(100))
+
+        def next_page(*_: Any) -> dict[str, Any]:
+            return _grid((0, f"F{next(reads)}"), padding=False)
+
+        backend = _scroll_backend(next_page)
+        with patch.object(se16_tools, "_SE16N_MAX_SELECTION_PAGES", 3):
+            result = await _fill_se16n_filters_webgui(backend, "T", {"F2": "x", "ZZ": "y"}, None)
+        assert _fills(backend) == [('[id="low0"]', "x")]  # F2 is on the last page read
+        assert result.unapplied_fields == ["ZZ"]
+        assert backend.press_key.await_count == 2
+        assert result.offered_partial is True
+        assert result.hint is not None
+        assert "was not read to its end" in result.hint
+
+    async def test_focus_failure_is_an_error(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False)], click=False)
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.other_errors == [
+            "Could not focus the SE16N selection grid to scroll it, so no filter was applied"
+        ]
+        backend.press_key.assert_not_awaited()
+
+    async def test_focus_goes_to_an_input_of_the_page_before_page_down(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False), _grid((0, "C"), (1, "D"))])
+        parent = MagicMock()
+        parent.attach_mock(backend.click_element, "click")
+        parent.attach_mock(backend.press_key, "press")
+        await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert [call[0] for call in parent.mock_calls] == ["click", "press"]
+        assert parent.mock_calls[0].args == ('[id="low0"]',)
+        assert parent.mock_calls[1].args == ("PageDown",)
+
+    async def test_focus_falls_back_to_the_grid_when_no_row_is_fillable(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), padding=False, unfillable=(0,)), _grid((0, "C"))])
+        await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        backend.click_element.assert_awaited_once_with('[role="grid"] [lsdata*="GS_SELFIELDS-"]')
+
+    async def test_unreadable_page_after_scrolling_is_an_error(self) -> None:
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), padding=False),
+                {"success": False, "error": "Selection criteria grid not found"},
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.other_errors == ["Selection criteria grid not found"]
+        assert result.unapplied_fields == []
+
+    async def test_failed_page_down_is_an_error(self) -> None:
+        backend = _scroll_backend([_grid((0, "A"), (1, "B"), padding=False)] * 3)
+        backend.press_key = AsyncMock(return_value=SimpleNamespace(success=False, error="boom"))
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert result.other_errors == [
+            "Could not scroll the SE16N selection grid (PageDown failed: boom), so no filter was applied"
+        ]
+        assert result.unapplied_fields == []
+        assert backend.evaluate_javascript.await_count == 1  # no re-read, so no "end of the grid" conclusion
+
+    async def test_unreadable_page_after_a_fill_is_an_error(self) -> None:
+        backend = _scroll_backend(
+            [
+                _grid((0, "A"), (1, "B"), padding=False),
+                {"success": False, "error": "Selection criteria grid not found"},  # re-read after filling A
+            ]
+        )
+        result = await _fill_se16n_filters_webgui(backend, "T", {"A": "1", "ZZ": "x"}, None)
+        assert result.other_errors == ["Selection criteria grid not found"]
+        assert result.unapplied_fields == []
+        backend.press_key.assert_not_awaited()
+
+    @pytest.mark.parametrize("second", [_grid(padding=False), _grid((0, None), padding=False)])
+    async def test_a_page_without_names_after_scrolling_is_an_error(self, second: dict[str, Any]) -> None:
+        backend = _scroll_backend([_grid((0, "A"), padding=False), second])
+        result = await _fill_se16n_filters_webgui(backend, "T", {"ZZ": "x"}, None)
+        assert len(result.other_errors) == 1
+        assert "could not be read again" in result.other_errors[0]
 
 
 class TestQueryStopsBeforeF8:

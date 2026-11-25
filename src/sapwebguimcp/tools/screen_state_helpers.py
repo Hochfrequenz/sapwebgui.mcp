@@ -36,6 +36,7 @@ async def _apply_changes(
         cb_actual = current.checkboxes.get(label)
         if cb_actual is None:
             diff.warnings.append(f"Checkbox '{label}' not found on screen")  # lang-ok: our own message
+            diff.not_applied.append(label)
             continue
         if cb_actual != desired:
             try:
@@ -47,11 +48,13 @@ async def _apply_changes(
                 )
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 diff.warnings.append(f"Failed to set checkbox '{label}': {exc}")
+                diff.not_applied.append(label)
 
     for label, desired in target.radios.items():
         radio_actual = current.radios.get(label)
         if radio_actual is None:
             diff.warnings.append(f"Radio '{label}' not found on screen")  # lang-ok: our own message
+            diff.not_applied.append(label)
             continue
         if radio_actual != desired and desired is True:
             try:
@@ -63,11 +66,13 @@ async def _apply_changes(
                 )
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 diff.warnings.append(f"Failed to set radio '{label}': {exc}")
+                diff.not_applied.append(label)
 
     for label, desired_val in target.fields.items():
         field_actual = current.fields.get(label)
         if field_actual is None:
             diff.warnings.append(f"Field '{label}' not found on screen")  # lang-ok: our own message
+            diff.not_applied.append(label)
             continue
         if field_actual != desired_val:
             try:
@@ -79,6 +84,13 @@ async def _apply_changes(
                 )
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 diff.warnings.append(f"Failed to fill field '{label}': {exc}")
+                diff.not_applied.append(label)
+
+
+def _mark_not_applied(diff: ScreenStateDiff, label: str) -> None:
+    """Append *label* to ``diff.not_applied`` unless it is already listed."""
+    if label not in diff.not_applied:
+        diff.not_applied.append(label)
 
 
 def _verify_state(
@@ -86,11 +98,16 @@ def _verify_state(
     target: SelectionScreenState,
     diff: ScreenStateDiff,
 ) -> None:
-    """Compare actual screen state against target; appends to *diff.mismatches*."""
+    """Compare actual screen state against target; appends to *diff.mismatches*.
+
+    A control whose value did not stick also counts as not applied, so its label is added
+    to *diff.not_applied* (once, even if the setter already failed for it).
+    """
     for label, desired in target.checkboxes.items():
         cb_val = actual_after.checkboxes.get(label)
         if cb_val is not None and cb_val != desired:
             diff.mismatches.append(f"Checkbox '{label}': expected {desired}, still {cb_val}")
+            _mark_not_applied(diff, label)
 
     for label, desired in target.radios.items():
         if not desired:
@@ -98,11 +115,13 @@ def _verify_state(
         radio_val = actual_after.radios.get(label)
         if radio_val is not None and radio_val != desired:
             diff.mismatches.append(f"Radio '{label}': expected selected, still unselected")  # lang-ok: our own message
+            _mark_not_applied(diff, label)
 
     for label, desired_val in target.fields.items():
         field_val = actual_after.fields.get(label)
         if field_val is not None and field_val != desired_val:
             diff.mismatches.append(f"Field '{label}': expected '{desired_val}', still '{field_val}'")
+            _mark_not_applied(diff, label)
 
 
 async def ensure_screen_state(
@@ -128,6 +147,7 @@ async def ensure_screen_state(
     if ambiguous_hits:
         return ScreenStateDiff.failure(
             error=f"Ambiguous labels on screen — cannot safely target: {', '.join(sorted(ambiguous_hits))}",
+            not_applied=sorted(ambiguous_hits),
         )
 
     diff = ScreenStateDiff()
@@ -145,6 +165,7 @@ async def ensure_screen_state(
             radios_changed=diff.radios_changed,
             fields_changed=diff.fields_changed,
             warnings=diff.warnings,
+            not_applied=diff.not_applied,
             mismatches=diff.mismatches,
         )
 
