@@ -69,7 +69,13 @@ async def resolve_user_date_format(backend: Any, labels: Sequence[str], fallback
         shown = await backend.read_field_text(labels)
         derived = derive_date_format(shown if isinstance(shown, str) else None)
         if derived is not None:
-            await backend.cache_date_format(derived)
+            try:
+                await backend.cache_date_format(derived)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.warning(
+                    "could not cache the user's date format",
+                    extra={"date_format": derived, "error": type(exc).__name__},
+                )
             return derived
         reason = "the date field is empty or does not show a Gregorian date"
     except Exception as exc:  # pylint: disable=broad-exception-caught

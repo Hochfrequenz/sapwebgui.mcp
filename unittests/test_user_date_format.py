@@ -103,7 +103,16 @@ async def test_the_logon_language_default_is_the_fallback_and_is_logged(
 
 
 @pytest.mark.anyio
-async def test_a_field_that_cannot_be_read_falls_back() -> None:
+async def test_a_field_that_cannot_be_read_falls_back(caplog: pytest.LogCaptureFixture) -> None:
     backend = _backend(None)
     backend.read_field_text = AsyncMock(side_effect=RuntimeError("boom"))
-    assert await resolve_user_date_format(backend, ("F",), "%d.%m.%Y") == "%d.%m.%Y"
+    with caplog.at_level(logging.WARNING):
+        assert await resolve_user_date_format(backend, ("F",), "%d.%m.%Y") == "%d.%m.%Y"
+    assert "falling back" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_a_derived_format_is_used_even_if_caching_fails() -> None:
+    backend = _backend("2026-10-07")
+    backend.cache_date_format = AsyncMock(side_effect=RuntimeError("boom"))
+    assert await resolve_user_date_format(backend, ("F",), "%d.%m.%Y") == "%Y-%m-%d"

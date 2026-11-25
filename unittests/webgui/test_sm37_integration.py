@@ -309,7 +309,7 @@ async def test_sm37_prefilled_date_gives_the_user_date_format(sap_mcp_client: Cl
     assert len(set(derived.values())) == 1, f"Pre-filled dates disagree on the user's date format: {derived}"
 
     # Today only: a wider range for all users can make the job list too slow to load. On most days the
-    # day is above 12, so typing it with day and month swapped would give an invalid date.
+    # From the 13th of a month on, typing today with day and month swapped would give an invalid date.
     today = datetime.now(UTC).strftime("%Y-%m-%d")
     result = await call_tool_typed(
         sap_mcp_client,
