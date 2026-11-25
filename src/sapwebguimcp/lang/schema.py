@@ -279,6 +279,20 @@ class Se24Section:
     interfaces_tab: Text
     source_button: Text
     """Button that opens the source of the selected method."""
+    properties_tab: Text
+    """Tab title of the properties tab of the class builder."""
+    description_field: Text
+    """Label of the description input on the properties tab."""
+    package_field: Text
+    """Label of the package input on the properties tab."""
+    superclass_field: Text
+    """Label of the superclass input on the properties tab (absent for a root class and for an interface)."""
+    instantiation_field: Text
+    """Label of the instantiation input on the properties tab (its value is Public, Protected, Private or Abstract)."""
+    final_checkbox: Text
+    """Label of the Final check box on the properties tab."""
+    interface_column: Text
+    """Title of the interface column of the interfaces grid (the live header text goes on with a hint sentence)."""
 
 
 @dataclass(frozen=True, slots=True)

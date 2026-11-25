@@ -91,6 +91,8 @@ Source = DataElement | ScreenText | GuiFunction | Message | DomainValue | Transa
 
 NOT_LOOKED_UP = Manual("not yet looked up")
 
+_DE_LIVE_ONLY = "; DE verified live, EN and IT are the SAP standard labels, not verified live"
+
 SOURCES: Mapping[str, Source] = MappingProxyType(
     {
         "popup.abapgit_error_keywords": Manual("abapGit UI text"),
@@ -203,6 +205,13 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se24.attributes_tab": Manual("tab title of the class builder tab strip"),
         "se24.interfaces_tab": Manual("tab title of the class builder tab strip"),
         "se24.source_button": Manual("button text of the class builder method list"),
+        "se24.properties_tab": Manual("tab title of the class builder tab strip" + _DE_LIVE_ONLY),
+        "se24.description_field": Manual("label of the description input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.package_field": Manual("label of the package input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.superclass_field": Manual("label of the superclass input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.instantiation_field": Manual("label of the instantiation input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.final_checkbox": Manual("label of the Final check box on the properties tab" + _DE_LIVE_ONLY),
+        "se24.interface_column": Manual("column title of the interfaces grid" + _DE_LIVE_ONLY),
         "se37.initial_screen": Manual(
             "window title of the function builder initial screen (titlebar, not in the supported text tables)"
         ),
