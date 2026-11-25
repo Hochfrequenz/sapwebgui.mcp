@@ -12,6 +12,8 @@ _PATCH_GET_BACKEND = "sapwebguimcp.tools.sap_login_impl.get_backend"
 _PATCH_GET_SETTINGS = "sapwebguimcp.tools.sap_login_impl.get_settings"
 _PATCH_GET_SAP_CONFIG = "sapwebguimcp.tools.sap_login_impl.get_sap_config"
 
+pytestmark = pytest.mark.usefixtures("empty_login_registry")
+
 
 def _make_sap_config(default_system: str = "sysA", client: str = "100", connection_name: str = "DEV S/4HANA") -> Config:
     return Config(

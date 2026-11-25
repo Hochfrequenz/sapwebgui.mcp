@@ -16,6 +16,8 @@ from sap_mcp_config import Config, SAPSystem
 
 from sapwebguimcp.models.sap_results import LoginResult
 
+pytestmark = pytest.mark.usefixtures("empty_login_registry")
+
 
 def _multi_system_config() -> Config:
     return Config(
