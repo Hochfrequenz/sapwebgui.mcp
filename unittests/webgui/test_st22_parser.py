@@ -445,6 +445,21 @@ class TestTerminationPoint:
 
         assert (detail.include, detail.line) == ("ZCL_X=========CM00C", 36)
 
+    def test_italian_termination_text(self) -> None:
+        snapshot = _snapshot(
+            [
+                "Informazioni punto di interr.",
+                (
+                    "Nel testo sorgente il punto di interruzione si trova alla riga 36 "
+                    'dell\'include "ZCL_X=========CM00C".'
+                ),
+                "Chiamate/eventi attivi",
+            ]
+        )
+        detail = parse_st22_dump_detail(snapshot, lang.view_for("IT"))
+
+        assert (detail.include, detail.line) == ("ZCL_X=========CM00C", 36)
+
     def test_italian_pack_names_the_termination_heading(self) -> None:
         assert "Informazioni punto di interr." in lang.pack_for("IT").st22.termination_heading
 
@@ -518,3 +533,9 @@ class TestShortText:
         detail = parse_st22_dump_detail(snapshot, T)
 
         assert detail.short_text == "Ein Fehler."
+
+    def test_a_repeated_short_text_heading_ends_the_first_section(self) -> None:
+        snapshot = _snapshot(["Kurztext", "erster Teil", "Kurztext", "zweiter Teil", "Was ist passiert?", "etwas"])
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.short_text == "erster Teil"
