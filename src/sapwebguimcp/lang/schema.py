@@ -449,7 +449,7 @@ class LanguagePack:
     logon_dropdown: str
     """Text of the WebGUI logon language dropdown, e.g. ``"Deutsch"``."""
     date_format: str
-    """Default date input format as a ``strftime`` pattern (#1043 reads the user's own)."""
+    """Date input format as a ``strftime`` pattern: the fallback when the user's own format cannot be read (#42)."""
     same_as_en: frozenset[str]
     """Field paths whose value deliberately equals EN (checked by the untranslated-field test)."""
 

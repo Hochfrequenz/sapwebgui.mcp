@@ -38,6 +38,7 @@ from sapwebguimcp.models.st22_models import (
     ST22DumpDetailResult,
     ST22DumpListResult,
 )
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -90,9 +91,12 @@ async def _clear_user_field(backend: "WebGuiBackend", t: LanguagePack) -> None:
 async def _fill_date_field(backend: "WebGuiBackend", t: LanguagePack, target_date: str) -> str | None:
     """Fill the date field with a formatted date. Returns error or None."""
     try:
-        formatted = format_sap_date_as(target_date, t.date_format)
+        format_sap_date_as(target_date, t.date_format)  # validate the ISO date before the field is read
     except ValueError:
         return f"Invalid date format: {target_date} (expected YYYY-MM-DD)"
+    # The date field is pre-filled: read the user's date format off it before it is overwritten (#42)
+    date_format = await resolve_user_date_format(backend, list(t.st22.date_field), t.date_format)
+    formatted = format_sap_date_as(target_date, date_format)
 
     # Find and fill the date field
     for label in t.st22.date_field:

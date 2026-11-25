@@ -53,7 +53,7 @@ The tool returns a structured result with:
 - `success`: Boolean indicating if the query succeeded
 - `rows`: List of row objects with field values
 - `returned_rows`: Number of rows returned
-- `total_hits`: Total matching rows in SAP
+- `total_hits`: Total matching rows in SAP; capped at max_hits when `truncated` is true
 - `columns`: List of column names
 - `truncated`: Whether results were limited by max_hits
 
