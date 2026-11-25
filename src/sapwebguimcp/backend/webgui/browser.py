@@ -65,6 +65,10 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
         self._chrome_process: Optional[subprocess.Popen[bytes]] = None
         self._cert_errors_ignored = False
         self._browser_cdp_session: Optional[CDPSession] = None
+        # Isolated contexts opened for additional logins (own cookie jar), see open_login_page().
+        self._login_contexts: set[BrowserContext] = set()
+        self._login_pages_with_listener: set[Page] = set()
+        self._login_context_close_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def is_initialized(self) -> bool:
@@ -421,9 +425,79 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
         self._cert_errors_ignored = True
         logger.info("Browser set to ignore certificate errors (tls_skip_verify)")
 
+    async def open_login_page(self) -> Page:
+        """Open a page in a new, isolated browser context (own cookies and storage) for an additional login.
+
+        The context is closed again when its last page closes (see ``close_login_page``). Initializes the
+        manager first when needed.
+
+        Raises:
+            RuntimeError: If the browser is not connected.
+        """
+        if not self._initialized:
+            await self.initialize()
+        if self._browser is None:
+            raise RuntimeError("Browser not connected")
+
+        context = await self._browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            ignore_https_errors=True,  # SAP systems often use self-signed certificates
+        )
+        self._login_contexts.add(context)
+        # Registered before new_page() so that the first page arrives through it, too.
+        context.on("page", self._watch_login_page)
+        try:
+            page = await context.new_page()
+        except Exception:
+            await self._close_login_context(context)
+            raise
+        self._watch_login_page(page)
+        return page
+
+    def _watch_login_page(self, page: Page) -> None:
+        """Attach exactly one "close" listener to a page of a login context."""
+        if page in self._login_pages_with_listener:
+            return
+        self._login_pages_with_listener.add(page)
+        page.on("close", self._on_login_page_closed)
+
+    def _on_login_page_closed(self, page: Page) -> None:
+        """Close the login context once its last page is gone (sync Playwright listener)."""
+        self._login_pages_with_listener.discard(page)
+        context = page.context
+        # Playwright removes a page from context.pages before it emits "close".
+        if context not in self._login_contexts or not all(p.is_closed() for p in context.pages):
+            return
+        task = asyncio.get_running_loop().create_task(self._close_login_context(context))
+        self._login_context_close_tasks.add(task)
+        task.add_done_callback(self._login_context_close_tasks.discard)
+
+    async def _close_login_context(self, context: BrowserContext) -> None:
+        """Close a login context; idempotent, never raises."""
+        if context not in self._login_contexts:
+            return
+        self._login_contexts.discard(context)
+        try:
+            await context.close()
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("Could not close login browser context", exc_info=True)
+
+    async def close_login_page(self, page: Page) -> None:
+        """Close a login page (and with its last page the context); never raises.
+
+        If the page does not close within 5 seconds, its whole context is closed instead.
+        """
+        try:
+            await asyncio.wait_for(page.close(), timeout=5)
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("Could not close login page, closing its browser context", exc_info=True)
+            await self._close_login_context(page.context)
+
     async def _reconnect(self) -> None:
         """Force reconnection to the browser."""
         logger.info("Reconnecting to browser")
+        self._login_contexts.clear()
+        self._login_pages_with_listener.clear()
         self._cert_errors_ignored = False
         self._browser_cdp_session = None
         self._initialized = False
@@ -529,8 +603,15 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
             del self._pages[name]
 
     async def close(self) -> None:
-        """Close the browser and cleanup all resources."""
+        """Close the browser and cleanup all resources.
+
+        Login contexts are closed without an SAP logoff, like the default-context tabs in CONNECT mode.
+        """
         settings = self._settings or get_settings()
+
+        for login_context in list(self._login_contexts):
+            await self._close_login_context(login_context)
+        self._login_pages_with_listener.clear()
 
         for page in list(self._pages.values()):
             if not page.is_closed():
