@@ -14,6 +14,7 @@ ST22 structure (DE/EN):
   "Was ist geschehen?" / "What happened?", source code excerpts, call stacks.
 """
 
+import json
 import logging
 import re
 from collections.abc import Iterable
@@ -314,16 +315,86 @@ def parse_st22_dump_list(snapshot: AriaSnapshot, t: LanguagePack) -> list[ST22Du
 # =============================================================================
 
 
+_QUOTED_NAME = re.compile(r'"((?:[^"\\]|\\.)*)"')
+_NON_TEXT_NAME_PREFIXES = ("button", "textbox", "checkbox", "menuitem")
+
+
+def _decode_json_string(raw: str) -> str:
+    """Decode the JSON escapes (quote, backslash, newline, unicode) of a string body; ``raw`` if it is not valid."""
+    try:
+        decoded = json.loads(f'"{raw}"')
+    except ValueError:
+        return raw
+    return decoded if isinstance(decoded, str) else raw
+
+
+def _unwrap_single_quoted(entry: str) -> str:
+    """Undo the YAML single quoting of a whole entry key (a doubled quote is one quote); what follows is kept."""
+    if not entry.startswith("'"):
+        return entry
+    unwrapped: list[str] = []
+    index = 1
+    while index < len(entry):
+        char = entry[index]
+        if char == "'":
+            if entry[index + 1 : index + 2] == "'":  # '' is an escaped single quote
+                unwrapped.append("'")
+                index += 2
+                continue
+            return "".join(unwrapped) + entry[index + 1 :]
+        unwrapped.append(char)
+        index += 1
+    return "".join(unwrapped)  # no closing quote: keep what there is
+
+
+def _split_key_and_value(entry: str) -> tuple[str, str | None]:
+    """Split an entry at the first ``: `` (or a trailing ``:``) that is not inside a double-quoted name."""
+    in_quotes = False
+    index = 0
+    while index < len(entry):
+        char = entry[index]
+        if in_quotes and char == "\\":
+            index += 2
+            continue
+        if char == '"':
+            in_quotes = not in_quotes
+        elif char == ":" and not in_quotes:
+            if index == len(entry) - 1:
+                return entry[:index], None
+            if entry[index + 1] == " ":
+                return entry[:index], entry[index + 2 :].strip()
+        index += 1
+    return entry, None
+
+
+def _entry_texts(entry: str) -> Iterable[str]:
+    """The texts of one snapshot entry (the line after ``- ``): its quoted names, then its inline value."""
+    key, value = _split_key_and_value(_unwrap_single_quoted(entry))
+    if key.startswith("/"):  # a property such as ``/url``, not text
+        return
+    for match in _QUOTED_NAME.finditer(key):
+        name = _decode_json_string(match.group(1))
+        if len(name) >= 2 and not name.startswith(_NON_TEXT_NAME_PREFIXES):
+            yield name
+    if value is not None:
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = _decode_json_string(value[1:-1])
+        if len(value) >= 2:
+            yield value
+
+
 def _extract_text_content(snapshot: str) -> str:
-    """Extract readable text content from ARIA snapshot, stripping ARIA markup."""
+    """Extract the readable text of an ARIA snapshot (Playwright YAML) without loss, one text per line.
+
+    Yields every accessible name (JSON-quoted, with escaped quotes and other JS escapes) and every inline value (text
+    nodes, inline element text, textbox values; unquoted or double-quoted), and undoes the single quoting of a whole
+    entry.
+    """
     text_parts: list[str] = []
-    # Match text content in quotes (from various ARIA elements like text:, heading, etc.)
-    text_pattern = re.compile(r'"([^"]{2,})"')
-    for match in text_pattern.finditer(snapshot):
-        text = match.group(1)
-        # Skip ARIA role names and short labels
-        if not text.startswith(("button", "textbox", "checkbox", "menuitem")):
-            text_parts.append(text)
+    for line in snapshot.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            text_parts.extend(_entry_texts(stripped[2:]))
     return "\n".join(text_parts)
 
 
@@ -464,15 +535,16 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     Returns:
         ST22DumpDetail with extracted data and raw_text fallback
     """
-    # Extract readable text
-    raw_text = _extract_text_content(snapshot)
+    # Extract readable text; every extraction reads the whole text, only raw_text is truncated
+    text = _extract_text_content(snapshot)
+    raw_text = text
     if len(raw_text) > _MAX_RAW_TEXT_LENGTH:
         raw_text = raw_text[:_MAX_RAW_TEXT_LENGTH] + "\n... [truncated]"
 
     # Best-effort section extraction
     sections = t.st22.section
     what_happened = _extract_section(
-        raw_text,
+        text,
         sections[DumpSection.WHAT_HAPPENED],
         [
             *sections[DumpSection.HOW_TO_CORRECT],
@@ -484,7 +556,7 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     )
 
     how_to_correct = _extract_section(
-        raw_text,
+        text,
         sections[DumpSection.HOW_TO_CORRECT],
         [
             *sections[DumpSection.ERROR_ANALYSIS],
@@ -495,13 +567,13 @@ def parse_st22_dump_detail(snapshot: AriaSnapshot, t: LanguagePack) -> ST22DumpD
     )
 
     return ST22DumpDetail(
-        error_type=_extract_error_type(raw_text, t),
+        error_type=_extract_error_type(text, t),
         short_text="",  # Populated from list data by caller
         what_happened=what_happened,
         how_to_correct=how_to_correct,
-        program=_extract_program(raw_text, t),
+        program=_extract_program(text, t),
         include=None,
-        line=_extract_line_number(raw_text, t),
-        call_stack=_extract_call_stack(raw_text, t),
+        line=_extract_line_number(text, t),
+        call_stack=_extract_call_stack(text, t),
         raw_text=raw_text,
     )

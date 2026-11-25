@@ -306,6 +306,47 @@ class TestParseDumpDetail:
 
         assert len(detail.raw_text) <= 12000  # ~10KB with margin
 
+    def test_raw_text_keeps_escaped_quotes_of_a_name(self) -> None:
+        """A name with escaped quotes (JSON string in the YAML) is decoded, not cut at the first quote."""
+        snapshot = '- document:\n  - generic "des Includes \\"ZCL_DEMO\\"."'
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert 'des Includes "ZCL_DEMO".' in detail.raw_text.split("\n")
+
+    def test_raw_text_keeps_an_unquoted_text_node(self) -> None:
+        """An unquoted inline value of a text node is kept."""
+        snapshot = """- document:
+  - text: Im Quelltext befindet sich die Abbruchstelle in Zeile 36
+  - text: des Includes "ZCL_DEMO"."""
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "Im Quelltext befindet sich die Abbruchstelle in Zeile 36" in lines
+        assert 'des Includes "ZCL_DEMO".' in lines
+
+    def test_raw_text_keeps_a_quoted_text_node(self) -> None:
+        """A double-quoted inline value is decoded."""
+        snapshot = '- document:\n  - text: "\\"ZCL_DEMO\\""'
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert '"ZCL_DEMO"' in detail.raw_text.split("\n")
+
+    def test_raw_text_keeps_inline_element_text(self) -> None:
+        """The inline text of an element (paragraph, generic with a ref) is kept."""
+        snapshot = "- document:\n  - paragraph: Kurztext\n  - generic [ref=e3]: Zeile 36"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        lines = detail.raw_text.split("\n")
+        assert "Kurztext" in lines
+        assert "Zeile 36" in lines
+
+    def test_raw_text_undoes_a_single_quoted_entry(self) -> None:
+        """A whole entry wrapped in single quotes (because its name contains ': ') is unwrapped."""
+        snapshot = "- document:\n  - 'generic \"Zugriff über ''NULL'': Objektreferenz\"'"
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert "Zugriff über 'NULL': Objektreferenz" in detail.raw_text.split("\n")
+
     def test_parse_detail_call_stack(self) -> None:
         """Extract call stack entries."""
         snapshot = """- document:
