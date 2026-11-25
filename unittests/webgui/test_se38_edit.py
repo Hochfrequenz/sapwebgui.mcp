@@ -255,3 +255,31 @@ async def test_se38_edit_failed_revert_hint_points_at_backup_source() -> None:
     assert result.error is not None
     assert "re-apply backup_source" in result.error
     assert "Manual intervention" not in result.error
+
+
+@pytest.mark.anyio
+async def test_se38_edit_revert_not_activated_says_the_restored_source_was_not_saved() -> None:
+    """The original source is written back but fails its own check: it is never saved, and
+    leaving the editor discards it, so the result must not claim the source was reverted."""
+    from sapwebguimcp.models.base import CheckActivateResult
+    from sapwebguimcp.tools.se38_edit_tools import _edit_check_activate
+
+    backend = MagicMock()
+    backend.read_editor_source = AsyncMock(return_value="OLD")
+    backend.replace_editor_source = AsyncMock(side_effect=[True, True])
+    backend.check_and_activate = AsyncMock(
+        return_value=CheckActivateResult(
+            success=False, error="Check failed", messages=["Check: error"], activated=False
+        )
+    )
+    with (
+        patch("sapwebguimcp.tools.se38_edit_tools._navigate_and_open_editor", AsyncMock(return_value=None)),
+        lang.use("DE"),
+    ):
+        t = lang.current("test")
+        result = await _edit_check_activate(backend, "ZTEST", "NEW", t)
+    assert result.success is False
+    assert result.error is not None
+    assert "Auto-reverted source" not in result.error
+    assert "not saved" in result.error
+    assert "re-apply backup_source" in result.error

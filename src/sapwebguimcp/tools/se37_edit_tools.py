@@ -144,7 +144,10 @@ async def _edit_check_activate_fm(
                 result.messages.append("Auto-reverted to original source and re-activated successfully")
             else:
                 result.messages.append(
-                    f"Auto-reverted source but re-activation failed: {'; '.join(revert_result.messages)}"
+                    "WARNING: The original source was written back but could not be activated "
+                    f"({'; '.join(revert_result.messages)}), so it was not saved; leaving the editor "
+                    "discards it. The server may hold the new source as an inactive version; "
+                    "re-apply backup_source with another edit call."
                 )
         else:
             result.messages.append(
