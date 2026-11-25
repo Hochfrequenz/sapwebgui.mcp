@@ -102,7 +102,8 @@ class PopupSection:
     type_confirm: Text
     """Keyword in a popup's title or message that classifies it as a confirmation (substring, checked last).
 
-    Short variants such as ``Ja`` and ``No`` also match inside other words, as they did on the desktop."""
+    Matched as whole words only (unlike on the desktop, where short variants such as ``Ja`` and ``No`` also
+    match inside other words), because a Web GUI popup is often a bare title."""
     inactive_objects: Text
     """Title of the "Inactive Objects" popup during activation. ``fold=False``: the WebGUI checks it
     case-sensitively in the ARIA snapshot; the desktop lower-cases both sides itself."""
