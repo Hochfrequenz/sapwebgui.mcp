@@ -20,7 +20,7 @@ from mcp.types import ToolAnnotations
 from sapwebguimcp import lang
 from sapwebguimcp.backend.manager import get_backend
 from sapwebguimcp.models.se24_edit_models import SE24EditResult
-from sapwebguimcp.tools.edit_helpers import describe_failed_replace
+from sapwebguimcp.tools.edit_helpers import describe_failed_replace, finish_edit
 from sapwebguimcp.tools.field_helpers import fill_field_with_keyboard, toggle_to_change_mode
 
 if TYPE_CHECKING:
@@ -229,7 +229,9 @@ def register_se24_edit_tools(mcp: FastMCP) -> None:
             "and activates (Ctrl+F3). Auto-reverts if check or activation fails.\n\n"
             "**Important:** Only for EXISTING classes and methods. To create new ones, use abapGit.\n\n"
             "**Workflow:** Read current class with sap_se24_lookup first to see methods, "
-            "then call this tool with the full new method source."
+            "then call this tool with the full new method source.\n\n"
+            "Afterwards the tool leaves the editor without saving (/n), which releases the edit lock; "
+            "check_messages carries a WARNING if that failed."
         ),
         annotations=ToolAnnotations(
             destructive_hint=True,
@@ -274,13 +276,15 @@ def register_se24_edit_tools(mcp: FastMCP) -> None:
         t = lang.current("sap_se24_edit")
 
         try:
-            return await _edit_check_activate_method(backend, class_name, method_name, new_source, t)
+            result = await _edit_check_activate_method(backend, class_name, method_name, new_source, t)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception("SE24 edit failed for %s->%s", class_name, method_name)
-            return SE24EditResult.failure(
+            result = SE24EditResult.failure(
                 error=f"Unexpected error: {exc}",
                 class_name=class_name,
                 method_name=method_name,
                 backup_source="",
                 activated=False,
             )
+
+        return await finish_edit(backend, result)

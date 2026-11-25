@@ -24,6 +24,7 @@ from sapwebguimcp.backend.webgui.models.browser_results import SnapshotResult
 from sapwebguimcp.models import LoginResult, StatusBarInfo, TransactionResult
 
 from .conftest import call_tool_typed
+from .integration_helpers import assert_primary_session_left_transaction
 
 YAML_SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "se24_edit_exploration"
 
@@ -183,6 +184,7 @@ async def test_se24_edit_round_trip(sap_mcp_client: ClientSession) -> None:
     assert edit_result.success, f"Edit failed: {edit_result.error}"
     assert edit_result.activated, "Class was not activated"
     assert edit_result.backup_source, "No backup source returned"
+    await assert_primary_session_left_transaction(sap_mcp_client, "SE24")
 
     # Restore original source
     original_source = edit_result.backup_source
@@ -200,3 +202,4 @@ async def test_se24_edit_round_trip(sap_mcp_client: ClientSession) -> None:
     print(f"Restore result: success={restore_result.success}, activated={restore_result.activated}")
     assert restore_result.success, f"Restore failed: {restore_result.error}"
     assert restore_result.activated, "Restore was not activated"
+    await assert_primary_session_left_transaction(sap_mcp_client, "SE24")

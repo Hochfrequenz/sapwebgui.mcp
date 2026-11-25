@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp import ClientSession
 
 from sapwebguimcp.backend.webgui.models.browser_results import WaitResult
+from sapwebguimcp.models import SessionListResult
 
 from .conftest import call_tool_typed, get_html_content
 
@@ -99,6 +100,23 @@ async def _wait_for_transaction_screen(
     result = await call_tool_typed(client, "browser_wait", {"selector": selector, "timeout": timeout}, WaitResult)
     if not result.success:
         raise RuntimeError(f"Wait for {tcode} failed: {result.error}")
+
+
+async def assert_primary_session_left_transaction(client: ClientSession, edit_tcode: str) -> None:
+    """
+    Assert that the primary session is no longer in the transaction an edit tool worked in.
+
+    The edit tools leave the editor (``/n``) so that the object lock is released; a primary session
+    that still reports the edit transaction means the editor was left open.
+
+    Args:
+        client: MCP ClientSession connected to the SAP Web GUI server
+        edit_tcode: Transaction code of the edit tool (e.g., "SE37")
+    """
+    listing = await call_tool_typed(client, "sap_session_list", {}, SessionListResult)
+    primary = [session for session in listing.sessions if session.is_primary]
+    assert primary, f"No primary session in the session list: {listing.sessions}"
+    assert primary[0].tcode != edit_tcode.upper(), f"Primary session is still in {edit_tcode} after the edit"
 
 
 async def _wait_for_easy_access(client: ClientSession, timeout: int = 5000) -> None:

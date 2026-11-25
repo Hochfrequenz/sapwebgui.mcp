@@ -17,7 +17,7 @@ from mcp.types import ToolAnnotations
 from sapwebguimcp import lang
 from sapwebguimcp.backend.manager import get_backend
 from sapwebguimcp.models.se37_edit_models import SE37EditResult
-from sapwebguimcp.tools.edit_helpers import describe_failed_replace
+from sapwebguimcp.tools.edit_helpers import describe_failed_replace, finish_edit
 from sapwebguimcp.tools.field_helpers import fill_field_with_keyboard, toggle_to_change_mode
 
 if TYPE_CHECKING:
@@ -178,7 +178,9 @@ def register_se37_edit_tools(mcp: FastMCP) -> None:
             "and activates (Ctrl+F3). Auto-reverts if check or activation fails.\n\n"
             "**Important:** Only for EXISTING function modules. To create new ones, use abapGit.\n\n"
             "**Workflow:** Read current source with sap_se37_lookup first (check the Quelltext/Source Code tab), "
-            "modify it, then call this tool with the full new source."
+            "modify it, then call this tool with the full new source.\n\n"
+            "Afterwards the tool leaves the editor without saving (/n), which releases the edit lock; "
+            "check_messages carries a WARNING if that failed."
         ),
         annotations=ToolAnnotations(
             destructive_hint=True,
@@ -219,12 +221,14 @@ def register_se37_edit_tools(mcp: FastMCP) -> None:
         t = lang.current("sap_se37_edit")
 
         try:
-            return await _edit_check_activate_fm(backend, function_module, new_source, t)
+            result = await _edit_check_activate_fm(backend, function_module, new_source, t)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception("SE37 edit failed for %s", function_module)
-            return SE37EditResult.failure(
+            result = SE37EditResult.failure(
                 error=f"Unexpected error: {exc}",
                 function_module=function_module,
                 backup_source="",
                 activated=False,
             )
+
+        return await finish_edit(backend, result)
