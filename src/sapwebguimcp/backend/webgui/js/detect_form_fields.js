@@ -103,7 +103,7 @@
         for (const token of Array.from(el.classList)) {
             const match = /^ls(?:CheckBox|RadioButton)--(checked|unchecked)(?:--|$)/.exec(token);
             if (match) {
-                return match[1] === 'checked';
+                return match[1] === 'checked'; // lang-ok: CSS class modifier
             }
         }
         return null;
@@ -192,11 +192,11 @@
         }
 
         const classes = Array.from(el.classList);
-        const isRadio = el.getAttribute('role') === 'radio' || classes.includes('lsRadioButton');
+        const isRadio = el.getAttribute('role') === 'radio' || classes.includes('lsRadioButton'); // lang-ok: CSS class name
         const isReadonly =
             el.getAttribute('aria-disabled') === 'true' ||
             el.getAttribute('aria-readonly') === 'true' ||
-            classes.some((token) => token.endsWith('--disabled') || token.endsWith('--readonly'));
+            classes.some((token) => token.endsWith('--disabled') || token.endsWith('--readonly')); // lang-ok: CSS class modifiers
 
         const field = {
             id: el.id || '',
