@@ -10,11 +10,15 @@ import pytest
 
 from sapwebguimcp.backend.webgui.parsers.se24_parser import (
     SE24TabSnapshots,
+    count_se24_grid_rows,
     parse_se24_attributes_snapshot,
+    parse_se24_interfaces_table,
     parse_se24_methods_snapshot,
+    parse_se24_properties_snapshot,
     parse_se24_snapshot,
 )
 from sapwebguimcp.lang import LanguagePack
+from sapwebguimcp.models import TableData
 from sapwebguimcp.models.se24_models import SE24Entry, SE24Error
 
 SNAPSHOTS_DIR = Path(__file__).parent / "testdata" / "se24_exploration"
@@ -26,6 +30,14 @@ def _load_snapshot(name: str) -> str:
     if not filepath.exists():
         pytest.skip(f"Snapshot {filepath} not available - run exploration tests first")
     return filepath.read_text(encoding="utf-8")
+
+
+def _load_table(name: str) -> TableData:
+    """Load a captured table read (JSON) of the interfaces grid."""
+    filepath = SNAPSHOTS_DIR / f"{name}_de.json"
+    if not filepath.exists():
+        pytest.skip(f"Table {filepath} not available - run exploration tests first")
+    return TableData.model_validate_json(filepath.read_text(encoding="utf-8"))
 
 
 # =============================================================================
@@ -435,3 +447,117 @@ class TestHeadingNameOnRealSnapshots:
         result = parse_se24_snapshot(_read(SNAPSHOTS_DIR, "se24_if_serializable_object_main_de.yaml"), "x", lang_de)
         assert isinstance(result, SE24Entry)
         assert result.class_name == "IF_SERIALIZABLE_OBJECT"
+
+
+# =============================================================================
+# Properties tab and interfaces table (#97)
+# =============================================================================
+
+
+class TestParsePropertiesSnapshot:
+    """The properties tab carries description, package, superclass, instantiation and the final flag."""
+
+    def test_subclass_final_public(self, lang_de: LanguagePack) -> None:
+        p = parse_se24_properties_snapshot(_load_snapshot("se24_cx_sy_zerodivide_properties"), lang_de)
+        assert p.superclass == "CX_SY_ARITHMETIC_ERROR"
+        assert p.description == "System-Exception für Teilen durch Null."
+        assert p.is_final is True
+        assert p.is_abstract is False
+        assert p.package == "S_ABAP_EXCEPTIONS"
+
+    def test_abstract_root_class_has_no_superclass(self, lang_de: LanguagePack) -> None:
+        p = parse_se24_properties_snapshot(_load_snapshot("se24_cx_root_properties"), lang_de)
+        assert p.superclass is None
+        assert p.is_abstract is True
+        assert p.is_final is False
+        assert p.description == "Abstrakte Oberklasse aller globalen Exceptions"
+
+    def test_private_final_class(self, lang_de: LanguagePack) -> None:
+        p = parse_se24_properties_snapshot(_load_snapshot("se24_cl_salv_table_properties"), lang_de)
+        assert (p.package, p.description, p.is_final, p.is_abstract, p.superclass) == (
+            "SALV_OM_OBJECTS",
+            "Basisklasse für einfache Tabellen",
+            True,
+            False,
+            None,
+        )
+
+    def test_interface_has_description_and_package_only(self, lang_de: LanguagePack) -> None:
+        p = parse_se24_properties_snapshot(_load_snapshot("se24_if_serializable_object_properties"), lang_de)
+        assert (p.description, p.package, p.superclass, p.is_final, p.is_abstract) == (
+            "Serialisierbares Objekt",
+            "SABP_CORE",
+            None,
+            False,
+            False,
+        )
+
+    def test_empty_snapshot_gives_defaults(self, lang_de: LanguagePack) -> None:
+        p = parse_se24_properties_snapshot("", lang_de)
+        assert (p.description, p.package, p.superclass, p.is_final, p.is_abstract) == ("", "", None, False, False)
+
+
+class TestParseInterfacesTable:
+    """The interfaces grid is read as a table; the column is found by its title, not by its position."""
+
+    def test_cx_root_interfaces(self, lang_de: LanguagePack) -> None:
+        table = _load_table("se24_cx_root_interfaces_table")
+        assert parse_se24_interfaces_table(table, lang_de) == ["IF_MESSAGE", "IF_SERIALIZABLE_OBJECT"]
+
+    def test_failed_table_gives_no_interfaces(self, lang_de: LanguagePack) -> None:
+        assert parse_se24_interfaces_table(TableData.failure("x"), lang_de) == []
+
+    def test_placeholders_and_duplicates_are_dropped(self, lang_de: LanguagePack) -> None:
+        cells = ["IF_A", "-", "   ", "/ABC/IF_EXAMPLE", "IF_A"]
+        table = TableData(
+            headers=["", "Interface", "Beschreibung"],
+            rows=[{"row": i, "data": {"Interface": c, "Beschreibung": "d"}} for i, c in enumerate(cells, 1)],
+        )
+        assert parse_se24_interfaces_table(table, lang_de) == ["IF_A", "/ABC/IF_EXAMPLE"]
+
+    def test_digit_led_namespace_is_kept_and_a_namespace_without_a_name_is_dropped(self, lang_de: LanguagePack) -> None:
+        cells = ["/1ABC/IF_EXAMPLE", "/", "/ABC/"]
+        table = TableData(
+            headers=["", "Interface", "Beschreibung"],
+            rows=[{"row": i, "data": {"Interface": c, "Beschreibung": "d"}} for i, c in enumerate(cells, 1)],
+        )
+        assert parse_se24_interfaces_table(table, lang_de) == ["/1ABC/IF_EXAMPLE"]
+
+    def test_methods_grid_is_not_the_interfaces_grid(self, lang_de: LanguagePack) -> None:
+        table = TableData(
+            headers=["", "Methode", "Art"],
+            rows=[{"row": 1, "data": {"Methode": "DISPLAY", "Art": "Instanzmethode"}}],
+        )
+        assert parse_se24_interfaces_table(table, lang_de) == []
+
+
+class TestCountGridRows:
+    def test_counts_data_rows_of_the_grid(self) -> None:
+        assert count_se24_grid_rows(_load_snapshot("se24_cx_root_interfaces")) == 19
+
+    def test_empty_snapshot_has_no_rows(self) -> None:
+        assert count_se24_grid_rows("") == 0
+
+
+class TestParseSnapshotHeader:
+    """``parse_se24_snapshot`` fills the header fields from the properties tab and the interfaces table."""
+
+    def test_header_fields_from_tabs(self, lang_de: LanguagePack) -> None:
+        tabs = SE24TabSnapshots(
+            properties_tab=_load_snapshot("se24_cx_root_properties"),
+            interfaces_table=_load_table("se24_cx_root_interfaces_table"),
+        )
+        result = parse_se24_snapshot(_load_snapshot("se24_cl_salv_table_main"), "CL_SALV_TABLE", lang_de, tabs)
+        assert isinstance(result, SE24Entry)
+        assert result.is_abstract is True
+        assert result.is_final is False
+        assert result.package == "S_ABAP_EXCEPTIONS"
+        assert result.description == "Abstrakte Oberklasse aller globalen Exceptions"
+        assert result.superclass is None
+        assert result.interfaces == ["IF_MESSAGE", "IF_SERIALIZABLE_OBJECT"]
+
+    def test_defaults_without_the_two_tabs(self, lang_de: LanguagePack) -> None:
+        result = parse_se24_snapshot(_load_snapshot("se24_cl_salv_table_main"), "CL_SALV_TABLE", lang_de)
+        assert isinstance(result, SE24Entry)
+        assert (result.description, result.package, result.superclass) == ("", "", None)
+        assert (result.is_abstract, result.is_final, result.interfaces) == (False, False, [])

@@ -76,6 +76,10 @@ class ScreenStateDiff(ToolResult):
         default_factory=list,
         description="Labels not found on screen (e.g. wrong-language labels)",
     )
+    not_applied: list[str] = Field(
+        default_factory=list,
+        description="Labels of controls that were not found on screen or could not be set",
+    )
     mismatches: list[str] = Field(
         default_factory=list,
         description="Controls that did not reach their target value after applying changes",

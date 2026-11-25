@@ -55,6 +55,8 @@ from sapwebguimcp.models.sap_results import (
 from sapwebguimcp.session_language import set_session_language
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from playwright.async_api import Page
 
     from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
@@ -330,6 +332,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             page_session = registry.register(self._page)
         language = await self._read_page_language() or requested_language or registry.language_of(page_session)
         registry.set_language(page_session, language)
+        # A login on a known tab may be another user, whose date format can differ (#42).
+        registry.clear_date_format(page_session)
         # The rest of this sap_login call works on this session (#1044).
         set_session_language(registry.language_of(page_session))
         await self._capture_sap_identity(effective_url, mandant, session_id)
@@ -895,6 +899,24 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
     # ===================================================================
     # SapUiPrimitives
     # ===================================================================
+
+    async def read_field_text(self, labels: Sequence[str]) -> str | None:
+        """Value of the first of *labels* that names one field with a non-empty value, else ``None``."""
+        result = await self._page.evaluate(load_js_with_field_utils("read_field_value.js"), {"labels": list(labels)})
+        return result if isinstance(result, str) else None
+
+    async def cached_date_format(self) -> str | None:
+        """The user's date format cached for this page's session, or ``None``."""
+        registry = await self._get_registry()
+        session_id = registry.session_id_of(self._page)
+        return None if session_id is None else registry.date_format_of(session_id)
+
+    async def cache_date_format(self, date_format: str) -> None:
+        """Cache the user's date format for this page's session; a page without a session is a no-op."""
+        registry = await self._get_registry()
+        session_id = registry.session_id_of(self._page)
+        if session_id is not None:
+            registry.set_date_format(session_id, date_format)
 
     async def fill_field(self, label: str, value: str) -> None:
         """Fill a labelled input field. Raises ``ValueError`` on failure."""

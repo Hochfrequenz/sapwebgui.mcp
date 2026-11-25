@@ -9,8 +9,16 @@ import pytest
 from mcp import ClientSession
 
 from sapwebguimcp.backend.webgui.models.browser_results import FillResult
-from sapwebguimcp.models import KeyboardResult, LoginResult, StatusBarInfo, TableData, TransactionResult
+from sapwebguimcp.models import (
+    FormFieldsResult,
+    KeyboardResult,
+    LoginResult,
+    StatusBarInfo,
+    TableData,
+    TransactionResult,
+)
 from sapwebguimcp.models.sm37_models import SM37JobListResult
+from sapwebguimcp.user_date_format import derive_date_format
 
 from .conftest import call_tool_typed
 from .integration_helpers import (
@@ -267,3 +275,46 @@ async def test_sm37_lookup_with_date_filter(sap_mcp_client: ClientSession) -> No
     assert result.filters_applied.get("to_date") == today, (
         f"Expected to_date='{today}' in filters, got {result.filters_applied}"
     )
+
+
+@pytest.mark.anyio
+async def test_sm37_prefilled_date_gives_the_user_date_format(sap_mcp_client: ClientSession) -> None:
+    """
+    Pin the premise of the fix for issue #42 against a live system.
+
+    SM37's selection screen pre-fills its date fields with a date shown in the user's date
+    format (SU3). ``derive_date_format`` must be able to read that format from a pre-filled
+    value, and the lookup with explicit dates must then succeed. The assertions do not depend
+    on labels, so the test works in every logon language.
+    """
+    from datetime import UTC, datetime
+
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success, f"Login failed: {login.error}"
+
+    await call_tool_typed(sap_mcp_client, "sap_transaction", {"tcode": "SM37"}, TransactionResult)
+    await _wait_for_transaction_screen(sap_mcp_client, "SM37")
+
+    form = await call_tool_typed(sap_mcp_client, "sap_get_form_fields", {}, FormFieldsResult)
+    assert form.success, f"sap_get_form_fields failed: {form.error}"
+
+    derived: dict[str, str] = {}
+    for field in form.fields:
+        date_format = derive_date_format(field.current_value)
+        if date_format is not None and field.current_value is not None:
+            derived[field.id] = date_format
+
+    seen = [(f.id, f.label, f.current_value) for f in form.fields if f.current_value]
+    assert derived, f"No SM37 field holds a date derive_date_format can read; fields with a value: {seen}"
+    assert len(set(derived.values())) == 1, f"Pre-filled dates disagree on the user's date format: {derived}"
+
+    # Today only: a wider range for all users can make the job list too slow to load.
+    # From the 13th of a month on, typing today with day and month swapped would give an invalid date.
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    result = await call_tool_typed(
+        sap_mcp_client,
+        "sap_sm37_lookup",
+        {"job_name": "*", "username": "*", "from_date": today, "to_date": today},
+        SM37JobListResult,
+    )
+    assert result.success, f"sap_sm37_lookup with today's date failed: {result.error}"

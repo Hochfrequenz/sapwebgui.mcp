@@ -18,13 +18,19 @@ from mcp.types import ToolAnnotations
 
 from sapwebguimcp import lang
 from sapwebguimcp.backend.manager import get_backend
-from sapwebguimcp.backend.webgui.parsers.se24_parser import SE24TabSnapshots, parse_se24_snapshot
+from sapwebguimcp.backend.webgui.parsers.se24_parser import (
+    SE24TabSnapshots,
+    count_se24_grid_rows,
+    parse_se24_interfaces_table,
+    parse_se24_snapshot,
+)
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
 from sapwebguimcp.models import (
     SE24Entry,
     SE24Error,
     SE24FileSummary,
     SE24Result,
+    TableData,
 )
 from sapwebguimcp.tools.field_helpers import fill_and_display
 
@@ -100,6 +106,36 @@ async def _fill_and_display(backend: WebGuiBackend, class_name: str, t: Language
     return None
 
 
+async def _read_interfaces_table(
+    backend: WebGuiBackend, class_name: str, interfaces_snapshot: AriaSnapshot, t: LanguagePack
+) -> TableData | None:
+    """Read the interfaces grid of the open interfaces tab. Returns None when the read fails.
+
+    The ARIA snapshot of the grid names only the cells in view and carries no values of the text boxes, so the
+    interface names come from a table read. A failed read is logged, not passed on as an empty table. When the
+    parsed interfaces fill the visible rows, the list may be cut off, and a warning says so.
+    """
+    try:
+        table = await backend.read_table()
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.warning("Could not read the interfaces table", extra={"object": class_name}, exc_info=True)
+        return None
+    if table.success is False:
+        logger.warning(
+            "Could not read the interfaces table",
+            extra={"object": class_name, "error": table.error},
+        )
+        return None
+    visible_rows = count_se24_grid_rows(interfaces_snapshot)
+    interfaces_read = len(parse_se24_interfaces_table(table, t))
+    if 0 < visible_rows <= interfaces_read:
+        logger.warning(
+            "The interface table fills the visible rows, interface list may be cut off at the visible rows",
+            extra={"object": class_name, "interfaces_read": interfaces_read, "visible_rows": visible_rows},
+        )
+    return table
+
+
 async def _lookup_class_on_initial_screen(
     backend: WebGuiBackend, class_name: str, t: LanguagePack
 ) -> SE24Entry | SE24Error:
@@ -120,14 +156,26 @@ async def _lookup_class_on_initial_screen(
     main_snapshot = AriaSnapshot(await backend.get_snapshot())
     logger.debug("Got main snapshot", extra={"object": class_name, "length": len(str(main_snapshot))})
 
-    # Capture each tab
+    # Capture each tab. The properties tab carries description, package, superclass and the abstract/final flags.
+    properties_raw = await _capture_tab_snapshot(backend, t.se24.properties_tab)
+    if properties_raw is None:
+        logger.warning(
+            "Properties tab not available, description, package, superclass and flags stay empty",
+            extra={"object": class_name},
+        )
     methods_raw = await _capture_tab_snapshot(backend, t.se24.methods_tab)
     attributes_raw = await _capture_tab_snapshot(backend, t.se24.attributes_tab)
     interfaces_raw = await _capture_tab_snapshot(backend, t.se24.interfaces_tab)
+    interfaces_snapshot = AriaSnapshot(interfaces_raw) if interfaces_raw is not None else None
+    interfaces_table = (
+        await _read_interfaces_table(backend, class_name, interfaces_snapshot, t) if interfaces_snapshot else None
+    )
     tab_snapshots = SE24TabSnapshots(
         methods_tab=AriaSnapshot(methods_raw) if methods_raw is not None else None,
         attributes_tab=AriaSnapshot(attributes_raw) if attributes_raw is not None else None,
-        interfaces_tab=AriaSnapshot(interfaces_raw) if interfaces_raw is not None else None,
+        interfaces_tab=interfaces_snapshot,
+        properties_tab=AriaSnapshot(properties_raw) if properties_raw is not None else None,
+        interfaces_table=interfaces_table,
     )
 
     # Parse all snapshots
