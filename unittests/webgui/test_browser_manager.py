@@ -250,6 +250,33 @@ async def test_failing_context_close_is_logged_not_raised(caplog: pytest.LogCapt
 
 
 @pytest.mark.anyio
+async def test_hanging_context_close_is_bounded_and_logged(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    manager, _, context = _manager_with_context()
+    monkeypatch.setattr(browser_module, "_CLOSE_TIMEOUT_SECONDS", 0.05)
+    page = await manager.open_login_page(ignore_https_errors=False)
+    assert isinstance(page, _FakePage)
+    page.close.side_effect = RuntimeError("tab is gone")
+
+    async def never_returns() -> None:
+        await asyncio.Event().wait()
+
+    context.close.side_effect = never_returns
+
+    with caplog.at_level(logging.WARNING, logger=browser_module.__name__):
+        # The outer guard only keeps a regression from hanging the test run.
+        await asyncio.wait_for(manager.close_login_page(page), timeout=2)  # type: ignore[arg-type]
+
+    context.close.assert_awaited_once()
+    assert not manager._login_contexts
+    assert any(
+        record.levelno == logging.WARNING and "Could not close login browser context" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+@pytest.mark.anyio
 async def test_close_login_page_falls_back_to_closing_the_context() -> None:
     manager, _, context = _manager_with_context()
     page = await manager.open_login_page(ignore_https_errors=False)

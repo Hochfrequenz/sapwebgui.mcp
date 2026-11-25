@@ -129,6 +129,31 @@ async def test_parallel_login_checks_certificates_unless_the_system_skips_tls_ve
 
 
 @pytest.mark.anyio
+async def test_parallel_login_leaves_the_browser_wide_certificate_bypass_off() -> None:
+    """The lax context scopes the bypass itself; login() must not enable it browser-wide."""
+    manager = _make_manager(["s1"])
+    current = _make_backend()
+    with _Patched(manager, current, tls_skip_verify=True) as p:
+        await sap_login_impl()
+
+    manager.open_login_page.assert_awaited_once_with(ignore_https_errors=True)
+    p.new_backend.login.assert_awaited_once()
+    assert p.new_backend.login.await_args.kwargs["tls_skip_verify"] is False
+    current.login.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_first_login_still_passes_the_system_tls_skip_verify() -> None:
+    manager = _make_manager([])
+    current = _make_backend()
+    with _Patched(manager, current, tls_skip_verify=True):
+        await sap_login_impl()
+
+    current.login.assert_awaited_once()
+    assert current.login.await_args.kwargs["tls_skip_verify"] is True
+
+
+@pytest.mark.anyio
 async def test_parallel_login_starts_keepalive_on_the_new_session() -> None:
     manager = _make_manager(["s1"])
     with _Patched(manager, _make_backend()) as p:

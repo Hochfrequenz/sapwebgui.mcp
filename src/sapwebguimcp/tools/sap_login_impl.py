@@ -92,7 +92,7 @@ async def sap_login_impl(
     browser_manager = await get_browser_manager()
     async with _get_login_lock():
 
-        async def login_on(target: WebGuiBackend) -> LoginResult:
+        async def login_on(target: WebGuiBackend, tls_skip_verify: bool) -> LoginResult:
             return await target.login(
                 url=effective_url or "",
                 username=user,
@@ -101,13 +101,13 @@ async def sap_login_impl(
                 language=language,
                 session_id=session_id,
                 connection_name=system.connection_name,
-                tls_skip_verify=bool(system.tls_skip_verify),
+                tls_skip_verify=tls_skip_verify,
             )
 
         if not browser_manager.registry.list_sessions():
             # First login: use the tab the browser already has.
             backend = await get_backend(tool_name="sap_login")
-            result = await login_on(backend)
+            result = await login_on(backend, bool(system.tls_skip_verify))
             if result.success:
                 # Never start keepalive for attached (user-owned) sessions unless the user asks (issue #1009).
                 await backend.start_keepalive()
@@ -117,7 +117,10 @@ async def sap_login_impl(
         page = await browser_manager.open_login_page(ignore_https_errors=bool(system.tls_skip_verify))
         succeeded = False
         try:
-            result = await login_on(WebGuiBackend(page))
+            # login() gets tls_skip_verify=False here on purpose: it would switch on the browser-wide certificate
+            # bypass (Security.setIgnoreCertificateErrors) for every session, strict ones included; the new context
+            # above already carries the system's setting scoped to itself.
+            result = await login_on(WebGuiBackend(page), False)
             if result.success:
                 backend = await get_backend(session=result.session_id, tool_name="sap_login")
                 await backend.start_keepalive()

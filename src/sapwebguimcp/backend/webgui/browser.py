@@ -31,6 +31,9 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+# Upper bound for closing a login page or its context; a Chrome that does not answer must not hang cleanup.
+_CLOSE_TIMEOUT_SECONDS = 5
+
 
 _DOCKER_COMPOSE_CMD = "docker compose up -d cdp-proxy"
 _DOCKER_DIAGNOSTIC_CMDS = (
@@ -483,17 +486,17 @@ class BrowserManager:  # pylint: disable=too-many-instance-attributes
             return
         self._login_contexts.discard(context)
         try:
-            await context.close()
+            await asyncio.wait_for(context.close(), timeout=_CLOSE_TIMEOUT_SECONDS)
         except Exception:  # pylint: disable=broad-exception-caught
             logger.warning("Could not close login browser context", exc_info=True)
 
     async def close_login_page(self, page: Page) -> None:
         """Close a login page (and with its last page the context); never raises.
 
-        If the page does not close within 5 seconds, its whole context is closed instead.
+        If the page does not close within the timeout, its whole context is closed instead.
         """
         try:
-            await asyncio.wait_for(page.close(), timeout=5)
+            await asyncio.wait_for(page.close(), timeout=_CLOSE_TIMEOUT_SECONDS)
         except Exception:  # pylint: disable=broad-exception-caught
             logger.warning("Could not close login page, closing its browser context", exc_info=True)
             await self._close_login_context(page.context)
