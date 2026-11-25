@@ -283,6 +283,24 @@ def test_regular_table_range_cut_by_the_row_limit_is_truncated() -> None:
     assert result["truncated"] is True
 
 
+def test_regular_table_reports_the_bounds_of_the_rows_read() -> None:
+    """A truncated read must say where it ended, so the caller can go on with start_row = end_row + 1."""
+    result = _run_regular(50, start_row=6, max_rows=5)
+
+    assert [row["row"] for row in result["rows"]] == [6, 7, 8, 9, 10]
+    assert result.get("startRow") == 6
+    assert result.get("endRow") == 10
+    assert result["truncated"] is True
+
+
+def test_regular_table_without_rows_in_range_ends_at_its_start() -> None:
+    result = _run_regular(5, start_row=20)
+
+    assert result["rows"] == []
+    assert result.get("startRow") == 20
+    assert result.get("endRow") == 20
+
+
 def test_regular_table_read_completely_is_not_truncated() -> None:
     result = _run_regular(8)
 

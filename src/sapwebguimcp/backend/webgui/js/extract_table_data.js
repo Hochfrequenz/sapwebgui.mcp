@@ -289,6 +289,9 @@
             // Only the row limit can cut the requested range short; rows after end_row are not part of it
             truncated: Math.min(dataRows.length, endRow || Infinity) > actualEndRow,
             rows: rows,
+            // Same bounds as an ALV grid, so a truncated read can go on with start_row = end_row + 1
+            startRow: startRow,
+            endRow: rows.length > 0 ? rows[rows.length - 1].row : startRow,
         };
     }
 
