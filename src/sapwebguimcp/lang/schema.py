@@ -289,6 +289,20 @@ class Se24Section:
     interfaces_tab: Text
     source_button: Text
     """Button that opens the source of the selected method."""
+    properties_tab: Text
+    """Tab title of the properties tab of the class builder."""
+    description_field: Text
+    """Label of the description input on the properties tab."""
+    package_field: Text
+    """Label of the package input on the properties tab."""
+    superclass_field: Text
+    """Label of the superclass input on the properties tab (absent for a root class and for an interface)."""
+    instantiation_field: Text
+    """Label of the instantiation input on the properties tab (its value is Public, Protected, Private or Abstract)."""
+    final_checkbox: Text
+    """Label of the Final check box on the properties tab."""
+    interface_column: Text
+    """Title of the interface column of the interfaces grid (the live header text goes on with a hint sentence)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,7 +444,10 @@ class St22Section:
     col_program: Text
     col_error_type: Text
     col_short_text: Text
+    """Column header of the short text in the dump list; also the heading of the short text in the dump detail."""
     call_stack_heading: Text
+    termination_heading: Text
+    """Heading of the text on where the program terminated, which names the include and line in full (#96)."""
     other_headings: Text
     """Headings that end a section of the dump detail (the ones in ``section`` and ``call_stack_heading`` do too)."""
     source_code_of: RegexText
@@ -456,7 +473,7 @@ class LanguagePack:
     logon_dropdown: str
     """Text of the WebGUI logon language dropdown, e.g. ``"Deutsch"``."""
     date_format: str
-    """Default date input format as a ``strftime`` pattern (#1043 reads the user's own)."""
+    """Date input format as a ``strftime`` pattern: the fallback when the user's own format cannot be read (#42)."""
     same_as_en: frozenset[str]
     """Field paths whose value deliberately equals EN (checked by the untranslated-field test)."""
 

@@ -33,9 +33,12 @@ from sapwebguimcp.backend.webgui.parsers.st22_parser import (
 )
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
 from sapwebguimcp.models.st22_models import (
+    ST22Dump,
+    ST22DumpDetail,
     ST22DumpDetailResult,
     ST22DumpListResult,
 )
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -88,9 +91,12 @@ async def _clear_user_field(backend: "WebGuiBackend", t: LanguagePack) -> None:
 async def _fill_date_field(backend: "WebGuiBackend", t: LanguagePack, target_date: str) -> str | None:
     """Fill the date field with a formatted date. Returns error or None."""
     try:
-        formatted = format_sap_date_as(target_date, t.date_format)
+        format_sap_date_as(target_date, t.date_format)  # validate the ISO date before the field is read
     except ValueError:
         return f"Invalid date format: {target_date} (expected YYYY-MM-DD)"
+    # The date field is pre-filled: read the user's date format off it before it is overwritten (#42)
+    date_format = await resolve_user_date_format(backend, list(t.st22.date_field), t.date_format)
+    formatted = format_sap_date_as(target_date, date_format)
 
     # Find and fill the date field
     for label in t.st22.date_field:
@@ -210,6 +216,13 @@ async def _capture_full_detail(backend: "WebGuiBackend") -> str:
         snapshots.append(new_snapshot_str)
 
     return "\n".join(snapshots)
+
+
+def _enrich_detail(detail: ST22DumpDetail, dump: ST22Dump) -> None:
+    """Fill the short text, the program and the error type of the detail from the list entry where it has none."""
+    detail.short_text = detail.short_text or dump.short_text
+    detail.program = detail.program or dump.program
+    detail.error_type = detail.error_type or dump.error_type
 
 
 # =============================================================================
@@ -335,12 +348,7 @@ async def _st22_lookup(  # pylint: disable=too-many-return-statements,too-many-l
     # Parse the detail
     detail = parse_st22_dump_detail(AriaSnapshot(detail_snapshot), t)
 
-    # Enrich detail with data from the list entry
-    detail.short_text = target_dump.short_text
-    if not detail.program:
-        detail.program = target_dump.program
-    if not detail.error_type:
-        detail.error_type = target_dump.error_type
+    _enrich_detail(detail, target_dump)
 
     return ST22DumpDetailResult(
         detail=detail,

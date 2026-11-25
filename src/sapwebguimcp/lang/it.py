@@ -49,6 +49,8 @@ IT = LanguagePack(
             "popup.abapgit_transport_required",
             "se09.organizer_title",
             "se24.class_builder",
+            "se24.final_checkbox",
+            "se24.interface_column",
             "se24.interface_label",
             "se24.interfaces_tab",
             "se37.function_builder",
@@ -217,6 +219,13 @@ IT = LanguagePack(
         attributes_tab=Text(("Attributi",)),
         interfaces_tab=Text(("Interfaces",)),
         source_button=Text(("Testo sorgente",)),
+        properties_tab=Text(("Proprietà",)),
+        description_field=Text(("Descrizione",)),
+        package_field=Text(("Pacchetto",)),
+        superclass_field=Text(("Superclasse",)),
+        instantiation_field=Text(("Generazione istanza",)),
+        final_checkbox=Text(("Final",)),
+        interface_column=Text(("Interface",)),
     ),
     se37=Se37Section(
         initial_screen=Text(("Function Builder: videata iniziale",)),
@@ -333,6 +342,7 @@ IT = LanguagePack(
         col_error_type=Text(("Runtime Errors", "Runtime Error")),
         col_short_text=Text(("Short Text", "Testo breve")),
         call_stack_heading=Text(("Chiamate/eventi attivi",)),
+        termination_heading=Text(("Informazioni punto di interr.",)),
         other_headings=Text(
             (
                 "Ambiente sistema",

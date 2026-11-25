@@ -17,9 +17,11 @@
     //   fillable   whether the From-Value (column LOW) is an input; false for rows SE16N shows
     //              but does not offer for selection (e.g. the client field)
     //   elementId, selector, elementType   the From-Value input to fill (null when not fillable)
-    // The grid is rendered only partly (about 30 rows) and is not scrolled here: fields further down
-    // the table are not in the DOM at all. The grid is padded with empty rows when the table has fewer
-    // fields than that, so "no empty row" means the table may continue below what is rendered.
+    // The grid shows one page of rows (16 on a typical system) and is not scrolled here: fields further
+    // down the table are not in the DOM at all. The row number in the SID is relative to the page shown
+    // (0..15), so rowIndex, elementId and selector are valid only for the page that was read; the caller
+    // scrolls with PageDown and reads again. The grid is padded with empty rows when the table has fewer
+    // fields than a page, so "no empty row" means the table may continue below the page.
     const sidPattern = /GS_SELFIELDS-(SCRTEXT_M|FIELDNAME|LOW)\[(\d+),(\d+)\]/;
     const technicalName = /^[A-Za-z0-9_\/]+$/;
 

@@ -28,6 +28,7 @@ from sapwebguimcp.models.slg1_models import (
     SLG1FileSummary,
     SLG1LogListResult,
 )
+from sapwebguimcp.user_date_format import resolve_user_date_format
 from sapwebguimcp.utils import format_sap_date_as
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ async def _fill_by_label(backend: "WebGuiBackend", labels: Iterable[str], value:
         result = await backend.fill_form({label: value})
         if label in result.not_found:
             continue
-        return not result.errors  # found: if it errored, the value was not accepted
+        return result.success and not result.errors  # found: a failed call or a refused value is not a fill
     return False
 
 
@@ -80,18 +81,35 @@ async def _slg1_lookup(  # pylint: disable=too-many-arguments,too-many-positiona
     await backend.wait_for_ready()
 
     # Fill the selection screen, one field at a time: each field is looked up by the labels of the session's view
-    fields: list[tuple[Text, str]] = [(t.slg1.log_object, object_name)]
+    fields: list[tuple[str, Text, str]] = [("object", t.slg1.log_object, object_name)]
     if subobject:
-        fields.append((t.slg1.log_subobject, subobject))
+        fields.append(("subobject", t.slg1.log_subobject, subobject))
     if external_id:
-        fields.append((t.slg1.external_id, external_id))
-    if from_date:
-        fields.append((t.slg1.from_datetime, format_sap_date_as(from_date, t.date_format)))
-    if to_date:
-        fields.append((t.slg1.to_datetime, format_sap_date_as(to_date, t.date_format)))
-    for labels, value in fields:
+        fields.append(("external_id", t.slg1.external_id, external_id))
+    if from_date or to_date:
+        # The date field is pre-filled: read the user's date format off it before it is overwritten (#42)
+        date_format = await resolve_user_date_format(
+            backend, [*t.slg1.from_datetime, *t.slg1.to_datetime], t.date_format
+        )
+        if from_date:
+            fields.append(("from_date", t.slg1.from_datetime, format_sap_date_as(from_date, date_format)))
+        if to_date:
+            fields.append(("to_date", t.slg1.to_datetime, format_sap_date_as(to_date, date_format)))
+    unfilled: list[str] = []
+    for name, labels, value in fields:
         if not await _fill_by_label(backend, labels, value):
-            logger.warning("SLG1 field not found labels=%r", list(labels))
+            logger.warning("SLG1 field not filled labels=%r", list(labels))
+            unfilled.append(name)
+    if unfilled:
+        # F8 with a field left at its default would run SAP's default selection and return unrelated logs
+        message = "Could not apply the filter(s) on the SLG1 selection screen: "  # lang-ok: our own message
+        return SLG1LogListResult.failure(
+            message + ", ".join(unfilled),
+            logs=[],
+            log_count=0,
+            logs_truncated=False,
+            retrieved_at=now,
+        )
 
     # Execute search (F8)
     await backend.press_key("F8")

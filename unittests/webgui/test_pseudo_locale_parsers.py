@@ -106,7 +106,9 @@ def _se37_with_tabs(snapshot: str, t: LanguagePack, path: Path) -> Any:
 
 
 def _se24_with_tabs(snapshot: str, t: LanguagePack, _: Path) -> Any:
-    tabs = se24_parser.SE24TabSnapshots(methods_tab=snapshot, attributes_tab=snapshot, interfaces_tab=snapshot)
+    tabs = se24_parser.SE24TabSnapshots(
+        methods_tab=snapshot, attributes_tab=snapshot, interfaces_tab=snapshot, properties_tab=snapshot
+    )
     return se24_parser.parse_se24_snapshot(snapshot, _object_name(snapshot), t, tabs)
 
 
@@ -136,6 +138,7 @@ _PROBES: dict[str, dict[str, Probe]] = {
         "snapshot_with_tabs": _se24_with_tabs,
         "methods": lambda s, t, _: se24_parser.parse_se24_methods_snapshot(s, t),
         "attributes": lambda s, t, _: se24_parser.parse_se24_attributes_snapshot(s, t),
+        "properties": lambda s, t, _: se24_parser.parse_se24_properties_snapshot(s, t),
     },
     "se37": {
         "snapshot": lambda s, t, _: se37_parser.parse_se37_snapshot(s, _object_name(s), t),
