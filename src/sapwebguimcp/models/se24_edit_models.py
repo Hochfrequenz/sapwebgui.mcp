@@ -11,5 +11,10 @@ class SE24EditResult(ToolResult):
     class_name: str = Field(description="Name of the class that was edited")
     method_name: str = Field(description="Name of the method that was edited")
     backup_source: str = Field(description="Original method source code before editing (for reference/undo)")
-    check_messages: list[str] = Field(default_factory=list, description="Messages from syntax check and activation")
+    check_messages: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Messages from syntax check and activation; may end with a WARNING entry if the editor could not be left"
+        ),
+    )
     activated: bool = Field(default=False, description="Whether the class was successfully activated")

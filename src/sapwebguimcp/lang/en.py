@@ -51,6 +51,9 @@ EN = LanguagePack(
         program=Text(("Program",)),
     ),
     popup=PopupSection(
+        type_error=Text(("Error",)),
+        type_info=Text(("Information",)),
+        type_confirm=Text(("Confirm", "Yes", "No"), word=True),
         inactive_objects=Text(("Inactive Objects",), fold=False),
         original_language_title=Text(("Different original and logon languages",), fold=False),
         maintain_in_original=Text(("Maint. in orig. lang.",)),
@@ -163,6 +166,13 @@ EN = LanguagePack(
         attributes_tab=Text(("Attributes",)),
         interfaces_tab=Text(("Interfaces",)),
         source_button=Text(("Source Code", "Sourcecode")),
+        properties_tab=Text(("Properties",)),
+        description_field=Text(("Description",)),
+        package_field=Text(("Package",)),
+        superclass_field=Text(("Superclass",)),
+        instantiation_field=Text(("Instantiation",)),
+        final_checkbox=Text(("Final",)),
+        interface_column=Text(("Interface",)),
     ),
     se37=Se37Section(
         initial_screen=Text(("Function Builder: Initial Screen",)),
@@ -284,6 +294,7 @@ EN = LanguagePack(
         col_error_type=Text(("Runtime Errors", "Runtime Error")),
         col_short_text=Text(("Short Text",)),
         call_stack_heading=Text(("Active Calls/Events", "Active Calls", "Call Stack")),
+        termination_heading=Text(("Information on Where Terminated",)),
         other_headings=Text(
             (
                 "System Environment",

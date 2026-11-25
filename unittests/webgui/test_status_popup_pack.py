@@ -16,6 +16,7 @@ from playwright.async_api import async_playwright
 
 from sapwebguimcp import lang
 from sapwebguimcp.backend.webgui.backend import WebGuiBackend, _parse_toolbar_note
+from sapwebguimcp.models.base import PopupType
 from sapwebguimcp.tools.sap_tools import SELECTORS, parse_shortcut_from_title
 
 SNAPSHOTS = Path(__file__).resolve().parents[1] / "testdata" / "html_snapshots"
@@ -195,6 +196,28 @@ async def _popup(backend: WebGuiBackend) -> tuple[str | None, list[str], str | N
 )
 async def test_webgui_popup_message_skips_button_labels(snapshot: str, expected: Any) -> None:
     assert await _on_snapshot(snapshot, _popup) == expected
+
+
+async def _popup_title_and_type(backend: WebGuiBackend) -> tuple[str | None, PopupType]:
+    popup = await backend.check_popup()
+    assert popup is not None
+    return popup.title, popup.popup_type
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("snapshot", "title", "popup_type"),
+    [
+        ("se38_error_popup_en.html", "Error in Object Editing", PopupType.ERROR),
+        # The German title carries no error keyword and the message is the same title: nothing to classify.
+        ("se38_error_popup_de.html", "Einstieg in die Objektbearbeitung", PopupType.UNKNOWN),
+        # "Beenden" / "Exit" are bare titles without a classifying keyword (the Yes/No buttons are not classified).
+        ("bp_validation_popup_de.html", "Beenden", PopupType.UNKNOWN),
+        ("bp_validation_popup_en.html", "Exit", PopupType.UNKNOWN),
+    ],
+)
+async def test_webgui_popup_title_and_type(snapshot: str, title: str, popup_type: PopupType) -> None:
+    assert await _on_snapshot(snapshot, _popup_title_and_type) == (title, popup_type)
 
 
 @pytest.mark.anyio

@@ -86,8 +86,37 @@ async def test_popup_error_drops_the_button_labels(code: str, popup_text: str) -
 
 @pytest.mark.anyio
 async def test_pull_without_a_session_language_is_not_turned_into_a_failure_result() -> None:
-    with lang.use(None), pytest.raises(lang.UnsupportedLanguageError):
+    settings = SimpleNamespace(abapgit_pat=None, github_pat=None, github_user=None)
+    with (
+        patch.object(abapgit_tools, "get_settings", return_value=settings),
+        lang.use(None),
+        pytest.raises(lang.UnsupportedLanguageError),
+    ):
         await abapgit_tools._abapgit_pull_via_api(MagicMock(), "R", None, None, None)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("kwargs", "expected_error"),
+    [
+        ({"repo": "REPO; DROP TABLE;"}, "Invalid repository"),
+        ({"repo": None, "key": "12;x"}, "Invalid key"),
+        ({"repo": "R", "branch": "a;b"}, "Invalid branch"),
+        ({"repo": "R", "trkorr": "X;Y"}, "Invalid trkorr"),
+    ],
+)
+async def test_pull_injection_is_rejected_without_sap_call_and_without_a_session_language(
+    kwargs: dict[str, str | None], expected_error: str
+) -> None:
+    """Malformed input is rejected client-side; the rejection needs no SAP text, so no logon language (#95)."""
+    backend = MagicMock()
+    call = {"trkorr": None, "username": None, "pat": None, **kwargs}
+    with lang.use(None):
+        result = await abapgit_tools._abapgit_pull_via_api(backend, **call)
+
+    assert result.success is False
+    assert expected_error in (result.error or "")
+    assert backend.mock_calls == []
 
 
 def _classifier_backend(status: StatusBarInfo) -> MagicMock:

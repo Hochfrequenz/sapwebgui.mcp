@@ -27,7 +27,7 @@ from sapwebguimcp.lang import UnsupportedLanguageError, alt_of, english_first, l
 from sapwebguimcp.lang.text import compiled
 from sapwebguimcp.middleware.logging import set_sap_identity
 from sapwebguimcp.models.alv_models import AlvCellInfo, AlvMetadata, TableCellClickResult
-from sapwebguimcp.models.base import CheckActivateResult, PopupButton, PopupInfo
+from sapwebguimcp.models.base import CheckActivateResult, PopupButton, PopupInfo, PopupType
 from sapwebguimcp.models.middleware import SapIdentity
 from sapwebguimcp.models.sap_results import (
     ButtonInfo,
@@ -55,6 +55,8 @@ from sapwebguimcp.models.sap_results import (
 from sapwebguimcp.session_language import set_session_language
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from playwright.async_api import Page
 
     from sapwebguimcp.backend.webgui.models.session_registry import SessionRegistry
@@ -210,6 +212,19 @@ def _logon_dropdown_text(language: str) -> str:
         return language
 
 
+def _classify_popup(title: str, message: str) -> PopupType:
+    """Popup type from keywords in its title and text (any case), in every language."""
+    popup = lang.universal().popup
+    combined = f"{message} {title}"
+    if popup.type_error.contains(combined):
+        return PopupType.ERROR
+    if popup.type_info.contains(combined):
+        return PopupType.INFO
+    if popup.type_confirm.contains(combined):
+        return PopupType.CONFIRM
+    return PopupType.UNKNOWN
+
+
 class WebGuiBackend:  # pylint: disable=too-many-public-methods
     """WebGUI backend using Playwright browser automation.
 
@@ -343,6 +358,8 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             page_session = registry.register(self._page)
         language = await self._read_page_language() or requested_language or registry.language_of(page_session)
         registry.set_language(page_session, language)
+        # A login on a known tab may be another user, whose date format can differ (#42).
+        registry.clear_date_format(page_session)
         # The rest of this sap_login call works on this session (#1044).
         set_session_language(registry.language_of(page_session))
         await self._capture_sap_identity(effective_url, mandant, session_id)
@@ -940,6 +957,24 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
     # SapUiPrimitives
     # ===================================================================
 
+    async def read_field_text(self, labels: Sequence[str]) -> str | None:
+        """Value of the first of *labels* that names one field with a non-empty value, else ``None``."""
+        result = await self._page.evaluate(load_js_with_field_utils("read_field_value.js"), {"labels": list(labels)})
+        return result if isinstance(result, str) else None
+
+    async def cached_date_format(self) -> str | None:
+        """The user's date format cached for this page's session, or ``None``."""
+        registry = await self._get_registry()
+        session_id = registry.session_id_of(self._page)
+        return None if session_id is None else registry.date_format_of(session_id)
+
+    async def cache_date_format(self, date_format: str) -> None:
+        """Cache the user's date format for this page's session; a page without a session is a no-op."""
+        registry = await self._get_registry()
+        session_id = registry.session_id_of(self._page)
+        if session_id is not None:
+            registry.set_date_format(session_id, date_format)
+
     async def fill_field(self, label: str, value: str) -> None:
         """Fill a labelled input field. Raises ``ValueError`` on failure."""
         result = await self._page.evaluate(
@@ -1340,6 +1375,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                         label=raw.get("label", ""),
                         field_type=SapFieldType(raw.get("field_type", "text")),
                         current_value=raw.get("current_value"),
+                        checked=raw.get("checked") if isinstance(raw.get("checked"), bool) else None,
                         readonly=raw.get("readonly", False),
                         options=options,
                     )
@@ -1441,6 +1477,7 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
                 total_rows=table_data.get("totalRows", 0),
                 start_row=table_data.get("startRow", 1),
                 end_row=table_data.get("endRow"),
+                truncated=bool(table_data.get("truncated", False)),
                 alv=alv,
             )
 
@@ -1625,8 +1662,12 @@ class WebGuiBackend:  # pylint: disable=too-many-public-methods
             for btn in result.get("buttons", [])
         ]
 
+        title = (result.get("title") or "").strip() or None
+        message = result.get("message")
         return PopupInfo(
-            message=result.get("message"),
+            popup_type=_classify_popup(title or "", message or ""),
+            title=title,
+            message=message,
             buttons=buttons,
             close_button_id=result.get("close_button_id"),
         )

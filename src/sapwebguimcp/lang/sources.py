@@ -91,6 +91,8 @@ Source = DataElement | ScreenText | GuiFunction | Message | DomainValue | Transa
 
 NOT_LOOKED_UP = Manual("not yet looked up")
 
+_DE_LIVE_ONLY = "; DE verified live, EN and IT are the SAP standard labels, not verified live"
+
 SOURCES: Mapping[str, Source] = MappingProxyType(
     {
         "popup.abapgit_error_keywords": Manual("abapGit UI text"),
@@ -118,6 +120,9 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "common.row_select_hint": Manual("WebGUI framework text: ARIA hint of a selectable table row"),
         "common.user": DataElement("XUBNAME", "medium"),
         "common.program": DataElement("PROGNAME", "short"),
+        "popup.type_error": Manual("keyword list classifying popups by title or text"),
+        "popup.type_info": Manual("keyword list classifying popups by title or text"),
+        "popup.type_confirm": Manual("keyword list classifying popups by title or text"),
         "popup.inactive_objects": Manual("popup title seen live; no matching text in D021T, T100 or RSMPTEXTS"),
         "popup.original_language_title": Manual(
             "GUI title of screen SAPLSETX 0100 (title bar, not a D021T text); the T100 messages about the"
@@ -207,6 +212,13 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "se24.attributes_tab": Manual("tab title of the class builder tab strip"),
         "se24.interfaces_tab": Manual("tab title of the class builder tab strip"),
         "se24.source_button": Manual("button text of the class builder method list"),
+        "se24.properties_tab": Manual("tab title of the class builder tab strip" + _DE_LIVE_ONLY),
+        "se24.description_field": Manual("label of the description input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.package_field": Manual("label of the package input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.superclass_field": Manual("label of the superclass input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.instantiation_field": Manual("label of the instantiation input on the properties tab" + _DE_LIVE_ONLY),
+        "se24.final_checkbox": Manual("label of the Final check box on the properties tab" + _DE_LIVE_ONLY),
+        "se24.interface_column": Manual("column title of the interfaces grid" + _DE_LIVE_ONLY),
         "se37.initial_screen": Manual(
             "window title of the function builder initial screen (titlebar, not in the supported text tables)"
         ),
@@ -325,6 +337,7 @@ SOURCES: Mapping[str, Source] = MappingProxyType(
         "st22.col_error_type": Manual("list column title of the dump list, not looked up"),
         "st22.col_short_text": Manual("list column title of the dump list, not looked up"),
         "st22.call_stack_heading": Manual("heading of the dump detail text (spec section 9)"),
+        "st22.termination_heading": Manual("heading of the dump detail text (spec section 9)"),
         "st22.other_headings": Manual("headings of the dump detail text (spec section 9)"),
         "st22.source_code_start": Manual("heading of the dump detail text (spec section 9)"),
         "st22.source_code_of": Manual("text of the dump detail"),

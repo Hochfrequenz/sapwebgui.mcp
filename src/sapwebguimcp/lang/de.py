@@ -38,6 +38,8 @@ DE = LanguagePack(
     date_format="%d.%m.%Y",
     same_as_en=frozenset(
         {
+            "se24.final_checkbox",
+            "se24.interface_column",
             "se24.interface_label",
             "se37.import_tab",
             "se37.export_tab",
@@ -58,6 +60,9 @@ DE = LanguagePack(
         program=Text(("Programm",)),
     ),
     popup=PopupSection(
+        type_error=Text(("Fehler",)),
+        type_info=Text(("Information", "Hinweis")),
+        type_confirm=Text(("Bestätigung", "Ja", "Nein"), word=True),
         inactive_objects=Text(("Inaktive Objekte",), fold=False),
         original_language_title=Text(
             ("Abweichende Original- und Anmeldesprache", "Originalsprache und Anmeldesprache"), fold=False
@@ -178,6 +183,13 @@ DE = LanguagePack(
         attributes_tab=Text(("Attribute",)),
         interfaces_tab=Text(("Schnittstellen",)),
         source_button=Text(("Quelltext", "Sourcecode", "Weiter zu Quelltext")),
+        properties_tab=Text(("Eigenschaften",)),
+        description_field=Text(("Beschreibung",)),
+        package_field=Text(("Paket",)),
+        superclass_field=Text(("Oberklasse",)),
+        instantiation_field=Text(("Instanzgenerierung",)),
+        final_checkbox=Text(("Final",)),
+        interface_column=Text(("Interface",)),
     ),
     se37=Se37Section(
         initial_screen=Text(("Function Builder: Einstieg",)),
@@ -294,6 +306,7 @@ DE = LanguagePack(
         col_error_type=Text(("Laufzeitfehler", "Fehler")),
         col_short_text=Text(("Kurztext",)),
         call_stack_heading=Text(("Aktive Aufrufe/Ereignisse", "Aktive Aufrufe", "Aufrufhierarchie")),
+        termination_heading=Text(("Informationen zur Abbruchstelle",)),
         other_headings=Text(
             (
                 "Systemumgebung",

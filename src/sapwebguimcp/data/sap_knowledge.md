@@ -246,7 +246,7 @@ USE THIS APPROACH TO ACCESS HELP.SAP.COM ONLY.
 
 **Impact on automation:** If your tool assumes a default checkbox state (e.g., "Workbench is checked by default in SE09"), it will break when the user previously used a different configuration. The checkbox state persists even across browser sessions and logins.
 
-**Solution:** Transaction-specific tools use `ensure_screen_state()` to always explicitly set the desired state before executing. This reads the ARIA snapshot, diffs against the target, applies only necessary changes, and verifies the result. Labels that don't match the current language produce harmless warnings (labels come from the language pack).
+**Solution:** Transaction-specific tools use `ensure_screen_state()` to always explicitly set the desired state before executing. This reads the ARIA snapshot, diffs against the target, applies only necessary changes, and verifies the result. Labels that don't match the current language produce harmless warnings (labels come from the language pack). SLG1 and SM37 fail the lookup before F8 when a requested filter cannot be applied, instead of running SAP's default selection.
 
 **Applies to:** All SAP selection screens, not just SE09. Any transaction with a selection screen (SE16, SM37, SLG1, etc.) has this stateful behavior.
 

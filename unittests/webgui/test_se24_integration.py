@@ -612,3 +612,40 @@ async def test_se24_lookup_attributes_parsing(sap_mcp_client: ClientSession) -> 
         if attr.name in ("HORIZONTAL_TAB", "NEWLINE", "CR_LF"):
             assert attr.is_constant, f"{attr.name} should be a constant"
             assert attr.visibility == "public", f"{attr.name} should be public"
+
+
+@pytest.mark.anyio
+async def test_se24_lookup_header_fields(sap_mcp_client: ClientSession) -> None:
+    """
+    Test that description, package, superclass, abstract/final flags and interfaces are filled (#97).
+
+    CX_SY_ZERODIVIDE is a final exception class with a superclass; CX_ROOT is abstract, has no superclass
+    and implements IF_MESSAGE and IF_SERIALIZABLE_OBJECT.
+    """
+    from sapwebguimcp.models import SE24Result
+
+    login = await call_tool_typed(sap_mcp_client, "sap_login", {}, LoginResult)
+    assert login.success, f"Login failed: {login.error}"
+
+    result = await call_tool_typed(
+        sap_mcp_client,
+        "sap_se24_lookup",
+        {"classes": ["CX_SY_ZERODIVIDE", "CX_ROOT"]},
+        SE24Result,
+    )
+
+    assert result.success, f"SE24 lookup failed: {result.error}"
+    entries = {e.class_name: e for e in result.entries}
+    assert set(entries) == {"CX_SY_ZERODIVIDE", "CX_ROOT"}, result.errors
+
+    zerodivide = entries["CX_SY_ZERODIVIDE"]
+    assert zerodivide.superclass == "CX_SY_ARITHMETIC_ERROR"
+    assert zerodivide.is_final
+    assert zerodivide.description
+    assert zerodivide.package == "S_ABAP_EXCEPTIONS"
+
+    root = entries["CX_ROOT"]
+    assert root.is_abstract
+    assert not root.is_final
+    assert root.superclass is None
+    assert {"IF_MESSAGE", "IF_SERIALIZABLE_OBJECT"} <= set(root.interfaces), root.interfaces

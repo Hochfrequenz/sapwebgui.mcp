@@ -185,6 +185,24 @@ class TestEnsureScreenStateFields:
         assert "Datenbankrelation" in diff.fields_changed
         backend.fill_field.assert_called_once_with("Datenbankrelation", "MARA")
 
+    @pytest.mark.anyio
+    async def test_fill_empty_field(self) -> None:
+        """An empty textbox (``- textbox "L"``, no colon) is found and filled, not reported as missing."""
+        before = '- textbox "User Name"\n'
+        after = '- textbox "User Name": ME\n'
+        backend = _mock_backend(before, after)
+        target = SelectionScreenState(
+            fields={"User Name": "ME"},
+        )
+
+        diff = await ensure_screen_state(backend, target)
+
+        assert diff.success is True
+        backend.fill_field.assert_awaited_once_with("User Name", "ME")
+        assert "User Name" in diff.fields_changed
+        assert "User Name" not in diff.not_applied
+        assert diff.warnings == []
+
 
 class TestEnsureScreenStateAmbiguity:
     """Test that ambiguous labels are refused."""
@@ -539,3 +557,50 @@ class TestEnsureScreenStateTransitions:
 
         assert diff.success is False
         assert any("Datenbankrelation" in m for m in diff.mismatches)
+
+
+class TestEnsureScreenStateNotApplied:
+    """``not_applied`` lists the labels of controls that were not found or could not be set (issue #98)."""
+
+    @pytest.mark.anyio
+    async def test_not_applied_lists_missing_and_failed_labels(self) -> None:
+        screen = '- checkbox "Present" [checked]:  Present\n- textbox "Stubborn": OLD\n'
+        backend = _mock_backend(screen, screen)
+        backend.fill_field = AsyncMock(side_effect=RuntimeError("refused"))
+        target = SelectionScreenState(
+            checkboxes={"Present": True, "Missing": True},
+            fields={"Stubborn": "NEW"},
+        )
+
+        diff = await ensure_screen_state(backend, target)
+
+        # The field keeps its old value, so the call fails on verification and the failure result carries not_applied.
+        # Before the fix the model has no such field: reading it through model_dump() raises KeyError.
+        assert diff.success is False
+        assert diff.model_dump()["not_applied"] == ["Missing", "Stubborn"]
+
+    @pytest.mark.anyio
+    async def test_verification_mismatch_after_successful_setter_is_not_applied(self) -> None:
+        """A setter that returns normally but whose value did not stick is listed in not_applied exactly once."""
+        screen = '- textbox "Stubborn": OLD\n'
+        backend = _mock_backend(screen, screen)
+        target = SelectionScreenState(fields={"Stubborn": "NEW"})
+
+        diff = await ensure_screen_state(backend, target)
+
+        backend.fill_field.assert_awaited_once_with("Stubborn", "NEW")
+        assert diff.success is False
+        assert diff.mismatches  # the mismatch is still reported
+        assert diff.not_applied == ["Stubborn"]
+
+    @pytest.mark.anyio
+    async def test_checkbox_and_radio_mismatches_are_not_applied(self) -> None:
+        """Checkbox and radio verification mismatches are listed in not_applied too."""
+        screen = '- checkbox "Box":  Box\n- radio "A" [checked]\n- radio "B"\n'
+        backend = _mock_backend(screen, screen)
+        target = SelectionScreenState(checkboxes={"Box": True}, radios={"B": True})
+
+        diff = await ensure_screen_state(backend, target)
+
+        assert diff.success is False
+        assert diff.not_applied == ["Box", "B"]

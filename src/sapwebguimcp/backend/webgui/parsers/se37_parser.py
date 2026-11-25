@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sapwebguimcp.backend.webgui.parsers.aria_fields import textbox_value, unescape_yaml_name
 from sapwebguimcp.backend.webgui.types import AriaSnapshot
 from sapwebguimcp.lang.schema import LanguagePack
 from sapwebguimcp.lang.text import Text, compiled
@@ -98,12 +99,6 @@ class _GridCell:
     checked: bool | None = None
 
 
-def _unescape_yaml_name(raw: str, quoted_line: bool) -> str:
-    """Undo the YAML escaping of an accessible name (``\\"`` and, in single-quoted lines, ``''``)."""
-    name = raw.replace('\\"', '"')
-    return name.replace("''", "'") if quoted_line else name
-
-
 def _grid_rows(snapshot: str) -> tuple[list[str], list[list[_GridCell]]]:
     """Split a grid snapshot into its column titles and its data rows (each a list of cells).
 
@@ -132,7 +127,7 @@ def _grid_rows(snapshot: str) -> tuple[list[str], list[list[_GridCell]]]:
         cell_match = _CELL_LINE.match(line)
         if cell_match:
             quoted = line.lstrip().startswith("- '")
-            name = _unescape_yaml_name(cell_match.group("name") or "", quoted)
+            name = unescape_yaml_name(cell_match.group("name") or "", quoted)
             if cell_match.group("kind") == "columnheader":
                 headers.append(name)
             else:
@@ -211,9 +206,6 @@ def _parse_exception_cells(snapshot: str) -> list[SE37Exception]:
 # Properties (attributes) tab
 # =============================================================================
 
-_TEXTBOX_LINE = re.compile(
-    r"""^\s*- '?textbox "(?P<label>(?:[^"\\]|\\.)*)"(?: \[[^\]]*\])*(?::[ ]?(?P<value>.*?))?'?\s*$"""
-)
 _RADIO_LINE = re.compile(r"""^\s*- '?radio "(?P<label>(?:[^"\\]|\\.)*)"(?P<flags>(?: \[[^\]]*\])*)""")
 
 
@@ -225,21 +217,6 @@ class SE37Properties:
     package: str | None = None
     description: str = ""
     is_rfc_enabled: bool = False
-
-
-def _textbox_value(snapshot: str, label: Text) -> str | None:
-    """Value of the first text box whose label is one of ``label``; None when there is no such text box."""
-    for line in snapshot.splitlines():
-        match = _TEXTBOX_LINE.match(line)
-        if match is None:
-            continue
-        if not label.equals(_unescape_yaml_name(match.group("label"), line.lstrip().startswith("- '"))):
-            continue
-        value = (match.group("value") or "").strip()
-        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
-            value = value[1:-1].replace('\\"', '"')
-        return value
-    return None
 
 
 def _radio_checked(snapshot: str, label: Text) -> bool:
@@ -255,9 +232,9 @@ def parse_se37_properties_snapshot(snapshot: AriaSnapshot, t: LanguagePack) -> S
     """Parse the properties (attributes) tab: function group, package, short text and the RFC flag."""
     text = str(snapshot)
     return SE37Properties(
-        function_group=_textbox_value(text, t.se37.function_group_field) or None,
-        package=_textbox_value(text, t.se37.package_field) or None,
-        description=_textbox_value(text, t.se37.short_text_field) or "",
+        function_group=textbox_value(text, t.se37.function_group_field) or None,
+        package=textbox_value(text, t.se37.package_field) or None,
+        description=textbox_value(text, t.se37.short_text_field) or "",
         is_rfc_enabled=_radio_checked(text, t.se37.rfc_radio),
     )
 
