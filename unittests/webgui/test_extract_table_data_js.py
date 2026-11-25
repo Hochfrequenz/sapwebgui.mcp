@@ -24,7 +24,7 @@ from unittests.lang.node_runner import run_node
 SNAPSHOT = Path(__file__).parent.parent / "testdata" / "html_snapshots" / "se11_t000_content_de.html"
 
 RUN_JS = """
-const { source, params, elements, table } = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const { source, params, elements, table, regularRows } = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 const fn = (0, eval)(source);
 const has = (id) => Object.prototype.hasOwnProperty.call(elements, id);
 const wrap = (id) => {
@@ -41,8 +41,22 @@ const tableElement = table && {
     getAttribute: (name) => (name === 'lsdata' ? table.lsdata : null),
     querySelectorAll: () => table.headers.map((text) => ({ textContent: text })),
 };
+const cell = (text) => ({
+    textContent: text,
+    querySelector: () => null,
+});
+const regularTable = regularRows && {
+    querySelectorAll: (selector) => {
+        if (selector.includes('th')) return [{ textContent: 'A' }, { textContent: 'B' }];
+        return regularRows.map((texts) => ({ querySelectorAll: () => texts.map(cell) }));
+    },
+    querySelector: () => null,
+};
 global.document = {
-    querySelector: (selector) => (selector === 'table[ct="STCS"]' ? tableElement : null),
+    querySelector: (selector) => {
+        if (selector === 'table[ct="STCS"]') return tableElement;
+        return regularTable;
+    },
     getElementById: (id) => (has(id) ? wrap(id) : null),
 };
 process.stdout.write(JSON.stringify(fn(params)));
@@ -99,6 +113,22 @@ def _run(
         "elements": grid["elements"],
         "table": {"id": grid["id"], "lsdata": grid["lsdata"], "headers": grid["headers"]},
     }
+    return _run_payload(payload)
+
+
+def _run_regular(rows: int, *, start_row: int = 1, end_row: int | None = None, max_rows: int = 500) -> dict[str, Any]:
+    """A regular (non-ALV) table of ``rows`` filled rows: the document has no ``table[ct="STCS"]``."""
+    payload = {
+        "source": load_js("extract_table_data.js"),
+        "params": {"startRow": start_row, "endRow": end_row, "maxRows": max_rows},
+        "elements": {},
+        "table": None,
+        "regularRows": [[f"A{row}", f"B{row}"] for row in range(1, rows + 1)],
+    }
+    return _run_payload(payload)
+
+
+def _run_payload(payload: dict[str, Any]) -> dict[str, Any]:
     result = run_node(RUN_JS, payload)
     assert isinstance(result, dict)
     return result
@@ -210,6 +240,54 @@ def test_row_count_below_the_rows_read_never_shrinks_the_total() -> None:
 
     assert result["totalRows"] == 6
     assert result.get("truncated") is False
+
+
+def test_row_limit_equal_to_the_grid_total_is_not_truncated() -> None:
+    """Regression guard (passes with the formula as it was): the limit reads the whole grid, nothing is left."""
+    result = _run(_grid(20, lsdata={"Type": "GuiGridView", "totalRows": 20}), max_rows=20)
+
+    assert len(result["rows"]) == 20
+    assert result["totalRows"] == 20
+    assert result.get("truncated") is False
+
+
+def test_end_row_beyond_the_grid_total_is_not_truncated() -> None:
+    """Regression guard (passes with the formula as it was): rows past the end of the grid do not exist."""
+    result = _run(_grid(20, lsdata={"Type": "GuiGridView", "totalRows": 20}), end_row=50)
+
+    assert len(result["rows"]) == 20
+    assert result["totalRows"] == 20
+    assert result.get("truncated") is False
+
+
+def test_regular_table_with_end_row_inside_the_rows_is_not_truncated() -> None:
+    """The requested range was read completely: rows after end_row are not part of it."""
+    result = _run_regular(50, end_row=10)
+
+    assert len(result["rows"]) == 10
+    assert result["totalRows"] == 50
+    assert result["truncated"] is False
+
+
+def test_regular_table_cut_by_the_row_limit_is_truncated() -> None:
+    result = _run_regular(50, max_rows=5)
+
+    assert len(result["rows"]) == 5
+    assert result["truncated"] is True
+
+
+def test_regular_table_range_cut_by_the_row_limit_is_truncated() -> None:
+    result = _run_regular(50, end_row=30, max_rows=5)
+
+    assert len(result["rows"]) == 5
+    assert result["truncated"] is True
+
+
+def test_regular_table_read_completely_is_not_truncated() -> None:
+    result = _run_regular(8)
+
+    assert len(result["rows"]) == 8
+    assert result["truncated"] is False
 
 
 class _SnapshotParser(HTMLParser):

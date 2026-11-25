@@ -181,6 +181,9 @@
 
         // Rows of the requested range that exist in the grid but were not read: the Web GUI did not render
         // them, or the read stopped at the row limit. end_row not given means everything up to the row limit.
+        // totalRows counts up to the last row returned (not startRow - 1 rows when start_row is beyond the total).
+        // A rendered row without text ends the data: the rowCount of an editable table control counts its blank
+        // input lines, which are not rows.
         const lastReturned = rows.length > 0 ? rows[rows.length - 1].row : 0;
         const lastRead = rows.length > 0 ? lastReturned : startRow - 1;
         const gridTotal = gridRowCount(alvTable);
@@ -283,7 +286,8 @@
             headers: usedHeaders,
             totalRows: dataRows.length,
             returnedRows: rows.length,
-            truncated: dataRows.length > actualEndRow,
+            // Only the row limit can cut the requested range short; rows after end_row are not part of it
+            truncated: Math.min(dataRows.length, endRow || Infinity) > actualEndRow,
             rows: rows,
         };
     }

@@ -354,9 +354,10 @@ class TableData(ToolResult):
     truncated: bool = Field(
         default=False,
         description="True if rows of the requested range exist but were not read: the Web GUI renders only part of a "
-        "long ALV grid or table control (for an ALV grid, focus it and page down with sap_press_key PageDown to load "
-        "more rows, then read again; a table control only holds the rows of its window; or narrow the range), or the "
-        "read stopped at max_rows",
+        "long ALV grid or table control. For an ALV grid, focus it and page down (sap_press_key PageDown) to load more "
+        "rows, then call sap_read_table again with start_row = the previous end_row + 1; a table control only holds "
+        "the rows of its window, so narrow the range. Also true when the read stopped at max_rows (read on with "
+        "start_row = end_row + 1)",
     )
     alv: AlvMetadata | None = Field(
         default=None,
