@@ -10,6 +10,7 @@ import pytest
 
 from sapwebguimcp import lang
 from sapwebguimcp.backend.webgui.parsers.st22_parser import (
+    _MAX_RAW_TEXT_LENGTH,
     is_no_dumps_message,
     parse_st22_dump_detail,
     parse_st22_dump_list,
@@ -300,11 +301,38 @@ class TestParseDumpDetail:
 
     def test_parse_detail_raw_text_truncated(self) -> None:
         """raw_text should be truncated if content is very large."""
-        # Create a large snapshot
-        large_content = '- text: "' + "x" * 500 + '"\n' * 100
+        # Create a large snapshot: 100 text lines of 500 characters each, well above the limit
+        large_content = ('- text: "' + "x" * 500 + '"\n') * 100
         detail = parse_st22_dump_detail(large_content, T)
 
-        assert len(detail.raw_text) <= 12000  # ~10KB with margin
+        marker = "\n... [truncated]"
+        assert detail.raw_text.endswith("[truncated]")
+        assert len(detail.raw_text) == _MAX_RAW_TEXT_LENGTH + len(marker)
+
+    def test_sections_and_call_stack_are_found_behind_the_raw_text_limit(self) -> None:
+        """Only raw_text is truncated; the call stack and the sections are read from the whole text."""
+        filler = "".join(f'  - text: "{"x" * 100} {i}"\n' for i in range(150))
+        snapshot = (
+            "- document:\n"
+            + filler
+            + """  - text: "Was ist geschehen?"
+  - text: "Der Abbruch geschah hinter der Grenze."
+  - text: "Was können Sie tun?"
+  - text: "Programm korrigieren."
+  - text: "Active Calls"
+  - text: "ZTEST_PROGRAM line 42"
+  - text: "SAPMSYST line 100"
+  - text: ""
+  - text: "End of call stack"
+"""
+        )
+        detail = parse_st22_dump_detail(snapshot, T)
+
+        assert detail.raw_text.endswith("[truncated]")
+        assert "Active Calls" not in detail.raw_text  # the heading lies behind the truncation point
+        assert detail.what_happened == "Der Abbruch geschah hinter der Grenze."
+        assert detail.how_to_correct == "Programm korrigieren."
+        assert detail.call_stack == ["ZTEST_PROGRAM line 42", "SAPMSYST line 100"]
 
     def test_raw_text_keeps_escaped_quotes_of_a_name(self) -> None:
         """A name with escaped quotes (JSON string in the YAML) is decoded, not cut at the first quote."""

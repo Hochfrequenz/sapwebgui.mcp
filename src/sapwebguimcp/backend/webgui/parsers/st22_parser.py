@@ -384,11 +384,12 @@ def _entry_texts(entry: str) -> Iterable[str]:
 
 
 def _extract_text_content(snapshot: str) -> str:
-    """Extract the readable text of an ARIA snapshot (Playwright YAML) without loss, one text per line.
+    """Extract the readable text of an ARIA snapshot (Playwright YAML) without loss, one text per entry.
 
     Yields every accessible name (JSON-quoted, with escaped quotes and other JS escapes) and every inline value (text
     nodes, inline element text, textbox values; unquoted or double-quoted), and undoes the single quoting of a whole
-    entry.
+    entry. The texts are joined by newlines; a decoded ``\\n`` inside a name or value yields a text that itself spans
+    several lines.
     """
     text_parts: list[str] = []
     for line in snapshot.split("\n"):
