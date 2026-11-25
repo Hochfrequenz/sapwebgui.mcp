@@ -9,6 +9,17 @@ class TestTextboxValue:
         snapshot = """- 'textbox "It''s \\"x\\"" [disabled]: v'"""
         assert textbox_value(snapshot, Text(('It\'s "x"',))) == "v"
 
+    def test_single_quoted_line_unescapes_apostrophes_in_the_value(self) -> None:
+        snapshot = """- 'textbox "Beschreibung": Kunde''s Kennzeichen'"""
+        assert textbox_value(snapshot, Text(("Beschreibung",))) == "Kunde's Kennzeichen"
+
+    def test_unquoted_line_keeps_a_trailing_apostrophe(self) -> None:
+        assert textbox_value("""- textbox "Beschreibung": Kunden'""", Text(("Beschreibung",))) == "Kunden'"
+
+    def test_single_quoted_line_with_apostrophes_in_label_and_value(self) -> None:
+        snapshot = """- 'textbox "Kunde''s Feld" [disabled]: Kunde''s Kennzeichen'"""
+        assert textbox_value(snapshot, Text(("Kunde's Feld",))) == "Kunde's Kennzeichen"
+
     def test_textbox_without_value_is_empty(self) -> None:
         assert textbox_value('- textbox "Paket"', Text(("Paket",))) == ""
 

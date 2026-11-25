@@ -11,7 +11,7 @@ from sapwebguimcp.lang.text import Text
 __all__ = ["checkbox_checked", "textbox_value", "unescape_yaml_name"]
 
 _TEXTBOX_LINE = re.compile(
-    r"""^\s*- '?textbox "(?P<label>(?:[^"\\]|\\.)*)"(?: \[[^\]]*\])*(?::[ ]?(?P<value>.*?))?'?\s*$"""
+    r"""^\s*- '?textbox "(?P<label>(?:[^"\\]|\\.)*)"(?: \[[^\]]*\])*(?::[ ]?(?P<value>.*)|'?)\s*$"""
 )
 _CHECKBOX_LINE = re.compile(r"""^\s*- '?checkbox "(?P<label>(?:[^"\\]|\\.)*)"(?P<flags>(?: \[[^\]]*\])*)""")
 
@@ -28,9 +28,14 @@ def textbox_value(snapshot: str, label: Text) -> str | None:
         match = _TEXTBOX_LINE.match(line)
         if match is None:
             continue
-        if not label.equals(unescape_yaml_name(match.group("label"), line.lstrip().startswith("- '"))):
+        quoted_line = line.lstrip().startswith("- '")
+        if not label.equals(unescape_yaml_name(match.group("label"), quoted_line)):
             continue
-        value = (match.group("value") or "").strip()
+        value = (match.group("value") or "").rstrip()
+        if quoted_line:
+            # a single-quoted YAML line: drop the closing quote and undo the doubling of apostrophes
+            value = value.removesuffix("'").replace("''", "'")
+        value = value.strip()
         if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
             value = value[1:-1].replace('\\"', '"')
         return value

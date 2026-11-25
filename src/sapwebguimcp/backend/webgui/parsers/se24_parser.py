@@ -303,7 +303,7 @@ def parse_se24_properties_snapshot(snapshot: AriaSnapshot, t: LanguagePack) -> S
     )
 
 
-_INTERFACE_NAME = re.compile(r"^/?[A-Z][A-Z0-9_/]*$")
+_INTERFACE_NAME = re.compile(r"^(?:/[A-Z0-9_]+/)?[A-Z][A-Z0-9_]*$")
 """An interface name; a placeholder cell of an empty grid row (``-``, blanks) is not one."""
 
 

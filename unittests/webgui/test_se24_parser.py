@@ -515,6 +515,14 @@ class TestParseInterfacesTable:
         )
         assert parse_se24_interfaces_table(table, lang_de) == ["IF_A", "/ABC/IF_EXAMPLE"]
 
+    def test_digit_led_namespace_is_kept_and_a_namespace_without_a_name_is_dropped(self, lang_de: LanguagePack) -> None:
+        cells = ["/1ABC/IF_EXAMPLE", "/", "/ABC/"]
+        table = TableData(
+            headers=["", "Interface", "Beschreibung"],
+            rows=[{"row": i, "data": {"Interface": c, "Beschreibung": "d"}} for i, c in enumerate(cells, 1)],
+        )
+        assert parse_se24_interfaces_table(table, lang_de) == ["/1ABC/IF_EXAMPLE"]
+
     def test_methods_grid_is_not_the_interfaces_grid(self, lang_de: LanguagePack) -> None:
         table = TableData(
             headers=["", "Methode", "Art"],
