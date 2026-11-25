@@ -51,6 +51,9 @@ EN = LanguagePack(
         program=Text(("Program",)),
     ),
     popup=PopupSection(
+        type_error=Text(("Error",)),
+        type_info=Text(("Information",)),
+        type_confirm=Text(("Confirm", "Yes", "No"), word=True),
         inactive_objects=Text(("Inactive Objects",), fold=False),
         original_language_title=Text(("Different original and logon languages",), fold=False),
         maintain_in_original=Text(("Maint. in orig. lang.",)),

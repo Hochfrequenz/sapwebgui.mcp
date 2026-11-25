@@ -71,6 +71,9 @@ IT = LanguagePack(
         program=Text(("Programma", "Progr.")),
     ),
     popup=PopupSection(
+        type_error=Text(("Errore",)),
+        type_info=Text(("Informazione",)),
+        type_confirm=Text(("Confermare", "Sì", "No"), word=True),
         inactive_objects=Text(("Oggetti inattivi",), fold=False),
         original_language_title=Text(("Lingua originale e lingua di Logon diverse",), fold=False),
         maintain_in_original=Text(("Agg. in lingua orig.",)),
